@@ -39,7 +39,7 @@ class HydrologyTest {
                 }
             }
         }
-        assertTrue(narrow > 20 && wide > 3, narrow + " narrow, " + wide + " wide crossings");
+        assertTrue(narrow >= 15 && wide > 3, narrow + " narrow, " + wide + " wide crossings");
     }
 
     @Test

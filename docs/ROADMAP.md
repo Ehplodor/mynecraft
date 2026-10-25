@@ -261,3 +261,10 @@
   1,4 × 1,4 km : 87 % des bords de rivière à 1 bloc ou moins au-dessus de l'eau (34 % avant)
 - Sortie de l'eau : un nageur qui pousse contre un rebord est hissé dessus (comme vanilla) ; la poussée
   dure tant que l'eau est au contact du corps ou juste sous les pieds, soit un rebord d'un bloc environ
+- Plus de murs de roche artificiels : la roche nue des pentes raides se juge contre la surface de l'eau
+  voisine (pas contre le fond du lit) ; les sédiments déposés en mer ou dans un lac restent sous l'eau
+  (hauts-fonds) ; une berge n'est jamais plus basse que l'eau qui la touche (rivières perchées) ; une
+  berge relevée redescend vers l'extérieur en levée d'un bloc par colonne sur 6 colonnes (marge de
+  8 colonnes calculée seulement près d'une rivière : génération inchangée, 0,75 ms/chunk)
+- Mesures (montagnes, graine 7) : roche nue près de l'eau 6,6 % → 1,6 % ; berges à 1 bloc ou moins 91 %
+- L'eau naturelle ne déborde plus de ses paliers (quantité finie) : cascades dessinées dans le lit

@@ -121,16 +121,23 @@ public final class Landscape {
         return column(wx, wz, fields(wx, wz));
     }
 
+    /** Halo of columns computed around a chunk, so banks and levees agree across chunk borders. */
+    private static final int HALO = 8, SPAN = 16 + 2 * HALO, LEVEE = 6;
+
     /** Columns of a chunk plus a 1-block halo (18 x 18, index (z + 1) * 18 + x + 1), sampling the grid once. */
     Column[] chunkColumns(int cx, int cz) {
-        int x0 = (cx << 4) - GRID, z0 = (cz << 4) - GRID, n = 16 / GRID + 3; // grid points from -4 to +20
+        int x0 = (cx << 4) - 3 * GRID, z0 = (cz << 4) - 3 * GRID, n = (16 + 6 * GRID) / GRID + 1; // grid points -12 .. +28
         float[] grid = new float[n * n * FIELDS];
         for (int j = 0; j < n; j++)
             for (int i = 0; i < n; i++) sample(x0 + i * GRID, z0 + j * GRID, grid, (j * n + i) * FIELDS);
-        Column[] out = new Column[18 * 18];
+        Column[] out = new Column[SPAN * SPAN];
         float[] g = new float[FIELDS * 4];
-        for (int z = -1; z <= 16; z++) {
-            for (int x = -1; x <= 16; x++) {
+        // The wide halo is only needed where banks and levees may be built: near a river.
+        int bx = cx << 4, bz = cz << 4;
+        boolean river = hydrology != null && hydrology.riverNear(bx - HALO, bz - HALO, bx + 15 + HALO, bz + 15 + HALO);
+        int halo = river ? HALO : 1;
+        for (int z = -halo; z < 16 + halo; z++) {
+            for (int x = -halo; x < 16 + halo; x++) {
                 int wx = (cx << 4) + x, wz = (cz << 4) + z;
                 int i = Math.floorDiv(wx - x0, GRID), j = Math.floorDiv(wz - z0, GRID);
                 for (int k = 0; k < 4; k++) {
@@ -138,21 +145,66 @@ public final class Landscape {
                     System.arraycopy(grid, (jj * n + ii) * FIELDS, g, k * FIELDS, FIELDS);
                 }
                 float fx = Math.floorMod(wx, GRID) / (float) GRID, fz = Math.floorMod(wz, GRID) / (float) GRID;
-                out[(z + 1) * 18 + x + 1] = column(wx, wz, interpolate(g, fx, fz));
+                out[(z + HALO) * SPAN + x + HALO] = column(wx, wz, interpolate(g, fx, fz));
             }
         }
-        // Banks: dry ground next to a river is raised to its water level, so the water stays in its
-        // bed. Each column looks at its 4 neighbours only, so chunks on both sides of a border agree
-        // (the halo columns are left as they are: they are only read for slopes).
+        // Each step below only reads its 4 neighbours, and the halo shrinks by one per step, so the
+        // columns of the chunk (and its 1-block halo) come out the same whichever chunk computes them.
+        if (!river) {
+            Column[] result = new Column[18 * 18];
+            for (int z = -1; z <= 16; z++)
+                for (int x = -1; x <= 16; x++) result[(z + 1) * 18 + x + 1] = out[(z + HALO) * SPAN + x + HALO];
+            return result;
+        }
+        Column[] banked = banks(out, 1);
+        int[] levee = new int[SPAN * SPAN];
+        java.util.Arrays.fill(levee, -100000); // no levee (minus one stays negative)
+        for (int k = 0; k < out.length; k++) if (banked[k] != out[k] && banked[k].river() == 0) levee[k] = banked[k].height();
+        // Levees: a raised bank slopes down outwards one block per column (no walls of earth or rock).
+        for (int pass = 0; pass < LEVEE; pass++) {
+            int[] next = levee.clone();
+            int lim = 2 + pass;
+            for (int z = -HALO + lim; z < 16 + HALO - lim; z++)
+                for (int x = -HALO + lim; x < 16 + HALO - lim; x++) {
+                    int k = (z + HALO) * SPAN + x + HALO;
+                    if (banked[k] == null || banked[k].river() > 0 || banked[k].height() < SEA) continue;
+                    int best = levee[k];
+                    best = Math.max(best, levee[k - 1] - 1);
+                    best = Math.max(best, levee[k + 1] - 1);
+                    best = Math.max(best, levee[k - SPAN] - 1);
+                    best = Math.max(best, levee[k + SPAN] - 1);
+                    next[k] = best;
+                }
+            levee = next;
+        }
+        Column[] result = new Column[18 * 18];
+        for (int z = -1; z <= 16; z++)
+            for (int x = -1; x <= 16; x++) {
+                int k = (z + HALO) * SPAN + x + HALO;
+                Column c = banked[k];
+                if (c.river() == 0 && levee[k] > c.height())
+                    c = new Column(levee[k], c.biome(), c.water(), c.river(), c.temperature());
+                result[(z + 1) * 18 + x + 1] = c;
+            }
+        return result;
+    }
+
+    /**
+     * Banks: dry ground next to a river is raised one block above its water, so the water stays in
+     * its bed; slivers and posts of land standing in the water join the bed. Columns at least
+     * {@code margin} in from the edge of the span are worked out (they need their 4 neighbours).
+     */
+    private Column[] banks(Column[] out, int margin) {
         Column[] banked = out.clone();
-        for (int z = 0; z < 16; z++)
-            for (int x = 0; x < 16; x++) {
-                Column col = out[(z + 1) * 18 + x + 1];
+        for (int z = -HALO + margin; z < 16 + HALO - margin; z++)
+            for (int x = -HALO + margin; x < 16 + HALO - margin; x++) {
+                int i = (z + HALO) * SPAN + x + HALO;
+                Column col = out[i];
                 if (col.river() > 0 || col.height() < SEA) continue;
                 int need = Integer.MIN_VALUE, low = Integer.MAX_VALUE, wet = 0, sides = 0;
+                int[] nbs = {i - 1, i + 1, i - SPAN, i + SPAN};
                 for (int k = 0; k < 4; k++) {
-                    int nx = x + (k == 0 ? -1 : k == 1 ? 1 : 0), nz = z + (k == 2 ? -1 : k == 3 ? 1 : 0);
-                    Column nb = out[(nz + 1) * 18 + nx + 1];
+                    Column nb = out[nbs[k]];
                     if (nb.river() > 0) {
                         need = Math.max(need, nb.water());
                         low = Math.min(low, nb.water());
@@ -161,7 +213,6 @@ public final class Landscape {
                     }
                 }
                 if (wet == 0) continue;
-                int i = (z + 1) * 18 + x + 1;
                 byte river = col.temperature() < 0.22f ? FROZEN_RIVER : RIVER;
                 boolean across = (sides & 3) == 3 || (sides & 12) == 12; // water on two opposite sides
                 if ((wet >= 3 || across) && col.height() <= need + 3) {

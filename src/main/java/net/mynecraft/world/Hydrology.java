@@ -110,6 +110,17 @@ public final class Hydrology {
         return bilinear(t, t.bank, wx, wz);
     }
 
+    /** True if a river or lake above the sea has a cell in this block rectangle (cheap: cell lookups). */
+    public boolean riverNear(int x0, int z0, int x1, int z1) {
+        for (int z = Math.floorDiv(z0, CELL) * CELL - CELL; z <= z1 + CELL; z += CELL)
+            for (int x = Math.floorDiv(x0, CELL) * CELL - CELL; x <= x1 + CELL; x += CELL) {
+                Tile t = tile(x, z);
+                int i = Math.floorDiv(x - t.x0, CELL), j = Math.floorDiv(z - t.z0, CELL);
+                if (i >= 0 && j >= 0 && i < t.n && j < t.n && !Float.isNaN(t.level[j * t.n + i])) return true;
+            }
+        return false;
+    }
+
     /** Flow at a column (0 on dry hillsides). */
     public float flow(int wx, int wz) {
         Tile t = tile(wx, wz);
@@ -188,6 +199,8 @@ public final class Hydrology {
             }
             for (int k = 0; k < N * N; k++) {
                 t.carve[k] = Math.max(-MAX_DIG, Math.min(MAX_FILL, h[k] - base[k]));
+                // Sediment dropped in the sea or a lake builds shoals, not land: it stays under water.
+                if (base[k] <= sea) t.carve[k] = Math.min(t.carve[k], Math.max(0, sea - 0.5f - base[k]));
                 h[k] = base[k] + t.carve[k];
             }
             rivers(t, h);
@@ -419,5 +432,19 @@ public final class Hydrology {
                 queue[tail++] = q;
             }
         }
+        // A bank never drops below the water right beside it (lower water nearby must not leave a
+        // river perched between walls).
+        float[] floor = new float[n];
+        java.util.Arrays.fill(floor, 10000);
+        for (int k = 0; k < n; k++) {
+            if (Float.isNaN(t.level[k])) continue;
+            int i = k % N, j = k / N;
+            for (int dj2 = -1; dj2 <= 1; dj2++)
+                for (int di2 = -1; di2 <= 1; di2++) {
+                    int ii = i + di2, jj = j + dj2;
+                    if (ii >= 0 && jj >= 0 && ii < N && jj < N) floor[jj * N + ii] = Math.min(floor[jj * N + ii], t.level[k] + 1);
+                }
+        }
+        for (int k = 0; k < n; k++) if (floor[k] < 10000) t.bank[k] = Math.max(t.bank[k], floor[k]);
     }
 }

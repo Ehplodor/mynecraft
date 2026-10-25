@@ -89,7 +89,9 @@ public final class TerrainGenerator {
                 // Steep ground shows bare rock (cliffs, plateau edges, ravine walls).
                 int steep = 0;
                 for (int[] o : new int[][] {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
-                    steep = Math.max(steep, h - cols[(z + 1 + o[1]) * 18 + x + 1 + o[0]].height());
+                    Landscape.Column nb = cols[(z + 1 + o[1]) * 18 + x + 1 + o[0]];
+                    // Against water, the drop that shows is down to the surface, not to the bed.
+                    steep = Math.max(steep, h - Math.max(nb.height(), Math.max(SEA_LEVEL, nb.water())));
                 }
                 byte[] surface = surface(biome, h, steep > 3);
                 c.set(x, Chunk.MIN_Y, z, Blocks.BEDROCK);
