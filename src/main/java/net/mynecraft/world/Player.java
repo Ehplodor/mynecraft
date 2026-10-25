@@ -38,6 +38,9 @@ public final class Player {
         double x0 = x, z0 = z;
         double mx = sweep(world, 0, dx), mz = sweep(world, 2, dz);
         if ((mx != dx || mz != dz) && (wasOnGround || onGround) && !flying) stepUp(world, dx - mx, dz - mz);
+        // Swimming into a ledge: pulled up and over it, like vanilla (a bank one block above the
+        // water could not be reached otherwise, since jumping only swims up to the surface).
+        if ((mx != dx || mz != dz) && !flying && touchesFluid(world)) vy = Math.max(vy, CLIMB_OUT_SPEED);
         // Whatever could not be travelled was blocked: stop that velocity component.
         if (Math.abs(x - x0 - dx) > EPS) vx = 0;
         if (Math.abs(z - z0 - dz) > EPS) vz = 0;
@@ -65,7 +68,18 @@ public final class Player {
      * The fluid the body is in (feet to head), water first; FLUID_NONE if dry. A thin sheet of
      * flowing fluid around the feet does not count: its surface must rise above WADE_DEPTH.
      */
+    /** Any fluid at all in the body's blocks or just under the feet (pushing off the surface). */
+    private boolean touchesFluid(World w) {
+        for (int by = fl(y - 1); by <= fl(y + HEIGHT - EPS); by++)
+            for (int bz = fl(z - HALF_WIDTH); bz <= fl(z + HALF_WIDTH); bz++)
+                for (int bx = fl(x - HALF_WIDTH); bx <= fl(x + HALF_WIDTH); bx++)
+                    if (Blocks.FLUID[w.get(bx, by, bz) & 0xFF] != Blocks.FLUID_NONE) return true;
+        return false;
+    }
+
     private static final double WADE_DEPTH = 0.5;
+    /** Upward speed (blocks/s) of a swimmer pushing against a ledge. */
+    private static final double CLIMB_OUT_SPEED = 5;
 
     private byte fluidAround(World w) {
         byte found = Blocks.FLUID_NONE;

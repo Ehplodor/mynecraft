@@ -259,3 +259,5 @@
 - Berges praticables : profil de vallée calculé par tuile (le sol près de l'eau ne dépasse pas le niveau
   de l'eau + 1, puis remonte en pente douce, plus douce le long des grandes rivières) ; mesuré sur
   1,4 × 1,4 km : 87 % des bords de rivière à 1 bloc ou moins au-dessus de l'eau (34 % avant)
+- Sortie de l'eau : un nageur qui pousse contre un rebord est hissé dessus (comme vanilla) ; la poussée
+  dure tant que l'eau est au contact du corps ou juste sous les pieds, soit un rebord d'un bloc environ

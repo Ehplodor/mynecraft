@@ -90,4 +90,26 @@ class HydrologyTest {
             }
         assertTrue(easy > edges * 0.8, easy + " of " + edges + " river edges are one block or less above the water");
     }
+
+    @Test
+    void aSwimmerCanClimbOntoABankOneBlockAboveTheWater() {
+        World w = new World(1);
+        Chunk c = new Chunk(0, 0);
+        c.fillSection(0, Blocks.STONE);
+        w.put(c);
+        int y = Chunk.MIN_Y + 16; // water layer two deep, bank top one block above the water
+        for (int x = 0; x < 16; x++)
+            for (int z = 0; z < 16; z++) {
+                if (x < 8) { c.set(x, y, z, Blocks.WATER); c.set(x, y + 1, z, Blocks.WATER); }
+                else { c.set(x, y, z, Blocks.STONE); c.set(x, y + 1, z, Blocks.STONE); c.set(x, y + 2, z, Blocks.STONE); }
+            }
+        Player p = new Player();
+        p.x = 6.5; p.y = y + 1.2; p.z = 8.5;
+        for (int i = 0; i < 300; i++) { // 3 s pushing towards the bank
+            p.vx = 4.3;
+            p.vz = 0;
+            p.step(w, 0.01);
+        }
+        assertTrue(p.x > 8.5 && p.y >= y + 3 - 1e-6, "still in the water at " + p.x + ", " + p.y);
+    }
 }
