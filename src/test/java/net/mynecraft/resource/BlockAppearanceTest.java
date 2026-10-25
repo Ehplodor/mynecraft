@@ -58,6 +58,16 @@ class BlockAppearanceTest {
         assertFalse(tinted(a, Blocks.POPPY, 4));
         assertEquals(Blocks.TINT_FOLIAGE, a.faceInfo[Blocks.OAK_LEAVES * 6 + UP] >> BlockAppearance.TINT_SHIFT & 3);
         assertEquals("minecraft:block/water_still", tex(a, Blocks.WATER, UP));
+
+        // Rotated logs: the end texture moves to the axis faces, side textures get turned.
+        assertEquals("minecraft:block/oak_log_top", tex(a, Blocks.OAK_LOG_X, WEST).split("#")[0]);
+        assertEquals("minecraft:block/oak_log_top", tex(a, Blocks.OAK_LOG_Z, 4).split("#")[0]);
+        assertTrue(tex(a, Blocks.OAK_LOG_X, UP).startsWith("minecraft:block/oak_log#"), tex(a, Blocks.OAK_LOG_X, UP));
+        assertTrue(tex(a, Blocks.OAK_LOG_Z, WEST).startsWith("minecraft:block/oak_log#"));
+        // Slabs and the double slab.
+        assertEquals("minecraft:block/oak_planks", tex(a, Blocks.OAK_SLAB, UP));
+        assertEquals("minecraft:block/oak_planks", tex(a, Blocks.OAK_SLAB_TOP, DOWN));
+        assertEquals("minecraft:block/oak_planks", tex(a, Blocks.OAK_SLAB_DOUBLE, WEST));
         for (int i = 0; i < a.faceInfo.length; i++) {
             if (i >= 6) assertNotEquals(0, a.faceInfo[i] & BlockAppearance.LAYER_MASK, "missing texture at " + i);
         }

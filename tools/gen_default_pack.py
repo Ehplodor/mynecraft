@@ -219,8 +219,31 @@ def main():
     write_json("models/block/oak_leaves.json", {"parent": "block/leaves", "textures": {"all": "block/oak_leaves"}})
     write_json("models/block/short_grass.json", {"parent": "block/tinted_cross", "textures": {"cross": "block/short_grass"}})
     write_json("models/block/poppy.json", {"parent": "block/cross", "textures": {"cross": "block/poppy"}})
+    # Slabs (vanilla parents) and the oak slab models.
+    for name, lo, hi in (("slab", 0, 8), ("slab_top", 8, 16)):
+        write_json(f"models/block/{name}.json", {
+            "parent": "block/block",
+            "textures": {"particle": "#side"},
+            "elements": [{"from": [0, lo, 0], "to": [16, hi, 16], "faces": {
+                "down": {"texture": "#bottom", **({"cullface": "down"} if lo == 0 else {})},
+                "up": {"texture": "#top", **({"cullface": "up"} if hi == 16 else {})},
+                "north": {"texture": "#side", "cullface": "north"},
+                "south": {"texture": "#side", "cullface": "south"},
+                "west": {"texture": "#side", "cullface": "west"},
+                "east": {"texture": "#side", "cullface": "east"}}}]})
+    planks = {"bottom": "block/oak_planks", "top": "block/oak_planks", "side": "block/oak_planks"}
+    write_json("models/block/oak_slab.json", {"parent": "block/slab", "textures": planks})
+    write_json("models/block/oak_slab_top.json", {"parent": "block/slab_top", "textures": planks})
+    write_json("blockstates/oak_slab.json", {"variants": {
+        "type=bottom": {"model": "minecraft:block/oak_slab"},
+        "type=top": {"model": "minecraft:block/oak_slab_top"},
+        "type=double": {"model": "minecraft:block/oak_planks"}}})
+    write_json("blockstates/oak_log.json", {"variants": {
+        "axis=x": {"model": "minecraft:block/oak_log", "x": 90, "y": 90},
+        "axis=y": {"model": "minecraft:block/oak_log"},
+        "axis=z": {"model": "minecraft:block/oak_log", "x": 90}}})
     for name in ("stone", "dirt", "sand", "bedrock", "grass_block", "gravel", "cobblestone", "oak_planks", "glass",
-                 "glowstone", "oak_log", "oak_leaves", "short_grass", "poppy", "water"):
+                 "glowstone", "oak_leaves", "short_grass", "poppy", "water"):
         write_json(f"blockstates/{name}.json", {"variants": {"": {"model": f"minecraft:block/{name}"}}})
 
 

@@ -75,9 +75,17 @@ public final class BlockAppearance {
             java.util.Arrays.fill(tex, "minecraft:block/water_still");
             java.util.Arrays.fill(tint, true);
         } else {
-            String modelId = modelFromBlockstate(name);
-            if (modelId == null) warnings.add("no blockstate for " + name);
-            else resolveModel(ResourceManager.normalize(modelId), tex, tint, overlay);
+            JsonObject variant = variantFromBlockstate(name, Blocks.STATE[id]);
+            if (variant == null) {
+                warnings.add("no blockstate for " + name);
+            } else {
+                String[] mTex = new String[6], mOverlay = new String[6];
+                boolean[] mTint = new boolean[6];
+                resolveModel(ResourceManager.normalize(variant.get("model").getAsString()), mTex, mTint, mOverlay);
+                int rx = variant.has("x") ? variant.get("x").getAsInt() : 0;
+                int ry = variant.has("y") ? variant.get("y").getAsInt() : 0;
+                rotate(rx, ry, mTex, mTint, mOverlay, tex, tint, overlay);
+            }
         }
         if (Blocks.SHAPE[id] == Blocks.SHAPE_CROSS) {
             // Cross models only texture the faces of their diagonal planes: reuse one for all.
@@ -98,20 +106,71 @@ public final class BlockAppearance {
         }
     }
 
-    private String modelFromBlockstate(String block) {
+    /** The variant whose property key matches the state (subset match, "" matches all), else the first. */
+    private JsonObject variantFromBlockstate(String block, String state) {
         JsonObject bs = json(ResourceManager.path(block, "blockstates", ".json"));
         if (bs == null) return null;
+        java.util.Map<String, String> props = new java.util.HashMap<>();
+        if (!state.isEmpty()) for (String kv : state.split(",")) {
+            int eq = kv.indexOf('=');
+            props.put(kv.substring(0, eq), kv.substring(eq + 1));
+        }
         JsonElement variant = null;
         if (bs.has("variants")) {
-            JsonObject variants = bs.getAsJsonObject("variants");
-            variant = variants.has("") ? variants.get("") : variants.entrySet().iterator().next().getValue();
+            for (var e : bs.getAsJsonObject("variants").entrySet()) {
+                if (variant == null) variant = e.getValue();
+                if (Blocks.matches(e.getKey(), props)) { variant = e.getValue(); break; }
+            }
         } else if (bs.has("multipart")) {
             variant = bs.getAsJsonArray("multipart").get(0).getAsJsonObject().get("apply");
         }
         if (variant == null) return null;
         // A variant may be a weighted list of models: take the first.
         if (variant.isJsonArray()) variant = variant.getAsJsonArray().get(0);
-        return variant.getAsJsonObject().get("model").getAsString();
+        return variant.getAsJsonObject();
+    }
+
+    // ---- variant rotation ----
+
+    /** Outward normals of our faces: -x, +x, -y, +y, -z, +z. */
+    private static final int[][] NORMAL = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
+    /** Directions of increasing u and v on each face, matching the chunk vertex shader. */
+    private static final int[][] U = {{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {1, 0, 0}, {-1, 0, 0}, {1, 0, 0}};
+    private static final int[][] V = {{0, -1, 0}, {0, -1, 0}, {0, 0, -1}, {0, 0, 1}, {0, -1, 0}, {0, -1, 0}};
+
+    /** Vanilla variant rotation: x first (up turns towards north), then y (north turns towards east). */
+    private static int[] rotate(int[] p, int rx, int ry) {
+        int x = p[0], y = p[1], z = p[2];
+        for (int i = 0; i < ((rx / 90) & 3); i++) { int t = y; y = z; z = -t; }
+        for (int i = 0; i < ((ry / 90) & 3); i++) { int t = x; x = -z; z = t; }
+        return new int[] {x, y, z};
+    }
+
+    private static int dot(int[] a, int[] b) {
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    }
+
+    private static int faceOf(int[] n) {
+        for (int f = 0; f < 6; f++) if (dot(NORMAL[f], n) == 1) return f;
+        throw new IllegalStateException();
+    }
+
+    /**
+     * Moves model faces to the world faces they end up on, and records how each texture must be
+     * turned so it keeps its orientation on the rotated block (as a "#a,b,c,d" suffix).
+     */
+    private static void rotate(int rx, int ry, String[] mTex, boolean[] mTint, String[] mOverlay,
+                               String[] tex, boolean[] tint, String[] overlay) {
+        for (int m = 0; m < 6; m++) {
+            int f = faceOf(rotate(NORMAL[m], rx, ry));
+            int[] ru = rotate(U[m], rx, ry), rv = rotate(V[m], rx, ry);
+            // Texture coordinates (s, t) sampled at world-face coordinates (u, v): s = a*u + b*v, t = c*u + d*v.
+            int a = dot(U[f], ru), b = dot(V[f], ru), c = dot(U[f], rv), d = dot(V[f], rv);
+            String suffix = a == 1 && d == 1 ? "" : "#" + a + "," + b + "," + c + "," + d;
+            tex[f] = mTex[m] == null ? null : mTex[m] + suffix;
+            overlay[f] = mOverlay[m] == null ? null : mOverlay[m] + suffix;
+            tint[f] = mTint[m];
+        }
     }
 
     private JsonObject model(String id) {

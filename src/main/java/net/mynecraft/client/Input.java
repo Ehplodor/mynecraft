@@ -13,7 +13,7 @@ import static org.lwjgl.glfw.GLFW.*;
 final class Input {
     private static final float SENSITIVITY = 0.0025f;
     private static final double CLICK_REPEAT = 0.25;
-    private static final byte[] HOTBAR = {Blocks.STONE, Blocks.DIRT, Blocks.GRASS, Blocks.OAK_PLANKS,
+    private static final byte[] HOTBAR = {Blocks.STONE, Blocks.OAK_SLAB, Blocks.GRASS, Blocks.OAK_PLANKS,
         Blocks.COBBLESTONE, Blocks.GLASS, Blocks.OAK_LOG, Blocks.OAK_LEAVES, Blocks.GLOWSTONE};
 
     private final long window;

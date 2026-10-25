@@ -132,6 +132,28 @@ class ChunkMesherTest {
         assertEquals(4 + 4 * 2, lowered, "top face + the top edge of 4 side faces");
     }
 
+    private static int countSpecial(int[] d, int special) {
+        int n = 0;
+        for (int i = 0; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) if ((d[i] >>> 30) == special) n++;
+        return n;
+    }
+
+    @Test
+    void slabsAreHalfHeight() {
+        World w = emptyWorld();
+        Chunk c = put(w, 0, 0);
+        c.set(2, 2, 2, Blocks.OAK_SLAB);
+        c.set(8, 2, 8, Blocks.OAK_SLAB_TOP);
+        ChunkMesher.Result r = mesh(w, c);
+        assertEquals(12, r.opaqueQuads());
+        // Bottom slab: top face (4) + upper edge of 4 sides (8); top slab: bottom face (4) + lower edges (8).
+        assertEquals(24, countSpecial(r.data(), 2));
+
+        // A slab on stone hides the stone's top? No: the slab is not a full cube, so the stone keeps it.
+        c.set(2, 1, 2, Blocks.STONE);
+        assertEquals(12 + 6 - 1, mesh(w, c).opaqueQuads(), "only the slab's bottom face is hidden");
+    }
+
     @Test
     void packedVerticesStayInRange() {
         World w = new World(42);

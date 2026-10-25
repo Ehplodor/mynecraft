@@ -8,6 +8,7 @@ import net.mynecraft.world.Blocks;
 import net.mynecraft.world.Chunk;
 import net.mynecraft.world.ChunkStreamer;
 import net.mynecraft.world.storage.WorldStorage;
+import net.mynecraft.world.Placement;
 import net.mynecraft.world.Player;
 import net.mynecraft.world.Raycast;
 import net.mynecraft.world.World;
@@ -30,6 +31,15 @@ public final class Main {
     private static String option(String[] args, String name, String def) {
         for (int i = 0; i < args.length - 1; i++) if (args[i].equals(name)) return args[i + 1];
         return def;
+    }
+
+    /** Height (0..1) within the hit block of the point where the ray enters it through a side face. */
+    private static double hitHeight(Raycast.Hit hit, double ox, double oy, double oz, double dx, double dy, double dz) {
+        double t;
+        if (hit.nx() != 0) t = (hit.x() + (hit.nx() > 0 ? 1 : 0) - ox) / dx;
+        else if (hit.nz() != 0) t = (hit.z() + (hit.nz() > 0 ? 1 : 0) - oz) / dz;
+        else return hit.ny() > 0 ? 1 : 0;
+        return oy + t * dy - hit.y();
     }
 
     private static void demoSet(World world, WorldRenderer renderer, int x, int y, int z, byte b) {
@@ -172,10 +182,9 @@ public final class Main {
                 }
             }
             if (hit != null && input.placeRequested) {
-                int px = hit.x() + hit.nx(), py = hit.y() + hit.ny(), pz = hit.z() + hit.nz();
-                if (!player.intersects(px, py, pz) && world.set(px, py, pz, input.selected)) {
-                    renderer.blockChanged(px, py, pz);
-                }
+                double dirX = -Math.sin(cam.yaw) * cp, dirY = Math.sin(cam.pitch), dirZ = -Math.cos(cam.yaw) * cp;
+                int[] placed = Placement.place(world, player, hit, hitHeight(hit, cam.pos.x, cam.pos.y, cam.pos.z, dirX, dirY, dirZ), input.selected);
+                if (placed != null) renderer.blockChanged(placed[0], placed[1], placed[2]);
             }
             if (editDemo && streamer.settled()) {
                 // Self-test for incremental remeshing and light: a pillar crossing a section border,
@@ -187,6 +196,13 @@ public final class Main {
                 demoSet(world, renderer, ox + 4, oy + 3, oz - 6, Blocks.GLOWSTONE);
                 demoSet(world, renderer, ox + 2, oy, oz - 4, Blocks.GLASS);
                 demoSet(world, renderer, ox + 2, oy + 1, oz - 4, Blocks.GLASS);
+                // Horizontal logs along x and z, and a slab staircase.
+                for (int i = 0; i < 4; i++) demoSet(world, renderer, ox - 2 + i, oy, oz - 3, Blocks.OAK_LOG_X);
+                for (int i = 0; i < 4; i++) demoSet(world, renderer, ox - 3, oy, oz - 3 + i, Blocks.OAK_LOG_Z);
+                demoSet(world, renderer, ox + 6, oy, oz - 3, Blocks.OAK_SLAB);
+                demoSet(world, renderer, ox + 7, oy, oz - 3, Blocks.OAK_SLAB_DOUBLE);
+                demoSet(world, renderer, ox + 8, oy + 1, oz - 3, Blocks.OAK_SLAB);
+                demoSet(world, renderer, ox + 6, oy + 2, oz - 2, Blocks.OAK_SLAB_TOP);
                 editDemo = false;
             }
 

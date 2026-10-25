@@ -1,13 +1,14 @@
 package net.mynecraft.world;
 
 /**
- * Player body: axis-aligned box, feet at (x, y, z). Movement is resolved one axis at a time
- * against the block grid, which is exact for voxel worlds and allocation-free.
+ * Player body: axis-aligned box, feet at (x, y, z). Movement is swept one axis at a time against
+ * the collision boxes of nearby blocks (full cubes, slabs...), which is exact and allocation-free.
+ * Walking into a ledge up to {@link #STEP_HEIGHT} high climbs it, like vanilla.
  */
 public final class Player {
-    public static final double HALF_WIDTH = 0.3, HEIGHT = 1.8, EYE_HEIGHT = 1.62;
+    public static final double HALF_WIDTH = 0.3, HEIGHT = 1.8, EYE_HEIGHT = 1.62, STEP_HEIGHT = 0.6;
     public static final double GRAVITY = 32, JUMP_VELOCITY = 9, TERMINAL_VELOCITY = 78;
-    private static final double EPS = 1e-4;
+    private static final double EPS = 1e-7;
 
     public double x, y, z;
     public double vx, vy, vz;
@@ -16,12 +17,30 @@ public final class Player {
     /** Integrates one step. Horizontal velocity is set by the controller; gravity is applied here. */
     public void step(World world, double dt) {
         if (!flying) vy = Math.max(-TERMINAL_VELOCITY, vy - GRAVITY * dt);
-        double dy = vy * dt;
-        double my = moveY(world, dy);
+        boolean wasOnGround = onGround;
+        double dy = vy * dt, dx = vx * dt, dz = vz * dt;
+        double my = sweep(world, 1, dy);
         onGround = dy < 0 && my > dy;
         if (my != dy) vy = 0;
-        if (moveX(world, vx * dt) != vx * dt) vx = 0;
-        if (moveZ(world, vz * dt) != vz * dt) vz = 0;
+        double x0 = x, z0 = z;
+        double mx = sweep(world, 0, dx), mz = sweep(world, 2, dz);
+        if ((mx != dx || mz != dz) && (wasOnGround || onGround) && !flying) stepUp(world, dx - mx, dz - mz);
+        // Whatever could not be travelled was blocked: stop that velocity component.
+        if (Math.abs(x - x0 - dx) > EPS) vx = 0;
+        if (Math.abs(z - z0 - dz) > EPS) vz = 0;
+    }
+
+    /** Retries the blocked rest of a horizontal move from up to STEP_HEIGHT higher; undone if it gains nothing. */
+    private void stepUp(World world, double restX, double restZ) {
+        double sx = x, sy = y, sz = z;
+        double up = sweep(world, 1, STEP_HEIGHT);
+        double ax = sweep(world, 0, restX), az = sweep(world, 2, restZ);
+        sweep(world, 1, -up);
+        if (Math.abs(ax) + Math.abs(az) > EPS) {
+            onGround = true;
+        } else {
+            x = sx; y = sy; z = sz;
+        }
     }
 
     public void jump() {
@@ -35,63 +54,37 @@ public final class Player {
             && z + HALF_WIDTH > bz && z - HALF_WIDTH < bz + 1;
     }
 
-    private double moveY(World w, double d) {
+    /**
+     * Moves along one axis (0 x, 1 y, 2 z) by at most d, stopping at the first collision box in the
+     * way. Returns the distance actually moved.
+     */
+    private double sweep(World w, int axis, double d) {
         if (d == 0) return 0;
-        int x0 = fl(x - HALF_WIDTH + EPS), x1 = fl(x + HALF_WIDTH - EPS);
-        int z0 = fl(z - HALF_WIDTH + EPS), z1 = fl(z + HALF_WIDTH - EPS);
-        if (d < 0) {
-            int from = fl(y - EPS), to = fl(y + d);
-            for (int by = from; by >= to; by--)
-                if (any(w, x0, x1, by, by, z0, z1)) { double m = by + 1 - y; y = by + 1; return m; }
-        } else {
-            int from = fl(y + HEIGHT + EPS), to = fl(y + HEIGHT + d);
-            for (int by = from; by <= to; by++)
-                if (any(w, x0, x1, by, by, z0, z1)) { double m = by - HEIGHT - y; y = by - HEIGHT; return m; }
-        }
-        y += d;
+        double[] min = {x - HALF_WIDTH, y, z - HALF_WIDTH};
+        double[] max = {x + HALF_WIDTH, y + HEIGHT, z + HALF_WIDTH};
+        // Blocks overlapped by the box swept along the axis (one extra below: slabs end inside a cell).
+        double[] lo = min.clone(), hi = max.clone();
+        if (d < 0) lo[axis] += d; else hi[axis] += d;
+        int x0 = fl(lo[0] + EPS), x1 = fl(hi[0] - EPS);
+        int y0 = fl(lo[1] + EPS) - 1, y1 = fl(hi[1] - EPS);
+        int z0 = fl(lo[2] + EPS), z1 = fl(hi[2] - EPS);
+        for (int by = y0; by <= y1; by++)
+            for (int bz = z0; bz <= z1; bz++)
+                for (int bx = x0; bx <= x1; bx++) {
+                    int box = w.collisionBox(bx, by, bz);
+                    if (box < 0) continue;
+                    double[] bmin = {bx, by + (box & 0xFF) / 16.0, bz};
+                    double[] bmax = {bx + 1, by + (box >> 8) / 16.0, bz + 1};
+                    boolean overlaps = true;
+                    for (int a = 0; a < 3 && overlaps; a++) {
+                        if (a != axis) overlaps = bmax[a] > min[a] + EPS && bmin[a] < max[a] - EPS;
+                    }
+                    if (!overlaps) continue;
+                    if (d > 0 && bmin[axis] >= max[axis] - EPS) d = Math.min(d, bmin[axis] - max[axis]);
+                    else if (d < 0 && bmax[axis] <= min[axis] + EPS) d = Math.max(d, bmax[axis] - min[axis]);
+                }
+        if (axis == 0) x += d; else if (axis == 1) y += d; else z += d;
         return d;
-    }
-
-    private double moveX(World w, double d) {
-        if (d == 0) return 0;
-        int y0 = fl(y + EPS), y1 = fl(y + HEIGHT - EPS);
-        int z0 = fl(z - HALF_WIDTH + EPS), z1 = fl(z + HALF_WIDTH - EPS);
-        if (d < 0) {
-            int from = fl(x - HALF_WIDTH - EPS), to = fl(x - HALF_WIDTH + d);
-            for (int bx = from; bx >= to; bx--)
-                if (any(w, bx, bx, y0, y1, z0, z1)) { double m = bx + 1 + HALF_WIDTH - x; x = bx + 1 + HALF_WIDTH; return m; }
-        } else {
-            int from = fl(x + HALF_WIDTH + EPS), to = fl(x + HALF_WIDTH + d);
-            for (int bx = from; bx <= to; bx++)
-                if (any(w, bx, bx, y0, y1, z0, z1)) { double m = bx - HALF_WIDTH - x; x = bx - HALF_WIDTH; return m; }
-        }
-        x += d;
-        return d;
-    }
-
-    private double moveZ(World w, double d) {
-        if (d == 0) return 0;
-        int y0 = fl(y + EPS), y1 = fl(y + HEIGHT - EPS);
-        int x0 = fl(x - HALF_WIDTH + EPS), x1 = fl(x + HALF_WIDTH - EPS);
-        if (d < 0) {
-            int from = fl(z - HALF_WIDTH - EPS), to = fl(z - HALF_WIDTH + d);
-            for (int bz = from; bz >= to; bz--)
-                if (any(w, x0, x1, y0, y1, bz, bz)) { double m = bz + 1 + HALF_WIDTH - z; z = bz + 1 + HALF_WIDTH; return m; }
-        } else {
-            int from = fl(z + HALF_WIDTH + EPS), to = fl(z + HALF_WIDTH + d);
-            for (int bz = from; bz <= to; bz++)
-                if (any(w, x0, x1, y0, y1, bz, bz)) { double m = bz - HALF_WIDTH - z; z = bz - HALF_WIDTH; return m; }
-        }
-        z += d;
-        return d;
-    }
-
-    private static boolean any(World w, int x0, int x1, int y0, int y1, int z0, int z1) {
-        for (int y = y0; y <= y1; y++)
-            for (int z = z0; z <= z1; z++)
-                for (int x = x0; x <= x1; x++)
-                    if (w.isSolid(x, y, z)) return true;
-        return false;
     }
 
     private static int fl(double v) {

@@ -64,6 +64,37 @@ class PlayerTest {
     }
 
     @Test
+    void walksUpSlabsButNotFullBlocks() {
+        World w = flat();
+        for (int z = 0; z < 16; z++) w.set(8, 10, z, Blocks.OAK_SLAB);
+        Player p = new Player();
+        p.x = 5.5; p.y = 10; p.z = 5.5;
+        run(p, w, 0.1);
+        for (int i = 0; i < 240; i++) { p.vx = 4; p.step(w, 1 / 120.0); }
+        assertTrue(p.x > 8.5, "climbed onto the slab and kept walking: x = " + p.x);
+
+        World w2 = flat();
+        for (int z = 0; z < 16; z++) w2.set(8, 10, z, Blocks.STONE);
+        Player q = new Player();
+        q.x = 5.5; q.y = 10; q.z = 5.5;
+        run(q, w2, 0.1);
+        for (int i = 0; i < 240; i++) { q.vx = 4; q.step(w2, 1 / 120.0); }
+        assertEquals(8 - Player.HALF_WIDTH, q.x, 1e-6, "a full block needs a jump");
+        assertEquals(10, q.y, 1e-9);
+    }
+
+    @Test
+    void standsOnSlabHalfway() {
+        World w = flat();
+        w.set(5, 10, 5, Blocks.OAK_SLAB);
+        Player p = new Player();
+        p.x = 5.5; p.y = 13; p.z = 5.5;
+        run(p, w, 1);
+        assertEquals(10.5, p.y, 1e-9);
+        assertTrue(p.onGround);
+    }
+
+    @Test
     void raycastFindsBlockAndFace() {
         World w = flat();
         Raycast.Hit hit = Raycast.cast(w, 5.5, 12, 5.5, 0, -1, 0, 8);

@@ -56,6 +56,19 @@ public final class World {
         return c == null || Blocks.isSolid(c.get(x & 15, y, z & 15));
     }
 
+    /**
+     * Collision box of a block as (minY | maxY &lt;&lt; 8) in sixteenths, or -1 if nothing collides.
+     * Unloaded chunks and below the world are full cubes.
+     */
+    public int collisionBox(int x, int y, int z) {
+        if (y >= Chunk.MAX_Y) return -1;
+        if (y < Chunk.MIN_Y) return 16 << 8;
+        Chunk c = chunk(x >> 4, z >> 4);
+        if (c == null) return 16 << 8;
+        byte b = c.get(x & 15, y, z & 15);
+        return Blocks.isSolid(b) ? Blocks.BOX_MIN[b & 0xFF] | Blocks.BOX_MAX[b & 0xFF] << 8 : -1;
+    }
+
     /** Sets a block in a loaded chunk; returns false if out of range or unchanged. */
     public boolean set(int x, int y, int z, byte id) {
         if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return false;

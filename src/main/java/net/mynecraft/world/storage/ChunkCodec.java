@@ -27,17 +27,26 @@ public final class ChunkCodec {
 
     private ChunkCodec() {}
 
-    /** Maps a Java block id to ours: exact name first, then the closest family, then stone. */
     public static byte blockFromName(String id) {
+        return blockFromState(id, Map.of());
+    }
+
+    /**
+     * Maps a Java block state to ours: exact name (and properties) first, then the closest family
+     * keeping its properties (any log keeps its axis, any slab its type), then stone.
+     */
+    public static byte blockFromState(String id, Map<String, String> properties) {
         String n = id.startsWith("minecraft:") ? id.substring(10) : id;
-        for (int i = 0; i < Blocks.COUNT; i++) if (Blocks.NAMES[i].equals(n)) return (byte) i;
+        byte exact = Blocks.fromState(n, properties);
+        if (exact >= 0) return exact;
+        if (n.endsWith("_slab")) return Blocks.fromState("oak_slab", properties);
         if (NON_SOLID.contains(n) || n.endsWith("torch") || n.endsWith("_button") || n.endsWith("_sign")
             || n.endsWith("_carpet") || n.endsWith("_pressure_plate") || n.endsWith("rail")) return Blocks.AIR;
         if (PLANTS.contains(n)) return Blocks.SHORT_GRASS;
         if (n.endsWith("_flower") || n.endsWith("tulip") || n.endsWith("sapling") || n.equals("dandelion")
             || n.equals("cornflower") || n.equals("azure_bluet") || n.equals("oxeye_daisy")) return Blocks.POPPY;
         if (n.endsWith("_leaves")) return Blocks.OAK_LEAVES;
-        if (n.endsWith("_log") || n.endsWith("_wood") || n.endsWith("_stem")) return Blocks.OAK_LOG;
+        if (n.endsWith("_log") || n.endsWith("_wood") || n.endsWith("_stem")) return Blocks.fromState("oak_log", properties);
         if (n.endsWith("_planks")) return Blocks.OAK_PLANKS;
         if (n.contains("glass")) return Blocks.GLASS;
         if (n.contains("cobble")) return Blocks.COBBLESTONE;
@@ -75,7 +84,10 @@ public final class ChunkCodec {
             for (int i = 0; i < ids.length; i++) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> entry = (Map<String, Object>) palette.get(i);
-                ids[i] = blockFromName(String.valueOf(entry.get("Name")));
+                Map<String, String> props = new java.util.HashMap<>();
+                Map<String, Object> p = Nbt.getCompound(entry, "Properties");
+                if (p != null) for (var e : p.entrySet()) props.put(e.getKey(), String.valueOf(e.getValue()));
+                ids[i] = blockFromState(String.valueOf(entry.get("Name")), props);
             }
             fill(chunk, y, ids, states);
         }
@@ -142,6 +154,14 @@ public final class ChunkCodec {
                 toPalette[b] = n++;
                 Map<String, Object> e = Nbt.compound();
                 e.put("Name", "minecraft:" + Blocks.NAMES[b]);
+                if (!Blocks.STATE[b].isEmpty()) {
+                    Map<String, Object> props = Nbt.compound();
+                    for (String kv : Blocks.STATE[b].split(",")) {
+                        int eq = kv.indexOf('=');
+                        props.put(kv.substring(0, eq), kv.substring(eq + 1));
+                    }
+                    e.put("Properties", props);
+                }
                 palette.values().add(e);
             }
         }

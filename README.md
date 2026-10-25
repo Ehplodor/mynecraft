@@ -21,17 +21,18 @@ gradle test                                  # tests + micro-benchmark générat
 
 Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
-`1`–`9` choisir le bloc, `Échap` quitter.
+`1`–`9` choisir le bloc (les dalles et bûches s'orientent selon la face visée), `Échap` quitter.
 
 ## Architecture
 | Fichier | Rôle |
 |---|---|
 | `world/Section`, `Chunk`, `World` | Stockage : 1 octet/bloc, sections 16³ vides = `null` |
 | `world/TerrainGenerator`, `Noise` | Génération par bruit fBm, déterministe par seed |
-| `world/Player`, `Raycast` | Physique AABB axe par axe (pas fixe 120 Hz), raycast DDA |
+| `world/Player`, `Raycast` | Physique AABB par balayage d'axe sur les vraies boîtes (dalles), montée de marche 0,6, raycast DDA |
 | `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |
 | `world/storage/*` | NBT, fichiers région Anvil `.mca`, codec de chunk 1.16+/1.18+, `level.dat` |
-| `world/Blocks` | Registre : couche de rendu, forme, collision, opacité, émission, teinte |
+| `world/Blocks` | Registre d'**états** (un id par état : `oak_log[axis=x]`, `oak_slab[type=top]`…) : rendu, forme, boîte de collision, opacité, émission, teinte |
+| `world/Placement` | Règles de pose vanilla (axe des bûches, demi-dalles, fusion en dalle double) |
 | `world/LightEngine` | Lumière ciel + blocs (BFS ajout/retrait incrémental, traverse les chunks) |
 | `world/ChunkMesher` | **Greedy meshing** (fusion à lumière et AO égales), lumière lisse + AO par sommet, eau abaissée, plantes en croix, 8 o/sommet |
 | `resource/PackSource`, `ResourceManager` | Packs dossier/zip/classpath empilés (le dernier gagne) |
@@ -40,6 +41,7 @@ Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches)
 | `world/SectionVisibility`, `OcclusionCuller` | Connexions entre faces de chaque section, parcours de visibilité par image (occlusion culling) |
 | `world/QuadAllocator` | Allocateur first-fit avec fusion des blocs libres, pour le tampon GPU partagé |
 | `client/WorldRenderer` | Un seul VBO pour tout le monde, **1 appel de dessin par passe** (`glMultiDrawElementsBaseVertex`), 3 passes triées, remaillage incrémental versionné |
+| `client/SkyRenderer` | Soleil, phases de lune, nuages (textures `environment/` du pack) |
 | `client/DayCycle`, `BiomeMap` | Cycle jour/nuit (`DayTime` vanilla), couleurs de biome depuis les colormaps du pack |
 | `client/Overlay` | Réticule et contour du bloc visé |
 

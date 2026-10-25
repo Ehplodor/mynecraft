@@ -96,6 +96,20 @@ class StorageTest {
     }
 
     @Test
+    void blockStatesRoundTripAndForeignFamiliesKeepProperties() throws IOException {
+        World w = new World(5);
+        Chunk c = w.getOrGenerateEmpty(0, 0);
+        byte[] states = {Blocks.OAK_LOG, Blocks.OAK_LOG_X, Blocks.OAK_LOG_Z, Blocks.OAK_SLAB, Blocks.OAK_SLAB_TOP, Blocks.OAK_SLAB_DOUBLE};
+        for (int i = 0; i < states.length; i++) c.set(i, 70, 0, states[i]);
+        Chunk back = ChunkCodec.decode(Nbt.read(Nbt.toBytes(ChunkCodec.encode(c))), 0, 0);
+        for (int i = 0; i < states.length; i++) assertEquals(states[i], back.get(i, 70, 0));
+
+        assertEquals(Blocks.OAK_LOG_X, ChunkCodec.blockFromState("minecraft:birch_log", Map.of("axis", "x")));
+        assertEquals(Blocks.OAK_SLAB_TOP, ChunkCodec.blockFromState("minecraft:stone_slab", Map.of("type", "top", "waterlogged", "false")));
+        assertEquals(Blocks.OAK_LOG, ChunkCodec.blockFromState("minecraft:oak_log", Map.of()));
+    }
+
+    @Test
     void regionFileStoresGrowsAndRelocatesChunks(@TempDir Path dir) throws IOException {
         Path p = dir.resolve("r.0.0.mca");
         Random rnd = new Random(1);

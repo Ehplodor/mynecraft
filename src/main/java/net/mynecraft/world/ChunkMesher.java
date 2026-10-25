@@ -85,6 +85,7 @@ public final class ChunkMesher {
             meshAxis(d, true);
         }
         meshCrosses();
+        meshSlabs();
         int vis = visibility.compute(section);
         int total = count[0] + count[1] + count[2];
         int[] data = new int[total];
@@ -300,6 +301,60 @@ public final class ChunkMesher {
                     crossQuad(Blocks.LAYER[b], tail, light, x1, y, z, x, z1, y1);
                     crossQuad(Blocks.LAYER[b], tail, light, x, y, z1, x1, z, y1);
                 }
+    }
+
+    /**
+     * Slabs: six faces per block (no merging), half height through the vertex "half block" flag
+     * (8/16 lower). A top slab's lower vertices are emitted at the block top and lowered, so one flag
+     * covers both halves. The face inside the cell uses the cell's own light, outer faces the light
+     * in front of them; no AO since slabs do not occlude.
+     */
+    private void meshSlabs() {
+        for (int y = 0; y < 16; y++)
+            for (int z = 0; z < 16; z++)
+                for (int x = 0; x < 16; x++) {
+                    int idx = pIndex(x, y, z);
+                    byte b = padded[idx];
+                    byte shape = Blocks.SHAPE[b & 0xFF];
+                    if (shape != Blocks.SHAPE_SLAB_BOTTOM && shape != Blocks.SHAPE_SLAB_TOP) continue;
+                    boolean top = shape == Blocks.SHAPE_SLAB_TOP;
+                    for (int f = 0; f < 6; f++) {
+                        int d = f >> 1;
+                        boolean positive = (f & 1) != 0;
+                        int n = idx + (positive ? STRIDE[d] : -STRIDE[d]);
+                        boolean inner = top ? f == 2 : f == 3;
+                        if (!inner && !Blocks.faceVisible(b, padded[n])) continue;
+                        int l = paddedLight[inner ? idx : n] & 0xFF;
+                        int light = (l >> 4) * 4 | (l & 15) * 4 << 6 | 3 << 12;
+                        slabFace(b, f, d, positive, x, y, z, top, light);
+                    }
+                }
+    }
+
+    private void slabFace(byte b, int face, int d, boolean positive, int x, int y, int z, boolean top, int light) {
+        int layer = Blocks.LAYER[b & 0xFF];
+        int[] o = reserve(layer);
+        int u = (d + 1) % 3, v = (d + 2) % 3;
+        int[] pos = {x, y, z};
+        int plane = pos[d] + (positive ? 1 : 0);
+        int i = pos[u], j = pos[v];
+        int tail = tail(face, faceInfo[(b & 0xFF) * 6 + face]);
+        int[][] corners = positive
+            ? new int[][] {{i, j}, {i + 1, j}, {i + 1, j + 1}, {i, j + 1}}
+            : new int[][] {{i, j}, {i, j + 1}, {i + 1, j + 1}, {i + 1, j}};
+        int c = count[layer];
+        for (int[] uv : corners) {
+            int[] p = new int[3];
+            p[d] = plane;
+            p[u] = uv[0];
+            p[v] = uv[1];
+            int special = 0;
+            if (!top && p[1] == y + 1) special = SPECIAL_HALF;          // bottom slab: top edge drops 8/16
+            if (top && p[1] == y) { p[1] = y + 1; special = SPECIAL_HALF; } // top slab: bottom edge at y + 8/16
+            o[c++] = tail | p[0] | p[1] << 5 | p[2] << 10 | special;
+            o[c++] = light;
+        }
+        count[layer] = c;
     }
 
     private void crossQuad(int layer, int tail, int light, int ax, int y0, int az, int bx, int bz, int y1) {

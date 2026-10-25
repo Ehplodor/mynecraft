@@ -76,8 +76,21 @@
   `foliage.png`), carte GPU 512×512 circulaire échantillonnée en linéaire (mélange gratuit entre colonnes)
 - Surface de l'eau abaissée de 2/16 (1 bit du sommet)
 - Coût mesuré : +11 % de quads par section (la lumière lisse limite un peu la fusion)
-- Reste à faire : overlay teinté du côté des blocs d'herbe, biomes lus depuis les sauvegardes vanilla,
-  soleil/lune/nuages
+- Reste à faire : biomes lus depuis les sauvegardes vanilla
+
+## ✅ M7 — Performance de génération, ciel, états de blocs
+- Génération : sections sous la roche remplies d'un coup ; lumière : tableau « sombre » partagé
+  (copie à l'écriture) pour les sections enfouies ; jointure de chunk lisant les tableaux directement
+  → jointure 1,6 → 0,04 ms/chunk, génération + lumière 0,53 → 0,30 ms/chunk (maillage identique)
+- Overlay teinté des côtés d'herbe composité dans le shader (couche + 1), sans quad supplémentaire
+- Soleil, lune (8 phases), nuages plats à y = 192 (UV en double précision, dérive au vent)
+- États de blocs : un id par état, variantes de blockstate par propriétés, rotations `x`/`y` appliquées
+  aux faces avec textures pré-tournées dans le texture array (aucun bit de sommet en plus)
+- Bûches orientées (`axis`), dalles bas/haut/double (`type`), lues et écrites dans les sauvegardes ;
+  les familles vanilla gardent leurs propriétés (`birch_log[axis=x]` → bûche horizontale)
+- Collisions AABB sur les boîtes réelles + montée automatique de 0,6 bloc ; règles de pose vanilla
+- Reste à faire : visée précise des demi-blocs (le raycast vise le cube entier), escaliers, `uvlock`,
+  plus de familles de blocs
 
 ## Pistes d'optimisation continues
 - Multi-draw indirect (`glMultiDrawElementsIndirect`) + un seul gros VBO → 1 draw call
