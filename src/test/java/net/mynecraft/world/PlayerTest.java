@@ -110,6 +110,19 @@ class PlayerTest {
     }
 
     @Test
+    void raycastHitsSlabShapeOnly() {
+        World w = flat();
+        w.set(9, 10, 5, Blocks.OAK_SLAB);
+        w.set(12, 10, 5, Blocks.DIRT);
+        // At height 10.75 the ray passes over the bottom slab and reaches the dirt behind it.
+        assertEquals(new Raycast.Hit(12, 10, 5, -1, 0, 0), Raycast.cast(w, 5.5, 10.75, 5.5, 1, 0, 0, 10));
+        // At 10.25 it hits the slab's side.
+        assertEquals(new Raycast.Hit(9, 10, 5, -1, 0, 0), Raycast.cast(w, 5.5, 10.25, 5.5, 1, 0, 0, 10));
+        // From above: the slab's top face at y = 10.5.
+        assertEquals(new Raycast.Hit(9, 10, 5, 0, 1, 0), Raycast.cast(w, 9.5, 13, 5.5, 0, -1, 0, 10));
+    }
+
+    @Test
     void intersectsDetectsOverlap() {
         Player p = new Player();
         p.x = 5.5; p.y = 10; p.z = 5.5;

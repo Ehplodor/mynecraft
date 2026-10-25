@@ -8,7 +8,7 @@ import static org.lwjgl.opengl.GL33.*;
 final class Overlay {
     private static final float E = 0.002f; // outline slightly outside the block to avoid z-fighting
     private final Shader shader;
-    private final int vao, vbo, uMvp, uOffset, uColor;
+    private final int vao, vbo, uMvp, uOffset, uScale, uColor;
     private final float[] matrixBuf = new float[16];
     private final Matrix4f ortho = new Matrix4f();
 
@@ -17,6 +17,7 @@ final class Overlay {
         uMvp = shader.uniform("uMvp");
         uOffset = shader.uniform("uOffset");
         uColor = shader.uniform("uColor");
+        uScale = shader.uniform("uScale");
 
         float lo = -E, hi = 1 + E;
         float[] c = {lo, hi};
@@ -47,11 +48,17 @@ final class Overlay {
         glBindVertexArray(0);
     }
 
-    /** @param viewProj camera-relative view-projection; offset = block position minus camera. */
-    void outline(Matrix4f viewProj, float ox, float oy, float oz) {
+    /**
+     * @param viewProj camera-relative view-projection; offset = block position minus camera;
+     *                 lo/hi = vertical extent of the block's shape (0..1).
+     */
+    void outline(Matrix4f viewProj, float ox, float oy, float oz, float lo, float hi) {
         glUseProgram(shader.program);
         glUniformMatrix4fv(uMvp, false, viewProj.get(matrixBuf));
-        glUniform3f(uOffset, ox, oy, oz);
+        // The unit outline spans -E..1+E: scale and shift it onto [lo, hi] vertically.
+        float sy = (hi - lo + 2 * E) / (1 + 2 * E);
+        glUniform3f(uScale, 1, sy, 1);
+        glUniform3f(uOffset, ox, oy + lo - E + E * sy, oz);
         glUniform4f(uColor, 0, 0, 0, 1);
         glBindVertexArray(vao);
         glDrawArrays(GL_LINES, 0, 24);
@@ -62,6 +69,7 @@ final class Overlay {
         ortho.setOrtho2D(-width / 2f, width / 2f, -height / 2f, height / 2f);
         glUniformMatrix4fv(uMvp, false, ortho.get(matrixBuf));
         glUniform3f(uOffset, 0, 0, 0);
+        glUniform3f(uScale, 1, 1, 1);
         glUniform4f(uColor, 1, 1, 1, 1);
         glDisable(GL_DEPTH_TEST);
         glBindVertexArray(vao);

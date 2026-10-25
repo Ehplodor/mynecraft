@@ -7,6 +7,28 @@ public final class Raycast {
 
     private Raycast() {}
 
+    /** Slab test of the ray against box [x, x+1] x [y+lo, y+hi] x [z, z+1]; normal of the entry face. */
+    private static Hit box(double ox, double oy, double oz, double dx, double dy, double dz, double maxDist,
+                           int x, int y, int z, double lo, double hi) {
+        double[] o = {ox, oy, oz}, d = {dx, dy, dz}, min = {x, y + lo, z}, max = {x + 1, y + hi, z + 1};
+        double tNear = 0, tFar = maxDist;
+        int axis = -1, sign = 0;
+        for (int a = 0; a < 3; a++) {
+            if (d[a] == 0) {
+                if (o[a] < min[a] || o[a] > max[a]) return null;
+                continue;
+            }
+            double t1 = (min[a] - o[a]) / d[a], t2 = (max[a] - o[a]) / d[a];
+            int s = -1; // entering through the min face: normal points to -axis
+            if (t1 > t2) { double t = t1; t1 = t2; t2 = t; s = 1; }
+            if (t1 > tNear) { tNear = t1; axis = a; sign = s; }
+            tFar = Math.min(tFar, t2);
+            if (tNear > tFar) return null;
+        }
+        if (axis < 0) return new Hit(x, y, z, 0, 1, 0); // ray starts inside the box
+        return new Hit(x, y, z, axis == 0 ? sign : 0, axis == 1 ? sign : 0, axis == 2 ? sign : 0);
+    }
+
     public static Hit cast(World world, double ox, double oy, double oz,
                            double dx, double dy, double dz, double maxDist) {
         int x = (int) Math.floor(ox), y = (int) Math.floor(oy), z = (int) Math.floor(oz);
@@ -20,7 +42,14 @@ public final class Raycast {
         int nx = 0, ny = 0, nz = 0;
         double t = 0;
         while (t <= maxDist) {
-            if (Blocks.isTargetable(world.get(x, y, z))) return new Hit(x, y, z, nx, ny, nz);
+            byte b = world.get(x, y, z);
+            if (Blocks.isTargetable(b)) {
+                if (!Blocks.isSlab(b)) return new Hit(x, y, z, nx, ny, nz);
+                // Partial block: the ray must actually cross its box, otherwise keep going.
+                Hit partial = box(ox, oy, oz, dx, dy, dz, maxDist, x, y, z,
+                    Blocks.BOX_MIN[b & 0xFF] / 16.0, Blocks.BOX_MAX[b & 0xFF] / 16.0);
+                if (partial != null) return partial;
+            }
             if (tmx < tmy && tmx < tmz) {
                 x += sx; t = tmx; tmx += tdx; nx = -sx; ny = 0; nz = 0;
             } else if (tmy < tmz) {

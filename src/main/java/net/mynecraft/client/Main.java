@@ -237,7 +237,11 @@ public final class Main {
             renderer.render(cam, aspect, far, sky);
             skyRenderer.drawClouds(skyViewProj, cam.pos.x, cam.pos.y, cam.pos.z, ticks, renderer.daylight, far);
             if (hit != null) {
-                overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y), (float) (hit.z() - cam.pos.z));
+                byte target = world.get(hit.x(), hit.y(), hit.z());
+                float lo = Blocks.isSlab(target) ? Blocks.BOX_MIN[target & 0xFF] / 16f : 0;
+                float hi = Blocks.isSlab(target) ? Blocks.BOX_MAX[target & 0xFF] / 16f : 1;
+                overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y),
+                    (float) (hit.z() - cam.pos.z), lo, hi);
             }
             overlay.crosshair(fbW[0], fbH[0]);
             if (stats != null) {
