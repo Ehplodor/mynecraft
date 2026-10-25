@@ -21,6 +21,10 @@ gradle run --args="--benchmark 20"           # vol scripté 20 s : FPS, percenti
 gradle test                                  # tests + micro-benchmark génération/lumière/maillage
 ```
 
+Modes : **survie** par défaut (vie, chutes, noyade, lave, minage chronométré, inventaire), **créatif** avec
+`F4` ou `--creative` (blocs illimités, vol avec `F`). En survie, la molette change d'emplacement ; à la mort, `R`
+fait réapparaître au point d'apparition.
+
 Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `Échap` pause (`Q` y quitte), souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
 `1`–`9` choisir l'emplacement de la barre, molette changer son bloc (dalles et bûches s'orientent selon la face visée).
@@ -35,6 +39,8 @@ Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `
 | `world/storage/*` | NBT, fichiers région Anvil `.mca`, codec de chunk 1.16+/1.18+, `level.dat` |
 | `world/Blocks` | Registre d'**états** (un id par état : `oak_log[axis=x]`, `oak_slab[type=top]`…) : rendu, forme, boîte de collision, opacité, émission, teinte |
 | `world/FluidSimulator` | Eau et lave qui coulent (ticks programmés, niveaux vanilla, sources infinies, obsidienne/pierre) |
+| `world/Survival`, `Inventory` | Vie, chutes, lave, noyade, régénération ; 36 emplacements de 64 ; butins vanilla |
+| `world/storage/PlayerData` | Joueur dans `level.dat` avec les clés vanilla (`Health`, `Air`, `Inventory`, `playerGameType`) |
 | `world/Placement` | Règles de pose vanilla (axe des bûches, demi-dalles, fusion en dalle double) |
 | `world/LightEngine` | Lumière ciel + blocs (BFS ajout/retrait incrémental, traverse les chunks) |
 | `world/ChunkMesher` | **Greedy meshing** (fusion à lumière et AO égales), lumière lisse + AO par sommet, eau abaissée, plantes en croix, **16 o/quad** (vertex pulling) |

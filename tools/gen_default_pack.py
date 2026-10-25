@@ -208,6 +208,30 @@ def main():
         {"type": "space", "advances": {" ": 4}},
         {"type": "bitmap", "file": "minecraft:font/ascii.png", "ascent": 7, "chars": ROWS}]})
 
+    # HUD sprites (1.20.2+ layout): hearts and air bubbles, 9x9.
+    heart = ["..##.##..", ".#######.", "#########", "#########", ".#######.", "..#####..", "...###...", "....#....", "........."]
+    def sprite(path, pixel):
+        img = Image.new("RGBA", (9, 9), (0, 0, 0, 0))
+        for y in range(9):
+            for x in range(9):
+                c = pixel(x, y)
+                if c:
+                    img.putpixel((x, y), c)
+        full = os.path.join(NS, "textures", "gui", "sprites", path + ".png")
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        img.save(full)
+    inside = lambda x, y: heart[y][x] == "#"
+    edge = lambda x, y: inside(x, y) and any(not (0 <= x + dx < 9 and 0 <= y + dy < 9) or heart[y + dy][x + dx] != "#"
+                                            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+    sprite("hud/heart/container", lambda x, y: (20, 20, 20, 255) if edge(x, y) else (60, 30, 30, 200) if inside(x, y) else None)
+    red = lambda x, y: (255, 120, 120, 255) if (x, y) in ((2, 1), (2, 2), (3, 1)) else (210, 20, 30, 255)
+    sprite("hud/heart/full", lambda x, y: red(x, y) if inside(x, y) and not edge(x, y) else None)
+    sprite("hud/heart/half", lambda x, y: red(x, y) if inside(x, y) and not edge(x, y) and x <= 4 else None)
+    bubble = lambda x, y: (x - 4) ** 2 + (y - 4) ** 2
+    sprite("hud/air", lambda x, y: (230, 245, 255, 255) if 9 <= bubble(x, y) <= 14 or (x, y) == (3, 3)
+           else (90, 160, 230, 220) if bubble(x, y) < 9 else None)
+    sprite("hud/air_empty", lambda x, y: (120, 150, 180, 140) if 9 <= bubble(x, y) <= 14 else None)
+
     with open(os.path.join(ROOT, "pack.mcmeta"), "w") as f:
         json.dump({"pack": {"pack_format": 34, "description": "Mynecraft default (original art)"}}, f, indent=2)
         f.write("\n")

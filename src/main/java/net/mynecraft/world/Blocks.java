@@ -47,6 +47,13 @@ public final class Blocks {
      * Lava in the overworld only uses even levels (it loses 2 per block).
      */
     public static final byte[] LEVEL = new byte[COUNT];
+    // ---- survival ----
+    /** Vanilla hardness (seconds by hand = hardness x 1.5); negative = unbreakable. */
+    public static final float[] HARDNESS = new float[COUNT];
+    /** Item dropped when broken (a block id; AIR = nothing) and how many. */
+    public static final byte[] DROP = new byte[COUNT];
+    public static final byte[] DROP_COUNT = new byte[COUNT];
+
     /** Families whose members hide faces between each other (each fluid, glass, each leaves). */
     private static final byte[] FAMILY = new byte[COUNT];
 
@@ -99,6 +106,7 @@ public final class Blocks {
         OPACITY[OAK_SLAB] = OPACITY[OAK_SLAB_TOP] = 0;
         BOX_MAX[OAK_SLAB] = 8;
         BOX_MIN[OAK_SLAB_TOP] = 8;
+        initSurvival();
         // Fluids are never full cubes: their surface is lowered, so neighbours keep their faces.
         for (int i = 1; i < COUNT; i++) FULL_OPAQUE[i] = LAYER[i] == LAYER_OPAQUE && SHAPE[i] == SHAPE_CUBE && FLUID[i] == FLUID_NONE;
     }
@@ -107,6 +115,42 @@ public final class Blocks {
         LAYER[id] = LAYER_CUTOUT;
         OPACITY[id] = (byte) opacity;
         CULLS_SELF[id] = cullsSelf;
+    }
+
+    private static void initSurvival() {
+        for (int i = 1; i < COUNT; i++) {
+            // Default: drops its own default state (a horizontal log drops a log, a top slab a slab).
+            DROP[i] = fromState(NAMES[i], java.util.Map.of());
+            DROP_COUNT[i] = 1;
+            HARDNESS[i] = 1.5f;
+        }
+        hardness(0.5f, DIRT, SAND);
+        hardness(0.6f, GRASS, GRAVEL);
+        hardness(2f, OAK_LOG, OAK_LOG_X, OAK_LOG_Z, BIRCH_LOG, BIRCH_LOG_X, BIRCH_LOG_Z, SPRUCE_LOG, SPRUCE_LOG_X,
+            SPRUCE_LOG_Z, OAK_PLANKS, BIRCH_PLANKS, SPRUCE_PLANKS, COBBLESTONE, OAK_SLAB, OAK_SLAB_TOP, OAK_SLAB_DOUBLE);
+        hardness(0.2f, OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES);
+        hardness(0.3f, GLASS, GLOWSTONE);
+        hardness(0f, SHORT_GRASS, POPPY);
+        hardness(3f, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, DEEPSLATE);
+        hardness(50f, OBSIDIAN);
+        hardness(-1f, BEDROCK);
+        DROP[STONE] = COBBLESTONE;
+        DROP[GRASS] = DIRT;
+        DROP_COUNT[OAK_SLAB_DOUBLE] = 2;
+        for (byte none : new byte[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES, GLASS, SHORT_GRASS, BEDROCK}) DROP[none] = AIR;
+        for (int i = 1; i < COUNT; i++) {
+            if (FLUID[i] != FLUID_NONE) { DROP[i] = AIR; HARDNESS[i] = -1; }
+        }
+    }
+
+    private static void hardness(float h, byte... ids) {
+        for (byte id : ids) HARDNESS[id] = h;
+    }
+
+    /** Seconds to break a block by hand (vanilla: hardness x 1.5); infinite if unbreakable. */
+    public static double breakSeconds(byte id) {
+        float h = HARDNESS[id & 0xFF];
+        return h < 0 ? Double.POSITIVE_INFINITY : h * 1.5;
     }
 
     private static void fluid(byte id, byte type, byte layer, int opacity, int level) {

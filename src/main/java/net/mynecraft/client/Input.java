@@ -33,6 +33,10 @@ final class Input {
     int slot;
     byte selected = hotbar[0];
     boolean breakRequested, placeRequested;
+    /** Left button held (survival mining is continuous). */
+    boolean breakHeld;
+    /** Creative: the wheel changes the block of the current slot; survival: it moves between slots. */
+    boolean creative = true;
 
     Input(long window) {
         this.window = window;
@@ -85,7 +89,7 @@ final class Input {
         lastX = mx[0];
         lastY = my[0];
 
-        boolean fly = down(GLFW_KEY_F);
+        boolean fly = down(GLFW_KEY_F) && creative;
         if (fly && !flyKeyWasDown) {
             player.flying = !player.flying;
             player.vy = 0;
@@ -93,6 +97,10 @@ final class Input {
         flyKeyWasDown = fly;
 
         for (int i = 0; i < hotbar.length; i++) if (down(GLFW_KEY_1 + i)) slot = i;
+        if (scroll != 0 && !creative) {
+            slot = Math.floorMod(slot - (int) Math.signum(scroll), hotbar.length);
+            scroll = 0;
+        }
         if (scroll != 0) {
             int current = 0;
             for (int i = 0; i < PLACEABLE.length; i++) if (PLACEABLE[i] == hotbar[slot]) current = i;
@@ -103,6 +111,7 @@ final class Input {
 
         breakCooldown = mouse(GLFW_MOUSE_BUTTON_LEFT) ? breakCooldown - dt : 0;
         placeCooldown = mouse(GLFW_MOUSE_BUTTON_RIGHT) ? placeCooldown - dt : 0;
+        breakHeld = mouse(GLFW_MOUSE_BUTTON_LEFT);
         breakRequested = mouse(GLFW_MOUSE_BUTTON_LEFT) && breakCooldown <= 0;
         placeRequested = mouse(GLFW_MOUSE_BUTTON_RIGHT) && placeCooldown <= 0;
         if (breakRequested) breakCooldown = CLICK_REPEAT;

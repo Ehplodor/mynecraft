@@ -174,6 +174,51 @@ class StorageTest {
     }
 
     @Test
+    void playerStateRoundTripsWithVanillaTags(@TempDir Path dir) throws IOException {
+        WorldStorage s = WorldStorage.open(dir.resolve("w"), 1, false);
+        PlayerData p = new PlayerData();
+        p.pos = new double[] {3.5, 80, -7.5};
+        p.health = 13;
+        p.air = 120;
+        p.creative = true;
+        p.selectedSlot = 4;
+        p.inventory.add(Blocks.COBBLESTONE, 70);
+        p.inventory.add(Blocks.OAK_LOG, 3);
+        s.spawn = new int[] {8, 72, 8};
+        s.saveLevel(p, 6000);
+        s.close();
+
+        WorldStorage back = WorldStorage.open(dir.resolve("w"), 0, false);
+        PlayerData q = back.player;
+        assertArrayEquals(p.pos, q.pos);
+        assertEquals(13, q.health);
+        assertEquals(120, q.air);
+        assertTrue(q.creative);
+        assertEquals(4, q.selectedSlot);
+        assertArrayEquals(new int[] {8, 72, 8}, back.spawn);
+        assertEquals(Blocks.COBBLESTONE, q.inventory.id(0));
+        assertEquals(64, q.inventory.counts[0]);
+        assertEquals(6, q.inventory.counts[1]);
+        assertEquals(Blocks.OAK_LOG, q.inventory.id(2));
+
+        // The raw tags are the vanilla ones.
+        Map<String, Object> data;
+        try (InputStream in = Files.newInputStream(dir.resolve("w").resolve("level.dat"))) {
+            data = Nbt.getCompound(Nbt.readGzip(in), "Data");
+        }
+        Map<String, Object> player = Nbt.getCompound(data, "Player");
+        assertEquals(13f, player.get("Health"));
+        assertEquals((short) 120, player.get("Air"));
+        assertEquals(1, player.get("playerGameType"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> first = (Map<String, Object>) Nbt.getList(player, "Inventory").get(0);
+        assertEquals("minecraft:cobblestone", first.get("id"));
+        assertEquals((byte) 0, first.get("Slot"));
+        assertEquals(64, first.get("count"));
+        back.close();
+    }
+
+    @Test
     void foreignWorldOpensReadOnly(@TempDir Path dir) throws IOException {
         Map<String, Object> data = Nbt.compound();
         Map<String, Object> wgs = Nbt.compound();

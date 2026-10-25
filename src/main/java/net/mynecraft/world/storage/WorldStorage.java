@@ -28,6 +28,10 @@ public final class WorldStorage implements AutoCloseable {
     public final long seed;
     /** Saved player position, or null for a new world. */
     public final double[] playerPos;
+    /** Saved player state (vanilla tags), or null for a new world. */
+    public final PlayerData player;
+    /** World spawn (SpawnX/Y/Z), or null if not recorded yet. */
+    public int[] spawn;
     /** Time of day in ticks (vanilla DayTime: 0 sunrise, 6000 noon, 18000 midnight). */
     public final long dayTime;
 
@@ -35,8 +39,13 @@ public final class WorldStorage implements AutoCloseable {
     /** Chunks queued for writing; loads check here first so an unload/reload never sees stale data. */
     private final ConcurrentHashMap<Long, Chunk> pendingSaves = new ConcurrentHashMap<>();
 
-    private WorldStorage(Path dir, boolean readOnly, boolean foreign, long seed, double[] playerPos, long dayTime) {
+    private WorldStorage(Path dir, boolean readOnly, boolean foreign, long seed, PlayerData player, int[] spawn,
+                         long dayTime) {
         this.dayTime = dayTime;
+        this.player = player;
+        this.spawn = spawn;
+        double[] playerPos = player != null ? player.pos : null;
+        if (playerPos == null && spawn != null) playerPos = new double[] {spawn[0] + 0.5, spawn[1], spawn[2] + 0.5};
         this.dir = dir;
         this.readOnly = readOnly;
         this.foreign = foreign;
@@ -49,8 +58,8 @@ public final class WorldStorage implements AutoCloseable {
         Path levelDat = dir.resolve("level.dat");
         if (!Files.exists(levelDat)) {
             Files.createDirectories(dir.resolve("region"));
-            WorldStorage s = new WorldStorage(dir, false, false, newSeed, null, 1000);
-            s.saveLevel(null, s.dayTime);
+            WorldStorage s = new WorldStorage(dir, false, false, newSeed, null, null, 1000);
+            s.saveLevel((PlayerData) null, s.dayTime);
             return s;
         }
         Map<String, Object> data;
@@ -61,17 +70,11 @@ public final class WorldStorage implements AutoCloseable {
         boolean foreign = !data.containsKey(MARKER);
         Map<String, Object> wgs = Nbt.getCompound(data, "WorldGenSettings");
         long seed = wgs != null ? Nbt.getLong(wgs, "seed", newSeed) : Nbt.getLong(data, "RandomSeed", newSeed);
-        double[] pos = null;
-        Map<String, Object> player = Nbt.getCompound(data, "Player");
-        if (player != null) {
-            var p = Nbt.getList(player, "Pos");
-            if (p.size() == 3) pos = new double[] {((Number) p.get(0)).doubleValue(),
-                ((Number) p.get(1)).doubleValue(), ((Number) p.get(2)).doubleValue()};
-        } else if (data.containsKey("SpawnX")) {
-            pos = new double[] {Nbt.getInt(data, "SpawnX", 0) + 0.5, Nbt.getInt(data, "SpawnY", 64),
-                Nbt.getInt(data, "SpawnZ", 0) + 0.5};
-        }
-        return new WorldStorage(dir, foreign && !allowForeignWrites, foreign, seed, pos,
+        Map<String, Object> playerTag = Nbt.getCompound(data, "Player");
+        PlayerData player = playerTag == null ? null : PlayerData.read(playerTag);
+        int[] spawn = data.containsKey("SpawnX") ? new int[] {Nbt.getInt(data, "SpawnX", 0),
+            Nbt.getInt(data, "SpawnY", 64), Nbt.getInt(data, "SpawnZ", 0)} : null;
+        return new WorldStorage(dir, foreign && !allowForeignWrites, foreign, seed, player, spawn,
             Nbt.getLong(data, "DayTime", 1000));
     }
 
@@ -130,7 +133,14 @@ public final class WorldStorage implements AutoCloseable {
     }
 
     /** Writes level.dat atomically (temp file + move), like vanilla does. */
-    public void saveLevel(double[] player, long dayTime) throws IOException {
+    /** Saves only the player's position (keeps the rest of the stored player state). */
+    public void saveLevel(double[] pos, long dayTime) throws IOException {
+        PlayerData p = player != null ? player : new PlayerData();
+        p.pos = pos;
+        saveLevel(pos == null ? null : p, dayTime);
+    }
+
+    public void saveLevel(PlayerData player, long dayTime) throws IOException {
         if (readOnly) return;
         Map<String, Object> data = Nbt.compound();
         Path levelDat = dir.resolve("level.dat");
@@ -146,12 +156,15 @@ public final class WorldStorage implements AutoCloseable {
         data.put("DataVersion", ChunkCodec.DATA_VERSION);
         data.put("DayTime", dayTime);
         if (!foreign) data.put(MARKER, 1);
+        if (spawn != null) {
+            data.put("SpawnX", spawn[0]);
+            data.put("SpawnY", spawn[1]);
+            data.put("SpawnZ", spawn[2]);
+        }
         if (player != null) {
             Map<String, Object> p = Nbt.getCompound(data, "Player");
             if (p == null) { p = Nbt.compound(); data.put("Player", p); }
-            Nbt.NbtList pos = new Nbt.NbtList(Nbt.DOUBLE);
-            for (double v : player) pos.values().add(v);
-            p.put("Pos", pos);
+            player.write(p);
         }
         Map<String, Object> root = Nbt.compound();
         root.put("Data", data);

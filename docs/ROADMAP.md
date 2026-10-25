@@ -154,3 +154,18 @@
   un niveau horizontal 8 était confondu avec « chute » et entretenait l'eau sans source
 - Reste à faire : surfaces inclinées (hauteur par coin), courant qui pousse le joueur, priorité
   d'écoulement vers les pentes, lave qui brûle
+
+## ✅ M12 — Bases de la survie
+- Modes de jeu survie / créatif (`F4`, `--creative`), sauvegardés comme `playerGameType` ; vol réservé au créatif
+- Vie (20 demi-cœurs) : chute au-delà de 3 blocs (annulée par l'eau), lave (4 par ½ s), noyade
+  (300 ticks d'air puis 2/s), régénération lente sans faim ; mort, écran dédié, réapparition au spawn
+- Inventaire 36 × 64 (barre = emplacements 0..8) ; butins vanilla (pierre → pierre taillée,
+  herbe → terre, feuilles/verre/herbes → rien, dalle double → 2) ; pose consommée
+- Minage chronométré : dureté vanilla × 1,5 s à la main, barre de progression ; bedrock et fluides
+  incassables
+- HUD : cœurs, bulles d'air, quantités ; sprites du pack au format 1.20.2+ (`gui/sprites/hud/…`),
+  sprites originaux dans le pack par défaut ; flash rouge sur dégât
+- `level.dat` : `Health`, `Air`, `Inventory` (format 1.21 `{Slot, id, count}`, ancien `Count` lu),
+  `SelectedItemSlot`, `SpawnX/Y/Z`
+- Simplifications : pas d'outils (tout se mine à la main et donne son butin), pas de faim, pas
+  d'objets non-blocs, inventaire conservé à la mort, pas d'écran d'inventaire (E)

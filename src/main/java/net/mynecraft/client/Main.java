@@ -10,6 +10,9 @@ import net.mynecraft.world.Chunk;
 import net.mynecraft.world.ChunkStreamer;
 import net.mynecraft.world.storage.WorldStorage;
 import net.mynecraft.world.FluidSimulator;
+import net.mynecraft.world.Inventory;
+import net.mynecraft.world.Survival;
+import net.mynecraft.world.storage.PlayerData;
 import net.mynecraft.world.Placement;
 import net.mynecraft.world.Player;
 import net.mynecraft.world.Raycast;
@@ -162,7 +165,7 @@ public final class Main {
         Overlay overlay = new Overlay();
         FontLoader font = FontLoader.load(resources);
         if (font == null) System.err.println("[resources] no bitmap font in font/default.json: text disabled");
-        Hud hud = new Hud(appearance.faceInfo, font);
+        Hud hud = new Hud(appearance.faceInfo, font, resources);
         GpuTimer gpuTimer = new GpuTimer();
         boolean paused = argv.contains("--paused"), debug = argv.contains("--f3"); // also for scripted shots
         byte shownBlock = -1;
@@ -181,6 +184,27 @@ public final class Main {
             player.x = 8.5;
             player.z = 8.5;
             player.y = world.generator.height(8, 8) + 1;
+        }
+        // Survival state: vanilla game mode, health, air and inventory from level.dat.
+        if (storage.spawn == null) storage.spawn = new int[] {8, world.generator.height(8, 8) + 1, 8};
+        PlayerData playerData = storage.player != null ? storage.player : new PlayerData();
+        boolean creative = argv.contains("--creative") || (playerData.creative && !argv.contains("--survival"));
+        Inventory inventory = playerData.inventory;
+        Survival survival = new Survival();
+        survival.health = playerData.health;
+        survival.air = playerData.air;
+        survival.dead = survival.health == 0;
+        int[] mining = null; // block being mined in survival
+        double miningProgress = 0;
+        long hurtFlashUntil = 0;
+        if (argv.contains("--survival-demo")) { // scripted HUD check: some loot, some damage, some air
+            inventory.add(Blocks.COBBLESTONE, 37);
+            inventory.add(Blocks.OAK_LOG, 12);
+            inventory.add(Blocks.DIRT, 64);
+            inventory.add(Blocks.GLASS, 5);
+            inventory.add(Blocks.OAK_SLAB, 1);
+            survival.health = 13;
+            survival.air = 130;
         }
         String pos = option(args, "--pos", null); // "x,y,z": start there, flying (scripted views)
         if (pos != null) {
@@ -213,6 +237,8 @@ public final class Main {
             cam.pitch = (float) Math.toRadians(Double.parseDouble(yp[1]));
         }
         Input input = new Input(window);
+        input.creative = creative;
+        input.slot = playerData.selectedSlot;
 
         int[] fbW = new int[1], fbH = new int[1];
         long last = System.nanoTime(), fpsTimer = last;
@@ -240,16 +266,31 @@ public final class Main {
                     input.capture(!paused);
                 }
                 if (input.pressed(GLFW_KEY_F3)) debug = !debug;
+                if (!paused && input.pressed(GLFW_KEY_F4)) {
+                    creative = !creative; // like vanilla's game mode switch
+                    input.creative = creative;
+                    if (!creative) player.flying = false;
+                }
+                if (survival.dead && input.pressed(GLFW_KEY_R)) {
+                    survival.respawn();
+                    player.x = storage.spawn[0] + 0.5;
+                    player.y = storage.spawn[1];
+                    player.z = storage.spawn[2] + 0.5;
+                    player.vx = player.vy = player.vz = 0;
+                }
                 if (paused && input.pressed(GLFW_KEY_Q)) glfwSetWindowShouldClose(window, true);
             }
-            if (paused) dt = 0; // the world stands still: no physics, no time, no edits
-            if (stats == null && !paused) input.frame(cam, player, dt);
-            else { input.breakRequested = false; input.placeRequested = false; }
+            if (paused || survival.dead) dt = 0; // the world stands still: no physics, no time, no edits
+            if (stats == null && dt > 0) input.frame(cam, player, dt);
+            else { input.breakRequested = false; input.placeRequested = false; input.breakHeld = false; }
+            if (!creative) input.selected = inventory.id(input.slot);
             // Fixed physics step: frame-rate independent and stable collisions.
             // Game ticks (20 per second, like vanilla) drive the fluids.
             tickAccumulator += dt;
             while (tickAccumulator >= TICK) {
                 fluids.tick();
+                if (screenshot == null) survival.tick(player, world, creative); // scripted shots stay reproducible
+                if (survival.lastDamage > 0) hurtFlashUntil = now + 300_000_000L;
                 tickAccumulator -= TICK;
             }
             accumulator += dt;
@@ -264,16 +305,36 @@ public final class Main {
             double cp = Math.cos(cam.pitch);
             Raycast.Hit hit = Raycast.cast(world, cam.pos.x, cam.pos.y, cam.pos.z,
                 -Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp, REACH);
-            if (hit != null && (input.breakRequested || (editDemo && streamer.settled()))) {
+            // Survival mining: hold the button for the block's break time, then collect its drop.
+            if (!creative && input.breakHeld && hit != null) {
+                if (mining == null || mining[0] != hit.x() || mining[1] != hit.y() || mining[2] != hit.z()) {
+                    mining = new int[] {hit.x(), hit.y(), hit.z()};
+                    miningProgress = 0;
+                }
+                byte target = world.get(hit.x(), hit.y(), hit.z());
+                miningProgress += dt / Blocks.breakSeconds(target);
+                if (miningProgress >= 1 && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
+                    inventory.add(Blocks.DROP[target & 0xFF], Blocks.DROP_COUNT[target & 0xFF]);
+                    renderer.blockChanged(hit.x(), hit.y(), hit.z());
+                    fluids.blockChanged(hit.x(), hit.y(), hit.z());
+                    mining = null;
+                    miningProgress = 0;
+                }
+            } else {
+                mining = null;
+                miningProgress = 0;
+            }
+            if (hit != null && ((creative && input.breakRequested) || (editDemo && streamer.settled()))) {
                 if (world.get(hit.x(), hit.y(), hit.z()) != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                 }
             }
-            if (hit != null && input.placeRequested) {
+            if (hit != null && input.placeRequested && input.selected != Blocks.AIR) {
                 double dirX = -Math.sin(cam.yaw) * cp, dirY = Math.sin(cam.pitch), dirZ = -Math.cos(cam.yaw) * cp;
                 int[] placed = Placement.place(world, player, hit, hitHeight(hit, cam.pos.x, cam.pos.y, cam.pos.z, dirX, dirY, dirZ), input.selected);
                 if (placed != null) {
+                    if (!creative) inventory.takeOne(input.slot);
                     renderer.blockChanged(placed[0], placed[1], placed[2]);
                     fluids.blockChanged(placed[0], placed[1], placed[2]);
                 }
@@ -325,7 +386,14 @@ public final class Main {
             overlay.crosshair(fbW[0], fbH[0]);
             if (debug) gpuTimer.end();
             hud.begin(fbW[0], fbH[0]);
-            float hotbarTop = hud.hotbar(input.hotbar, input.slot);
+            float hotbarTop = creative ? hud.hotbar(input.hotbar, null, input.slot)
+                : hud.hotbar(java.util.Arrays.copyOf(inventory.ids, Inventory.HOTBAR),
+                    java.util.Arrays.copyOf(inventory.counts, Inventory.HOTBAR), input.slot);
+            if (!creative) {
+                hotbarTop = hud.status(hotbarTop, hud.hotbarLeft(), hud.hotbarRight(), survival.health, survival.air, Survival.MAX_AIR);
+                if (miningProgress > 0) hud.progress((float) miningProgress);
+            }
+            if (now < hurtFlashUntil) hud.rect(0, 0, hud.width(), hud.height(), 0.8f, 0, 0, 0.25f);
             if (input.selected != shownBlock) {
                 shownBlock = input.selected;
                 blockShownAt = now;
@@ -337,7 +405,12 @@ public final class Main {
                 debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis,
                     fluids.pending());
             }
-            if (paused) {
+            if (survival.dead) {
+                hud.rect(0, 0, hud.width(), hud.height(), 0.5f, 0, 0, 0.45f);
+                float cy = hud.height() / 2f;
+                hud.textCentered("Vous êtes mort !", hud.width() / 2f, cy - hud.lineHeight(), 1, 1, 1);
+                hud.textCentered("R : réapparaître", hud.width() / 2f, cy + hud.lineHeight(), 0.9f, 0.9f, 0.9f);
+            } else if (paused) {
                 hud.rect(0, 0, hud.width(), hud.height(), 0, 0, 0, 0.5f);
                 float cy = hud.height() / 2f;
                 hud.textCentered("Pause", hud.width() / 2f, cy - 2 * hud.lineHeight(), 1, 1, 1);
@@ -395,7 +468,12 @@ public final class Main {
 
         try {
             streamer.saveAll();
-            storage.saveLevel(new double[] {player.x, player.y, player.z}, (long) ticks % DayCycle.DAY_TICKS);
+            playerData.pos = new double[] {player.x, player.y, player.z};
+            playerData.health = survival.health;
+            playerData.air = survival.air;
+            playerData.creative = creative;
+            playerData.selectedSlot = input.slot;
+            storage.saveLevel(playerData, (long) ticks % DayCycle.DAY_TICKS);
             storage.close();
         } catch (IOException | InterruptedException e) {
             System.err.println("[storage] save failed: " + e.getMessage());
