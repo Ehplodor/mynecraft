@@ -160,9 +160,9 @@ public final class Landscape {
                 }
                 if (need <= col.height()) continue;
                 int i = (z + 1) * 18 + x + 1;
-                if (wet >= 3 || col.height() < need - 1) // a hole or a sliver of land in the river: flooded
+                if (wet >= 3 || (col.height() >= need - 3 && col.height() < need - 1)) // a shallow hole or a sliver of land: flooded
                     banked[i] = new Column(col.height(), col.temperature() < 0.22f ? FROZEN_RIVER : RIVER, need, 1, col.temperature());
-                else // a low bank: raised to the water's edge
+                else // a bank, or the lip of a drop: raised to the water's edge so the water stays up
                     banked[i] = new Column(need, col.biome(), col.water(), col.river(), col.temperature());
             }
         return banked;

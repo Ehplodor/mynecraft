@@ -105,13 +105,46 @@ public final class TerrainGenerator {
                 for (int y = h + 1; y <= water; y++) c.set(x, y, z, frozen && y == water ? Blocks.ICE : Blocks.WATER);
             }
         }
+        borderSpills(c, cols);
         carveRavines(c, cols, heights);
-        carveCaves(c, heights);
+        carveCaves(c, heights, cols);
         ores(c, heights);
         decorate(c, heights, biomes);
         c.compact();
         LightEngine.initChunk(c);
         return c;
+    }
+
+    /**
+     * Water on the chunk's edge that will run into the next chunk (a river or lake above lower
+     * ground there): seen from the columns of the 1-block halo, so it is found without the neighbour
+     * loaded. Listed in {@link Chunk#unsettledFluids} for the fluid pre-computation.
+     */
+    private static void borderSpills(Chunk c, Landscape.Column[] cols) {
+        int[] out = null;
+        int n = 0;
+        int[][] side = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (int z = 0; z < 16; z++)
+            for (int x = 0; x < 16; x++) {
+                if (x != 0 && x != 15 && z != 0 && z != 15) continue;
+                Landscape.Column col = cols[(z + 1) * 18 + x + 1];
+                int water = Math.max(SEA_LEVEL, col.water());
+                if (water <= col.height()) continue;
+                for (int[] o : side) {
+                    int nx = x + o[0], nz = z + o[1];
+                    if (nx >= 0 && nx < 16 && nz >= 0 && nz < 16) continue; // inside: found by the chunk scan
+                    Landscape.Column nb = cols[(nz + 1) * 18 + nx + 1];
+                    int top = Math.max(nb.height(), Math.max(SEA_LEVEL, nb.water()));
+                    for (int y = Math.max(top + 1, col.height() + 1); y <= water; y++) {
+                        if (out == null) out = new int[48];
+                        if (n == out.length) out = java.util.Arrays.copyOf(out, n * 2);
+                        out[n++] = (c.cx << 4) + x;
+                        out[n++] = y;
+                        out[n++] = (c.cz << 4) + z;
+                    }
+                }
+            }
+        c.unsettledFluids = out == null ? null : java.util.Arrays.copyOf(out, n);
     }
 
     /** Top block and the 3 blocks below it for a biome. */
@@ -223,7 +256,7 @@ public final class TerrainGenerator {
      * under water or beaches are left alone near their surface: there is no fluid flow to fill
      * what a cave would expose.
      */
-    private void carveCaves(Chunk c, int[] heights) {
+    private void carveCaves(Chunk c, int[] heights, Landscape.Column[] cols) {
         int maxH = Chunk.MIN_Y;
         for (int h : heights) maxH = Math.max(maxH, h);
         int ny = (maxH - CAVE_FLOOR) / GRID_Y + 2;
@@ -250,8 +283,15 @@ public final class TerrainGenerator {
                 int ix = x / GRID_XZ;
                 float fx = (x % GRID_XZ) / (float) GRID_XZ;
                 int h = heights[z * 16 + x];
-                boolean wet = h <= SEA_LEVEL + 2;
-                int top = wet ? Math.min(h - 8, SEA_LEVEL - 10) : h;
+                // Under the sea, a river or a lake (or beside one), caves stay well below the bed.
+                int water = SEA_LEVEL + 2;
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++) {
+                        Landscape.Column nb = cols[(z + 1 + dz) * 18 + x + 1 + dx];
+                        if (nb.water() > nb.height()) water = Math.max(water, nb.water());
+                    }
+                boolean wet = h <= water;
+                int top = wet ? Math.min(h - 8, h <= SEA_LEVEL + 2 ? SEA_LEVEL - 10 : h - 8) : h;
                 if (top < CAVE_FLOOR) continue;
                 int levels = Math.min(ny, (top - CAVE_FLOOR) / GRID_Y + 2);
                 for (int iy = 0; iy < levels; iy++) {

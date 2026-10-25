@@ -245,3 +245,7 @@
 - Rendu des fluides : hauteur de surface par coin (moyenne des cellules voisines, l'air libre comptant
   pour 0, comme vanilla) : paliers et bords en pentes continues ; les surfaces calmes restent plates et
   fusionnées ; la texture glisse dans le sens de la pente (courant) et descend le long des chutes
+- Eau figée supprimée : les grottes ne percent plus le fond des rivières et des lacs ; les débordements
+  vers le chunk voisin sont repérés dès la génération (colonnes du halo) ; seuls les creux peu profonds
+  sont inondés, les ruptures de pente gardent une berge ; l'écoulement des terres chargées est
+  pré-calculé sans délai (3 ms par image) : 400 chunks de rivières réglés en ~0,3 s de calcul

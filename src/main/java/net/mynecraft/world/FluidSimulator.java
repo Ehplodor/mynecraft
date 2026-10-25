@@ -27,6 +27,10 @@ public final class FluidSimulator {
     private final Listener listener;
     private final LightEngine.LongQueue[] queues = {null, new LightEngine.LongQueue(), new LightEngine.LongQueue()};
     private final HashSet<Long> scheduled = new HashSet<>();
+    // Pre-computation: updates that run without waiting (fluids of newly loaded land), and
+    // everything they set off while they run.
+    private final LightEngine.LongQueue fast = new LightEngine.LongQueue();
+    private boolean settling;
     private long tick;
     /** Fluid updates run so far (for progress and rate displays). */
     public long updates;
@@ -83,11 +87,47 @@ public final class FluidSimulator {
         for (int i = 0; i < 4; i++) schedule(x + HX[i], y, z + HZ[i]);
     }
 
+    /**
+     * Like {@link #blockChanged}, but the flow it starts is pre-computed by {@link #settleStep}: it
+     * reaches its final shape without the 5-tick wait per block (unseen land, just loaded).
+     */
+    public void settle(int x, int y, int z) {
+        boolean was = settling;
+        settling = true;
+        blockChanged(x, y, z);
+        settling = was;
+    }
+
+    /** Runs pre-computed flow for at most {@code nanos}; returns the updates done. */
+    public int settleStep(long nanos) {
+        long end = System.nanoTime() + nanos;
+        int done = 0;
+        settling = true;
+        try {
+            while (!fast.isEmpty() && System.nanoTime() < end) {
+                for (int k = 0; k < 256 && !fast.isEmpty(); k++) {
+                    long p = fast.pop();
+                    scheduled.remove(p);
+                    updates++;
+                    done++;
+                    update(LightEngine.unpackX(p), LightEngine.unpackY(p), LightEngine.unpackZ(p));
+                }
+            }
+        } finally {
+            settling = false;
+        }
+        return done;
+    }
+
     private void schedule(int x, int y, int z) {
         byte type = Blocks.FLUID[world.get(x, y, z) & 0xFF];
         if (type == Blocks.FLUID_NONE) return;
         long p = LightEngine.pack(x, y, z);
         if (!scheduled.add(p)) return;
+        if (settling) {
+            fast.push(p, 0);
+            return;
+        }
         queues[type].push(p, (int) (tick + (type == Blocks.FLUID_WATER ? WATER_DELAY : LAVA_DELAY)));
     }
 
@@ -99,6 +139,7 @@ public final class FluidSimulator {
         long end = System.nanoTime() + nanos;
         int ticks = 0;
         while (!scheduled.isEmpty() && System.nanoTime() < end) {
+            settleStep(end - System.nanoTime());
             tick();
             ticks++;
         }

@@ -490,7 +490,8 @@ public final class Main {
             world.light.drainTouched(k -> renderer.sectionChanged(k, true));
 
             for (int[] f; (f = springs.poll()) != null; )
-                for (int i = 0; i < f.length; i += 3) fluids.blockChanged(f[i], f[i + 1], f[i + 2]);
+                for (int i = 0; i < f.length; i += 3) fluids.settle(f[i], f[i + 1], f[i + 2]);
+            fluids.settleStep(3_000_000L); // flows of newly loaded land, pre-computed in the background budget
             if (settling) {
                 fluids.fastForward(8_000_000L);
                 if (streamer.settled() && fluids.pending() == 0) settling = false;
