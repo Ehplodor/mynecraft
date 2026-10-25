@@ -60,12 +60,22 @@ def main():
     # Grass top is grayscale: tinted at render time (tintindex 0), like vanilla packs expect.
     save("grass_block_top", noisy((150, 150, 150), 22, 5))
     side = noisy((122, 86, 58), 16, 6)
+    fringe = [3 + random.Random(7 + x).randint(0, 2) for x in range(S)]  # shared with the overlay
     rnd = random.Random(7)
     for x in range(S):
-        for y in range(3 + rnd.randint(0, 2)):
+        for y in range(fringe[x]):
             g = rnd.randint(-15, 15)
             side.putpixel((x, y), (95 + g, 150 + g, 60 + g))
     save("grass_block_side", side)
+    # Grayscale fringe, tinted per biome and drawn over the side (vanilla layout).
+    over = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    rnd = random.Random(8)
+    for x in range(S):
+        for y in range(fringe[x]):
+            v = 150 + rnd.randint(-20, 20)
+            over.putpixel((x, y), (v, v, v, 255))
+    path = os.path.join(NS, "textures", "block", "grass_block_side_overlay.png")
+    over.save(path)
 
     save("gravel", noisy((128, 120, 116), 30, 8))
     save("cobblestone", rgba(lambda x, y, r: (lambda v: (v, v, v + 4, 255))(
@@ -124,15 +134,21 @@ def main():
                      "north": "#side", "south": "#side", "west": "#side", "east": "#side"}})
     write_json("models/block/grass_block.json", {
         "parent": "block/block",
-        "textures": {"particle": "block/dirt", "bottom": "block/dirt",
-                     "top": "block/grass_block_top", "side": "block/grass_block_side"},
-        "elements": [{"from": [0, 0, 0], "to": [16, 16, 16], "faces": {
-            "down": {"texture": "#bottom", "cullface": "down"},
-            "up": {"texture": "#top", "cullface": "up", "tintindex": 0},
-            "north": {"texture": "#side", "cullface": "north"},
-            "south": {"texture": "#side", "cullface": "south"},
-            "west": {"texture": "#side", "cullface": "west"},
-            "east": {"texture": "#side", "cullface": "east"}}}]})
+        "textures": {"particle": "block/dirt", "bottom": "block/dirt", "top": "block/grass_block_top",
+                     "side": "block/grass_block_side", "overlay": "block/grass_block_side_overlay"},
+        "elements": [
+            {"from": [0, 0, 0], "to": [16, 16, 16], "faces": {
+                "down": {"texture": "#bottom", "cullface": "down"},
+                "up": {"texture": "#top", "cullface": "up", "tintindex": 0},
+                "north": {"texture": "#side", "cullface": "north"},
+                "south": {"texture": "#side", "cullface": "south"},
+                "west": {"texture": "#side", "cullface": "west"},
+                "east": {"texture": "#side", "cullface": "east"}}},
+            {"from": [0, 0, 0], "to": [16, 16, 16], "faces": {
+                "north": {"texture": "#overlay", "tintindex": 0, "cullface": "north"},
+                "south": {"texture": "#overlay", "tintindex": 0, "cullface": "south"},
+                "west": {"texture": "#overlay", "tintindex": 0, "cullface": "west"},
+                "east": {"texture": "#overlay", "tintindex": 0, "cullface": "east"}}}]})
     write_json("models/block/cube_column.json", {
         "parent": "block/cube",
         "textures": {"particle": "#side", "down": "#end", "up": "#end",

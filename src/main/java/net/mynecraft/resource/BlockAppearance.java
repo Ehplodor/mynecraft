@@ -26,6 +26,8 @@ public final class BlockAppearance {
     static final String[] FACE_NAMES = {"west", "east", "down", "up", "north", "south"};
     public static final int LAYER_MASK = (1 << 10) - 1;
     public static final int TINT_SHIFT = 10;
+    /** Face draws a tinted overlay texture (stored in layer + 1) over an untinted base (e.g. grass sides). */
+    public static final int OVERLAY_BIT = 1 << 12;
     public static final String MISSING = "mynecraft:missing";
 
     public final List<String> textures = new ArrayList<>();
@@ -49,6 +51,15 @@ public final class BlockAppearance {
         });
     }
 
+    /** Two consecutive layers: base, then overlay (the shader reads layer + 1). */
+    private int pairLayer(String base, String over) {
+        return layers.computeIfAbsent(base + "|" + over, k -> {
+            textures.add(base);
+            textures.add(over);
+            return textures.size() - 2;
+        });
+    }
+
     private JsonObject json(String path) {
         byte[] data = resources.read(path);
         if (data == null) return null;
@@ -57,7 +68,7 @@ public final class BlockAppearance {
 
     private void resolveBlock(int id) {
         String name = "minecraft:" + Blocks.NAMES[id];
-        String[] tex = new String[6];
+        String[] tex = new String[6], overlay = new String[6];
         boolean[] tint = new boolean[6];
         if (id == Blocks.WATER) {
             // Fluids have no block model in Java packs: the game draws them from *_still textures.
@@ -66,7 +77,7 @@ public final class BlockAppearance {
         } else {
             String modelId = modelFromBlockstate(name);
             if (modelId == null) warnings.add("no blockstate for " + name);
-            else resolveModel(ResourceManager.normalize(modelId), tex, tint);
+            else resolveModel(ResourceManager.normalize(modelId), tex, tint, overlay);
         }
         if (Blocks.SHAPE[id] == Blocks.SHAPE_CROSS) {
             // Cross models only texture the faces of their diagonal planes: reuse one for all.
@@ -79,7 +90,11 @@ public final class BlockAppearance {
         }
         for (int f = 0; f < 6; f++) {
             if (tex[f] == null) tex[f] = MISSING;
-            faceInfo[id * 6 + f] = layer(tex[f]) | (tint[f] ? Blocks.TINT[id] << TINT_SHIFT : 0);
+            if (overlay[f] != null) {
+                faceInfo[id * 6 + f] = pairLayer(tex[f], overlay[f]) | Blocks.TINT[id] << TINT_SHIFT | OVERLAY_BIT;
+            } else {
+                faceInfo[id * 6 + f] = layer(tex[f]) | (tint[f] ? Blocks.TINT[id] << TINT_SHIFT : 0);
+            }
         }
     }
 
@@ -103,7 +118,7 @@ public final class BlockAppearance {
         return modelCache.computeIfAbsent(id, k -> json(ResourceManager.path(k, "models", ".json")));
     }
 
-    private void resolveModel(String modelId, String[] tex, boolean[] tint) {
+    private void resolveModel(String modelId, String[] tex, boolean[] tint, String[] overlay) {
         Map<String, String> textures = new LinkedHashMap<>();
         JsonArray elements = null;
         String id = modelId;
@@ -120,12 +135,25 @@ public final class BlockAppearance {
         }
         if (elements == null || elements.isEmpty()) { warnings.add("no elements in " + modelId); return; }
 
-        JsonObject faces = pickFullCube(elements).getAsJsonObject("faces");
+        JsonObject base = pickFullCube(elements);
+        JsonObject faces = base.getAsJsonObject("faces");
         for (int f = 0; f < 6; f++) {
             JsonObject face = faces.getAsJsonObject(FACE_NAMES[f]);
             if (face == null) continue;
             tex[f] = deref(face.get("texture").getAsString(), textures);
             tint[f] = face.has("tintindex") && face.get("tintindex").getAsInt() >= 0;
+        }
+        // A second full-cube element with tinted faces is an overlay (vanilla grass block sides).
+        for (JsonElement e : elements) {
+            JsonObject o = e.getAsJsonObject();
+            if (o == base || !isVec(o.getAsJsonArray("from"), 0) || !isVec(o.getAsJsonArray("to"), 16)) continue;
+            JsonObject ofaces = o.getAsJsonObject("faces");
+            for (int f = 0; f < 6; f++) {
+                JsonObject face = ofaces.getAsJsonObject(FACE_NAMES[f]);
+                if (face == null || !face.has("tintindex") || tex[f] == null || tint[f]) continue;
+                overlay[f] = deref(face.get("texture").getAsString(), textures);
+            }
+            break;
         }
     }
 

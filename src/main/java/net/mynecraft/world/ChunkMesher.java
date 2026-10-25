@@ -9,7 +9,8 @@ import java.util.Arrays;
  * <p>Each vertex is two ints (8 bytes):
  * <ol>
  *   <li>x,y,z (5 bits each, 0..16) | face (3 bits: 0-5 cube faces, 6 cross plane) | texture layer
- *       (10 bits) | tint type (2 bits) | lowered (1 bit: water surface, 2/16 below the block top).
+ *       (10 bits) | tint type (2 bits) | special (2 bits: 0 none, 1 water surface 2/16 lower,
+ *       2 half block 8/16 lower, 3 tinted overlay in layer + 1 over an untinted base).
  *       UVs are derived from position in the shader, so merged quads tile their texture.</li>
  *   <li>smooth sky light (6 bits) | smooth block light (6 bits) | ambient occlusion 0..3 &lt;&lt; 12
  *       | section x mod 64 &lt;&lt; 14 | section z mod 64 &lt;&lt; 20 | section index &lt;&lt; 26. Smooth light is
@@ -46,7 +47,8 @@ public final class ChunkMesher {
     private final byte[] padded = new byte[P * P * P];
     private final byte[] paddedLight = new byte[P * P * P];
     private final long[] mask = new long[Section.SIZE * Section.SIZE];
-    private static final int LOWERED_FLAG = 1 << 30;
+    static final int SPECIAL_WATER = 1 << 30, SPECIAL_HALF = 2 << 30, SPECIAL_OVERLAY = 3 << 30;
+    private static final int LOWERED_FLAG = SPECIAL_WATER;
     private static final int WATER_SURFACE = 0x80; // key bit on the block field (ids stay below 128)
     private final int[][] out = {new int[4096], new int[1024], new int[1024]};
     private final int[] count = new int[3];
@@ -235,7 +237,7 @@ public final class ChunkMesher {
         int l0 = (int) (key >> 16) & 0xFFF, l1 = (int) (key >> 28) & 0xFFF, l2 = (int) (key >> 40) & 0xFFF, l3 = (int) (key >>> 52);
         int layer = Blocks.LAYER[block];
         int[] o = reserve(layer);
-        int tail = (face << 15) | (faceInfo[block * 6 + face] << 18);
+        int tail = tail(face, faceInfo[block * 6 + face]);
         int sd = d * 5, su = u * 5, sv = v * 5;
         int base = (plane << sd) | tail;
         // Water surface: lower the top face entirely, and the top edge of side faces (y is u or v).
@@ -257,6 +259,11 @@ public final class ChunkMesher {
             c = quad(o, c, b0 + b2 > b1 + b3, p0, x0, p3, x3, p2, x2, p1, x1);
         }
         count[layer] = c;
+    }
+
+    /** Face, texture layer, tint and overlay bits of a vertex (see class doc). */
+    private static int tail(int face, int info) {
+        return face << 15 | (info & 0xFFF) << 18 | ((info >> 12 & 1) != 0 ? SPECIAL_OVERLAY : 0);
     }
 
     private static int score(int ao, int light) {
@@ -286,7 +293,7 @@ public final class ChunkMesher {
                     if (Blocks.SHAPE[b & 0xFF] != Blocks.SHAPE_CROSS) continue;
                     int l = paddedLight[idx] & 0xFF;
                     int light = (l >> 4) * 4 | (l & 15) * 4 << 6 | 3 << 12;
-                    int tail = (CROSS_FACE << 15) | (faceInfo[(b & 0xFF) * 6 + 4] << 18);
+                    int tail = tail(CROSS_FACE, faceInfo[(b & 0xFF) * 6 + 4]);
                     int x1 = x + 1, y1 = y + 1, z1 = z + 1;
                     crossQuad(Blocks.LAYER[b], tail, light, x, y, z, x1, z1, y1);
                     crossQuad(Blocks.LAYER[b], tail, light, x1, y, z1, x, z, y1);

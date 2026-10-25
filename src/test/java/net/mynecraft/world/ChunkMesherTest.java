@@ -124,7 +124,7 @@ class ChunkMesherTest {
         int[] d = mesh(w, c).data();
         int lowered = 0;
         for (int i = 0; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) {
-            if ((d[i] & (1 << 30)) != 0) {
+            if ((d[i] >>> 30) == 1) {
                 lowered++;
                 assertEquals(4, (d[i] >> 5) & 31, "only vertices at the top of the column (y = 3 + 1)");
             }
@@ -145,7 +145,7 @@ class ChunkMesherTest {
                 assertTrue(((p >> 15) & 7) < 7);
                 int layer = (p >> 18) & 1023;
                 assertTrue(layer > 0 && layer < Blocks.COUNT);
-                assertEquals(0, p >>> 31);
+                assertTrue((p >>> 30) != 2, "no half blocks in generated terrain");
                 int l = d[i + 1];
                 assertTrue((l & 63) <= 60 && ((l >> 6) & 63) <= 60, "smooth light sums");
                 assertEquals(0, (l >> 14) & 63, "section x mod 64");

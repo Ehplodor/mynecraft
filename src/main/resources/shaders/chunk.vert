@@ -11,7 +11,9 @@ uniform sampler2DArray uBiome; // grass (layer 0) and foliage (layer 1) colour p
 
 out vec2 vUv;
 flat out float vLayer;
-out vec3 vLight;
+flat out float vOverlay;
+out vec3 vTint;
+out float vLight;
 out float vDist;
 
 const float SHADE[7] = float[7](0.6, 0.6, 0.5, 1.0, 0.8, 0.8, 0.9);
@@ -27,7 +29,10 @@ void main() {
     uint face = (aPacked >> 15) & 7u;
     uint layer = (aPacked >> 18) & 1023u;
     uint tint = (aPacked >> 28) & 3u;
-    if ((aPacked & (1u << 30)) != 0u) local.y -= 0.125; // water surface sits 2/16 below the block top
+    uint special = aPacked >> 30;
+    if (special == 1u) local.y -= 0.125;      // water surface sits 2/16 below the block top
+    else if (special == 2u) local.y -= 0.5;   // half blocks (slabs)
+    vOverlay = special == 3u ? 1.0 : 0.0;
 
     // UV from position so greedy-merged quads repeat the texture once per block. V grows downward.
     if (face < 2u)      vUv = vec2(face == 0u ? local.z : -local.z, -local.y);
@@ -51,7 +56,8 @@ void main() {
                            float(((uCamChunk.y + dz) & 31) * 16) + local.z);
         tintColor = textureLod(uBiome, vec3(column / 512.0, float(tint - 1u)), 0.0).rgb;
     }
-    vLight = tintColor * light;
+    vTint = tintColor;
+    vLight = light;
     vec3 p = vec3(dx * 16, sy * 16, dz * 16) + local - uCamOffset;
     vDist = length(p);
     gl_Position = uViewProj * vec4(p, 1.0);
