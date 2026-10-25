@@ -15,6 +15,8 @@ public final class Chunk {
      */
     final byte[][] light = new byte[SECTIONS][];
     public static final int DEFAULT_LIGHT = 0xF0;
+    /** Shared all-zero light array for buried sections; replaced by a copy on first write. */
+    static final byte[] DARK = new byte[Section.VOLUME];
     /** Set when modified since load/generation; only dirty chunks are written (generation is deterministic). */
     private volatile boolean dirty;
 
@@ -31,6 +33,12 @@ public final class Chunk {
     /** World y of the bottom of section index sy. */
     public static int sectionMinY(int sy) {
         return (sy << 4) + MIN_Y;
+    }
+
+    /** Fills a whole section with one block (generation fast path). */
+    public void fillSection(int sy, byte id) {
+        if (sections[sy] == null) sections[sy] = new Section();
+        sections[sy].fill(id);
     }
 
     public Section section(int sy) {
@@ -64,6 +72,9 @@ public final class Chunk {
             if (value == DEFAULT_LIGHT) return;
             l = light[sy] = new byte[Section.VOLUME];
             java.util.Arrays.fill(l, (byte) DEFAULT_LIGHT);
+        } else if (l == DARK) {
+            if (value == 0) return;
+            l = light[sy] = new byte[Section.VOLUME];
         }
         l[Section.index(x, y & 15, z)] = (byte) value;
     }

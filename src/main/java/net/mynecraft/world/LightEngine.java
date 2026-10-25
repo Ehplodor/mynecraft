@@ -27,6 +27,7 @@ public final class LightEngine {
     private final World world;
     private final HashSet<Long> touched = new HashSet<>();
     private final LongQueue addQueue = new LongQueue(), removeQueue = new LongQueue();
+    private final LongQueue skyQueue = new LongQueue(), blockQueue = new LongQueue();
     private final Access worldAccess = new Access() {
         public int opacity(int x, int y, int z) {
             if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return -1;
@@ -50,6 +51,15 @@ public final class LightEngine {
     // ---- per-chunk initial light (no neighbours) ----
 
     public static void initChunk(Chunk c) {
+        // Buried sections (all opaque, nothing glowing) are entirely dark: share one zero array.
+        boolean[] dark = new boolean[Chunk.SECTIONS];
+        for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
+            Section s = c.sections[sy];
+            if (s != null && s.isDark()) {
+                dark[sy] = true;
+                c.light[sy] = Chunk.DARK;
+            }
+        }
         // Vertical pass: sunlight down each column; remember where it first gets dimmed.
         int[] top = new int[256];
         LongQueue blockSeeds = new LongQueue();
@@ -57,6 +67,13 @@ public final class LightEngine {
             for (int x = 0; x < 16; x++) {
                 int sky = 15, t = Chunk.MIN_Y - 1;
                 for (int y = Chunk.MAX_Y - 1; y >= Chunk.MIN_Y; y--) {
+                    int sy = Chunk.sectionIndex(y);
+                    if (dark[sy]) {
+                        if (t < Chunk.MIN_Y) t = y;
+                        sky = 0;
+                        y = Chunk.sectionMinY(sy); // skip the rest of this section
+                        continue;
+                    }
                     byte b = c.get(x, y, z);
                     int op = Blocks.OPACITY[b & 0xFF];
                     if (sky != 15 || op != 0) {
@@ -137,27 +154,49 @@ public final class LightEngine {
         }
     }
 
-    /** Lets light flow across the borders between a newly loaded chunk and its loaded neighbours. */
+    /**
+     * Lets light flow across the borders between a newly loaded chunk and its loaded neighbours.
+     * Reads both chunks' arrays directly and skips section pairs sharing the same light array
+     * (both full sky, or both buried), which is most of them.
+     */
     public void chunkJoined(Chunk c) {
-        int bx = c.cx << 4, bz = c.cz << 4;
-        for (int shift : new int[] {SKY, BLOCK}) {
-            for (int side = 0; side < 4; side++) {
-                int ncx = c.cx + (side == 0 ? -1 : side == 1 ? 1 : 0), ncz = c.cz + (side == 2 ? -1 : side == 3 ? 1 : 0);
-                if (world.chunk(ncx, ncz) == null) continue;
+        for (int side = 0; side < 4; side++) {
+            int sx = side == 0 ? -1 : side == 1 ? 1 : 0, sz = side == 2 ? -1 : side == 3 ? 1 : 0;
+            Chunk n = world.chunk(c.cx + sx, c.cz + sz);
+            if (n == null) continue;
+            for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
+                byte[] la = c.light[sy], lb = n.light[sy];
+                if (la == lb) continue; // identical uniform light on both sides: nothing to exchange
+                Section secA = c.sections[sy], secB = n.sections[sy];
+                int y0 = Chunk.sectionMinY(sy);
                 for (int i = 0; i < 16; i++) {
-                    // a: border cell inside c, b: the adjacent cell in the neighbour.
-                    int ax = side == 0 ? bx : side == 1 ? bx + 15 : bx + i;
-                    int az = side == 2 ? bz : side == 3 ? bz + 15 : bz + i;
-                    int nx = ax + (side == 0 ? -1 : side == 1 ? 1 : 0), nz = az + (side == 2 ? -1 : side == 3 ? 1 : 0);
-                    for (int y = Chunk.MIN_Y; y < Chunk.MAX_Y; y++) {
-                        int la = (worldAccess.get(ax, y, az) >> shift) & 15, lb = (worldAccess.get(nx, y, nz) >> shift) & 15;
-                        if (la > lb + 1 && worldAccess.opacity(nx, y, nz) < 15) addQueue.push(pack(ax, y, az), 0);
-                        else if (lb > la + 1 && worldAccess.opacity(ax, y, az) < 15) addQueue.push(pack(nx, y, nz), 0);
+                    int ax = side == 0 ? 0 : side == 1 ? 15 : i, az = side == 2 ? 0 : side == 3 ? 15 : i;
+                    int bx = side == 0 ? 15 : side == 1 ? 0 : i, bz = side == 2 ? 15 : side == 3 ? 0 : i;
+                    for (int ly = 0; ly < 16; ly++) {
+                        int ia = Section.index(ax, ly, az), ib = Section.index(bx, ly, bz);
+                        int va = la == null ? Chunk.DEFAULT_LIGHT : la[ia] & 0xFF;
+                        int vb = lb == null ? Chunk.DEFAULT_LIGHT : lb[ib] & 0xFF;
+                        if (va == vb) continue;
+                        int opA = secA == null ? 0 : Blocks.OPACITY[secA.blocks[ia] & 0xFF];
+                        int opB = secB == null ? 0 : Blocks.OPACITY[secB.blocks[ib] & 0xFF];
+                        int y = y0 + ly;
+                        int wax = (c.cx << 4) + ax, waz = (c.cz << 4) + az;
+                        int wbx = (n.cx << 4) + bx, wbz = (n.cz << 4) + bz;
+                        seedIfBrighter(va >> 4, vb >> 4, opB, wax, y, waz, wbx, wbz, skyQueue);
+                        seedIfBrighter(va & 15, vb & 15, opB, wax, y, waz, wbx, wbz, blockQueue);
+                        seedIfBrighter(vb >> 4, va >> 4, opA, wbx, y, wbz, wax, waz, skyQueue);
+                        seedIfBrighter(vb & 15, va & 15, opA, wbx, y, wbz, wax, waz, blockQueue);
                     }
                 }
             }
-            propagate(worldAccess, shift, addQueue);
         }
+        propagate(worldAccess, SKY, skyQueue);
+        propagate(worldAccess, BLOCK, blockQueue);
+    }
+
+    /** Seeds the brighter side if it can raise the other (transparent) side. */
+    private static void seedIfBrighter(int from, int to, int toOpacity, int fx, int y, int fz, int tx, int tz, LongQueue q) {
+        if (from > to + 1 && toOpacity < 15) q.push(pack(fx, y, fz), 0);
     }
 
     /** Hands out the sections whose light changed since the last call (they need re-meshing). */

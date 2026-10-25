@@ -43,15 +43,28 @@ public final class TerrainGenerator {
     public Chunk generate(int cx, int cz) {
         Chunk c = new Chunk(cx, cz);
         int[] heights = new int[256];
+        int minH = Integer.MAX_VALUE;
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
                 int h = height((cx << 4) + x, (cz << 4) + z);
                 heights[z * 16 + x] = h;
+                minH = Math.min(minH, h);
+            }
+        }
+        // Sections entirely below every column's stone line are filled in one go.
+        int stoneFrom = Chunk.MIN_Y + 1;
+        for (int sy = 0; Chunk.sectionMinY(sy) + 15 < minH - 3; sy++) {
+            c.fillSection(sy, Blocks.STONE);
+            stoneFrom = Chunk.sectionMinY(sy) + 16;
+        }
+        for (int z = 0; z < 16; z++) {
+            for (int x = 0; x < 16; x++) {
+                int h = heights[z * 16 + x];
                 boolean beach = h <= SEA_LEVEL + 1;
                 byte top = h < SEA_LEVEL - 4 ? Blocks.GRAVEL : beach ? Blocks.SAND : Blocks.GRASS;
                 byte under = beach ? top : Blocks.DIRT;
                 c.set(x, Chunk.MIN_Y, z, Blocks.BEDROCK);
-                for (int y = Chunk.MIN_Y + 1; y < h - 3; y++) c.set(x, y, z, Blocks.STONE);
+                for (int y = stoneFrom; y < h - 3; y++) c.set(x, y, z, Blocks.STONE);
                 for (int y = Math.max(Chunk.MIN_Y + 1, h - 3); y < h; y++) c.set(x, y, z, under);
                 c.set(x, h, z, top);
                 for (int y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, Blocks.WATER);

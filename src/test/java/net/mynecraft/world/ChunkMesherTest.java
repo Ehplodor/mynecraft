@@ -157,12 +157,19 @@ class ChunkMesherTest {
     }
 
     @Test
-    void benchmarkGenerateAndMesh() {
+    void benchmarkGenerateJoinAndMesh() {
+        int r = 8, n = (2 * r + 3) * (2 * r + 3);
         World w = new World(1337);
-        int r = 8;
+        Chunk[] fresh = new Chunk[n];
+        // Warm-up pass so the JIT does not dominate the numbers.
+        for (int i = 0; i < 64; i++) w.generator.generate(100 + i, 100);
+
         long t0 = System.nanoTime();
-        for (int x = -r - 1; x <= r + 1; x++) for (int z = -r - 1; z <= r + 1; z++) w.getOrGenerate(x, z);
+        int k = 0;
+        for (int x = -r - 1; x <= r + 1; x++) for (int z = -r - 1; z <= r + 1; z++) fresh[k++] = w.generator.generate(x, z);
         long t1 = System.nanoTime();
+        for (Chunk c : fresh) { w.put(c); w.light.chunkJoined(c); } // main-thread cross-border light
+        long t2 = System.nanoTime();
         ChunkMesher m = new ChunkMesher();
         long quads = 0;
         int sections = 0;
@@ -174,9 +181,9 @@ class ChunkMesherTest {
                 sections++;
             }
         }
-        long t2 = System.nanoTime();
-        System.out.printf("gen+light: %.3f ms/chunk | mesh: %.3f ms/section (%d sections) | %.1f quads/section%n",
-            (t1 - t0) / 1e6 / ((2 * r + 3) * (2 * r + 3)), (t2 - t1) / 1e6 / sections, sections, quads / (double) sections);
+        long t3 = System.nanoTime();
+        System.out.printf("gen+light: %.3f ms/chunk | join: %.3f ms/chunk | mesh: %.3f ms/section (%d sections) | %.1f quads/section%n",
+            (t1 - t0) / 1e6 / n, (t2 - t1) / 1e6 / n, (t3 - t2) / 1e6 / sections, sections, quads / (double) sections);
         assertTrue(sections > 0);
     }
 }
