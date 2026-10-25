@@ -13,6 +13,7 @@ import net.mynecraft.world.FluidSimulator;
 import net.mynecraft.world.crafting.CraftingMenu;
 import net.mynecraft.world.crafting.RecipeBook;
 import net.mynecraft.world.Inventory;
+import net.mynecraft.world.Landscape;
 import net.mynecraft.world.Survival;
 import net.mynecraft.world.storage.PlayerData;
 import net.mynecraft.world.Placement;
@@ -76,7 +77,8 @@ public final class Main {
                 Math.floorMod((long) Math.round(yawDeg), 360), Math.toDegrees(cam.pitch)),
             "Bloc visé : " + target,
             String.format("Lumière : ciel %d | bloc %d", light >> 4, light & 15),
-            String.format("Climat : température %.2f | humidité %.2f", world.generator.temperature(bx, bz),
+            String.format("Biome : %s | température %.2f | humidité %.2f",
+                Landscape.BIOME_NAMES[world.generator.column(bx, bz).biome()], world.generator.temperature(bx, bz),
                 world.generator.downfall(bx, bz)),
             String.format("Heure : %d ticks | jour %d", (long) ticks % DayCycle.DAY_TICKS, (long) ticks / DayCycle.DAY_TICKS),
             String.format("Sections : %d dessinées / %d maillées | %d quads", renderer.drawnSections,
@@ -183,12 +185,13 @@ public final class Main {
             player.y = Math.max(Chunk.MIN_Y + 1, Math.min(Chunk.MAX_Y - 2, storage.playerPos[1]));
             player.z = storage.playerPos[2];
         } else {
-            player.x = 8.5;
-            player.z = 8.5;
-            player.y = world.generator.height(8, 8) + 1;
+            int[] spawn = world.generator.findSpawn(8, 8);
+            player.x = spawn[0] + 0.5;
+            player.y = spawn[1];
+            player.z = spawn[2] + 0.5;
         }
         // Survival state: vanilla game mode, health, air and inventory from level.dat.
-        if (storage.spawn == null) storage.spawn = new int[] {8, world.generator.height(8, 8) + 1, 8};
+        if (storage.spawn == null) storage.spawn = world.generator.findSpawn(8, 8); // dry land, not a glacier
         PlayerData playerData = storage.player != null ? storage.player : new PlayerData();
         boolean creative = argv.contains("--creative") || (playerData.creative && !argv.contains("--survival"));
         Inventory inventory = playerData.inventory;

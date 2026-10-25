@@ -2,52 +2,52 @@ package net.mynecraft.world;
 
 public final class TerrainGenerator {
     public static final int SEA_LEVEL = 63;
-    private final Noise noise, temperatureNoise, downfallNoise, tunnelA, tunnelB, cavern, mountainMask, ridges;
     /** Above this height the surface is bare rock. */
     public static final int ROCK_LINE = 135;
+    private final Noise tunnelA, tunnelB, cavern;
+    private final Landscape landscape;
     private final long seed;
 
     public TerrainGenerator(long seed) {
-        this.noise = new Noise(seed);
-        this.temperatureNoise = new Noise(seed ^ 0x5DEECE66DL);
-        this.downfallNoise = new Noise(seed * 31 + 17);
         this.tunnelA = new Noise(seed + 101);
         this.tunnelB = new Noise(seed + 202);
         this.cavern = new Noise(seed + 303);
-        this.mountainMask = new Noise(seed + 404);
-        this.ridges = new Noise(seed + 505);
+        this.landscape = new Landscape(seed);
         this.seed = seed;
     }
 
     /** Climate in [0, 1], smooth over hundreds of blocks; drives grass and foliage colours. */
     public float temperature(int wx, int wz) {
-        return clamp01(0.5f + temperatureNoise.fbm(wx / 600f, wz / 600f, 3) * 1.1f);
+        return landscape.temperature(wx, wz);
     }
 
     public float downfall(int wx, int wz) {
-        return clamp01(0.5f + downfallNoise.fbm(wx / 500f, wz / 500f, 3) * 1.1f);
-    }
-
-    private static float smoothstep(float e0, float e1, float v) {
-        float t = clamp01((v - e0) / (e1 - e0));
-        return t * t * (3 - 2 * t);
-    }
-
-    private static float clamp01(float v) {
-        return Math.max(0, Math.min(1, v));
+        return landscape.downfall(wx, wz);
     }
 
     public int height(int wx, int wz) {
-        float n = noise.fbm(wx / 128f, wz / 128f, 5);
-        // Mountain ranges: a slow mask selects where they rise, ridged noise shapes crests and peaks.
-        float mask = smoothstep(0.05f, 0.45f, mountainMask.fbm(wx / 700f, wz / 700f, 2));
-        float mountains = 0;
-        if (mask > 0) {
-            float r = 1 - Math.abs(ridges.fbm(wx / 220f, wz / 220f, 4));
-            mountains = mask * r * r * 110;
+        return landscape.column(wx, wz).height();
+    }
+
+    public Landscape.Column column(int wx, int wz) {
+        return landscape.column(wx, wz);
+    }
+
+    /** A dry, non-snowy land column near (x, z) to spawn on, searched in a growing square. */
+    public int[] findSpawn(int x, int z) {
+        for (int r = 0; r < 4096; r += 16) {
+            for (int dz = -r; dz <= r; dz += 16)
+                for (int dx = -r; dx <= r; dx += 16) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                    Landscape.Column c = landscape.column(x + dx, z + dz);
+                    byte b = c.biome();
+                    if (c.height() > SEA_LEVEL + 1 && c.height() < ROCK_LINE && b != Landscape.BEACH
+                        && b != Landscape.GLACIER && b != Landscape.SNOWY_PEAKS) {
+                        return new int[] {x + dx, c.height() + 1, z + dz};
+                    }
+                }
         }
-        int h = SEA_LEVEL + 10 + (int) (n * 45 + mountains);
-        return Math.max(Chunk.MIN_Y + 1, Math.min(Chunk.MAX_Y - 12, h));
+        return new int[] {x, height(x, z) + 1, z};
     }
 
     /** Deterministic per-column random in [0, 1000). */
@@ -61,57 +61,149 @@ public final class TerrainGenerator {
 
     public Chunk generate(int cx, int cz) {
         Chunk c = new Chunk(cx, cz);
+        Landscape.Column[] cols = landscape.chunkColumns(cx, cz);
         int[] heights = new int[256];
+        byte[] biomes = new byte[256];
         int minH = Integer.MAX_VALUE;
-        for (int z = 0; z < 16; z++) {
+        for (int z = 0; z < 16; z++)
             for (int x = 0; x < 16; x++) {
-                int h = height((cx << 4) + x, (cz << 4) + z);
-                heights[z * 16 + x] = h;
-                minH = Math.min(minH, h);
+                Landscape.Column col = cols[(z + 1) * 18 + x + 1];
+                heights[z * 16 + x] = col.height();
+                biomes[z * 16 + x] = col.biome();
+                minH = Math.min(minH, col.height());
             }
-        }
         // Sections entirely below every column's stone line are filled in one go.
         int stoneFrom = Chunk.MIN_Y + 1;
-        for (int sy = 0; Chunk.sectionMinY(sy) + 15 < minH - 3; sy++) {
+        for (int sy = 0; Chunk.sectionMinY(sy) + 15 < minH - 4; sy++) {
             c.fillSection(sy, Chunk.sectionMinY(sy) < DEEPSLATE_TOP ? Blocks.DEEPSLATE : Blocks.STONE);
             stoneFrom = Chunk.sectionMinY(sy) + 16;
         }
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
                 int h = heights[z * 16 + x];
-                boolean beach = h <= SEA_LEVEL + 1;
-                boolean rock = h > ROCK_LINE;
-                byte top = rock ? Blocks.STONE : h < SEA_LEVEL - 4 ? Blocks.GRAVEL : beach ? Blocks.SAND : Blocks.GRASS;
-                byte under = rock ? Blocks.STONE : beach ? top : Blocks.DIRT;
+                byte biome = biomes[z * 16 + x];
+                // Steep ground shows bare rock (cliffs, plateau edges, ravine walls).
+                int steep = 0;
+                for (int[] o : new int[][] {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+                    steep = Math.max(steep, h - cols[(z + 1 + o[1]) * 18 + x + 1 + o[0]].height());
+                }
+                byte[] surface = surface(biome, h, steep > 3);
                 c.set(x, Chunk.MIN_Y, z, Blocks.BEDROCK);
                 for (int y = stoneFrom; y < h - 3; y++) c.set(x, y, z, y < DEEPSLATE_TOP ? Blocks.DEEPSLATE : Blocks.STONE);
-                for (int y = Math.max(Chunk.MIN_Y + 1, h - 3); y < h; y++) c.set(x, y, z, under);
-                c.set(x, h, z, top);
-                for (int y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, Blocks.WATER);
+                for (int y = Math.max(Chunk.MIN_Y + 1, h - 3); y < h; y++) c.set(x, y, z, surface[1]);
+                c.set(x, h, z, surface[0]);
+                if (biome == Landscape.GLACIER) { // an ice cap on top of the rock
+                    int cap = 3 + hash((cx << 4) + x, (cz << 4) + z) % 4;
+                    for (int y = h - cap + 1; y <= h; y++) c.set(x, y, z, Blocks.PACKED_ICE);
+                }
+                boolean frozen = biome == Landscape.FROZEN_OCEAN || biome == Landscape.FROZEN_RIVER;
+                for (int y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, frozen && y == SEA_LEVEL ? Blocks.ICE : Blocks.WATER);
             }
         }
+        carveRavines(c, cols, heights);
         carveCaves(c, heights);
         ores(c, heights);
-        // Decorations stay inside the chunk so generation never depends on neighbours.
-        for (int z = 0; z < 16; z++) {
-            for (int x = 0; x < 16; x++) {
-                int h = heights[z * 16 + x];
-                if (c.get(x, h, z) != Blocks.GRASS) continue;
-                int r = hash((cx << 4) + x, (cz << 4) + z);
-                if (r < 8 && x >= 2 && x <= 13 && z >= 2 && z <= 13) {
-                    int wx = (cx << 4) + x, wz = (cz << 4) + z;
-                    float t = temperature(wx, wz), d = downfall(wx, wz);
-                    if (t < 0.35f) spruce(c, x, h + 1, z, 6 + r % 3);
-                    else if (d > 0.55f) tree(c, x, h + 1, z, 5 + r % 2, Blocks.BIRCH_LOG, Blocks.BIRCH_LEAVES);
-                    else tree(c, x, h + 1, z, 4 + r % 3, Blocks.OAK_LOG, Blocks.OAK_LEAVES);
-                }
-                else if (r < 150 && c.get(x, h + 1, z) == Blocks.AIR) c.set(x, h + 1, z, Blocks.SHORT_GRASS);
-                else if (r < 165 && c.get(x, h + 1, z) == Blocks.AIR) c.set(x, h + 1, z, Blocks.POPPY);
-            }
-        }
+        decorate(c, heights, biomes);
         c.compact();
         LightEngine.initChunk(c);
         return c;
+    }
+
+    /** Top block and the 3 blocks below it for a biome. */
+    private static byte[] surface(byte biome, int h, boolean steep) {
+        switch (biome) {
+            case Landscape.OCEAN, Landscape.FROZEN_OCEAN:
+                return h < SEA_LEVEL - 12 ? new byte[] {Blocks.GRAVEL, Blocks.GRAVEL} : new byte[] {Blocks.SAND, Blocks.SAND};
+            case Landscape.RIVER, Landscape.FROZEN_RIVER, Landscape.LAKE:
+                return new byte[] {Blocks.SAND, Blocks.DIRT};
+            case Landscape.BEACH:
+                return new byte[] {Blocks.SAND, Blocks.SAND};
+            case Landscape.STONY_PEAKS:
+                return new byte[] {Blocks.STONE, Blocks.STONE};
+            case Landscape.SNOWY_PEAKS:
+                return new byte[] {steep ? Blocks.STONE : Blocks.SNOW_BLOCK, Blocks.STONE};
+            case Landscape.GLACIER:
+                return new byte[] {Blocks.PACKED_ICE, Blocks.STONE};
+            case Landscape.SNOWY_PLAINS, Landscape.SNOWY_TAIGA:
+                return new byte[] {steep ? Blocks.STONE : Blocks.SNOW_BLOCK, Blocks.DIRT};
+            default:
+                return steep ? new byte[] {Blocks.STONE, Blocks.STONE} : new byte[] {Blocks.GRASS, Blocks.DIRT};
+        }
+    }
+
+    /** Ravines: narrow vertical cuts, carved per column down from the surface. */
+    private void carveRavines(Chunk c, Landscape.Column[] cols, int[] heights) {
+        for (int z = 0; z < 16; z++)
+            for (int x = 0; x < 16; x++) {
+                Landscape.Column col = cols[(z + 1) * 18 + x + 1];
+                int depth = landscape.ravineDepth((c.cx << 4) + x, (c.cz << 4) + z, col);
+                if (depth <= 0) continue;
+                int h = heights[z * 16 + x];
+                for (int y = h; y > h - depth && y > Chunk.MIN_Y + 5; y--) c.set(x, y, z, Blocks.AIR);
+                heights[z * 16 + x] = h - depth; // decorations go on the ravine floor (none: no grass there)
+            }
+    }
+
+    /** Trees and plants, with densities and species per biome. Trees stay inside the chunk. */
+    private void decorate(Chunk c, int[] heights, byte[] biomes) {
+        int cx = c.cx, cz = c.cz;
+        for (int z = 0; z < 16; z++) {
+            for (int x = 0; x < 16; x++) {
+                int h = heights[z * 16 + x];
+                byte ground = c.get(x, h, z);
+                if (ground != Blocks.GRASS && ground != Blocks.SNOW_BLOCK) continue;
+                if (c.get(x, h + 1, z) != Blocks.AIR) continue;
+                byte biome = biomes[z * 16 + x];
+                int r = hash((cx << 4) + x, (cz << 4) + z);
+                int trees = switch (biome) {
+                    case Landscape.DARK_FOREST -> 140;
+                    case Landscape.FOREST, Landscape.BIRCH_FOREST -> 70;
+                    case Landscape.TAIGA -> 60;
+                    case Landscape.SNOWY_TAIGA -> 35;
+                    case Landscape.PLATEAU -> 12;
+                    case Landscape.PLAINS, Landscape.DRY_PLAINS -> 4;
+                    case Landscape.SNOWY_PLAINS -> 3;
+                    default -> 0;
+                };
+                if (r < trees && x >= 3 && x <= 12 && z >= 3 && z <= 12) {
+                    switch (biome) {
+                        case Landscape.TAIGA, Landscape.SNOWY_TAIGA, Landscape.SNOWY_PLAINS -> spruce(c, x, h + 1, z, 6 + r % 4);
+                        case Landscape.BIRCH_FOREST -> tree(c, x, h + 1, z, 5 + r % 3, Blocks.BIRCH_LOG, Blocks.BIRCH_LEAVES);
+                        case Landscape.DARK_FOREST -> {
+                            if (r % 3 == 0) bigOak(c, x, h + 1, z, 7 + r % 3);
+                            else tree(c, x, h + 1, z, 5 + r % 2, r % 3 == 1 ? Blocks.OAK_LOG : Blocks.BIRCH_LOG,
+                                r % 3 == 1 ? Blocks.OAK_LEAVES : Blocks.BIRCH_LEAVES);
+                        }
+                        case Landscape.FOREST -> {
+                            if (r % 5 == 0) tree(c, x, h + 1, z, 5, Blocks.BIRCH_LOG, Blocks.BIRCH_LEAVES);
+                            else tree(c, x, h + 1, z, 4 + r % 3, Blocks.OAK_LOG, Blocks.OAK_LEAVES);
+                        }
+                        default -> tree(c, x, h + 1, z, 4 + r % 3, Blocks.OAK_LOG, Blocks.OAK_LEAVES);
+                    }
+                    continue;
+                }
+                if (ground != Blocks.GRASS) continue;
+                int grass = biome == Landscape.PLAINS || biome == Landscape.DRY_PLAINS ? 250 : 120;
+                if (r >= 300 && r < 300 + grass) c.set(x, h + 1, z, Blocks.SHORT_GRASS);
+                else if (r >= 700 && r < (biome == Landscape.PLAINS ? 730 : 712)) c.set(x, h + 1, z, Blocks.POPPY);
+            }
+        }
+    }
+
+    /** Big oak: tall trunk and a wide two-layer crown (dense forests). */
+    private static void bigOak(Chunk c, int x, int y, int z, int trunk) {
+        int top = y + trunk;
+        for (int ly = top - 3; ly <= top + 1; ly++) {
+            int r = ly >= top ? 2 : 3;
+            for (int dz = -r; dz <= r; dz++)
+                for (int dx = -r; dx <= r; dx++) {
+                    if (dx * dx + dz * dz > r * r + 1) continue;
+                    if (ly == top + 1 && dx * dx + dz * dz > 2) continue;
+                    if (c.get(x + dx, ly, z + dz) == Blocks.AIR) c.set(x + dx, ly, z + dz, Blocks.OAK_LEAVES);
+                }
+        }
+        for (int ty = y; ty < top; ty++) c.set(x, ty, z, Blocks.OAK_LOG);
+        c.set(x, y - 1, z, Blocks.DIRT);
     }
 
     // ---- caves ----

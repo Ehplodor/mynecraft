@@ -154,6 +154,13 @@ def main():
     save("crafting_table_side", rgba(table(False), 39))
     save("crafting_table_front", rgba(lambda x, y, r: (60, 60, 64, 255) if 9 <= x <= 12 and 4 <= y <= 7 else table(False)(x, y, r), 40))
 
+    # Snow and ice.
+    save("snow_block", rgba(lambda x, y, r: (lambda v: (v, v, clamp(v + 6), 255))(clamp(240 + r.randint(-10, 8))), 41))
+    save("ice", rgba(lambda x, y, r: (clamp(150 + r.randint(-10, 10)), clamp(190 + r.randint(-10, 10)), 250,
+                                      230 if (x + 2 * y) % 9 == 0 else 170), 42))
+    save("packed_ice", rgba(lambda x, y, r: (clamp(140 + r.randint(-12, 12)), clamp(175 + r.randint(-12, 12)),
+                                             clamp(235 + r.randint(-8, 8)), 255), 43))
+
     # Biome colormaps (vanilla layout: x = 1 - temperature, y = 1 - downfall * temperature).
     def colormap(name, hot_dry, cold, wet):
         img = Image.new("RGB", (256, 256))
@@ -317,7 +324,7 @@ def main():
     write_json("models/block/lava.json", {"textures": {"particle": "block/lava_still"}})
     write_json("blockstates/lava.json", {"variants": {"": {"model": "minecraft:block/lava"}}})
     for name in ("granite", "diorite", "andesite", "deepslate", "coal_ore", "iron_ore", "gold_ore", "diamond_ore",
-                 "birch_planks", "spruce_planks", "obsidian"):
+                 "birch_planks", "spruce_planks", "obsidian", "snow_block", "ice", "packed_ice"):
         write_json(f"models/block/{name}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{name}"}})
         write_json(f"blockstates/{name}.json", {"variants": {"": {"model": f"minecraft:block/{name}"}}})
     for wood in ("birch", "spruce"):

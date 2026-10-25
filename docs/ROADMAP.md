@@ -183,3 +183,17 @@
 - Créatif : `E` ouvre la palette de tous les blocs, un clic remplit l'emplacement choisi
 - Pack de données intégré : planches (chêne, bouleau, épicéa), établi, dalles ; tags `planks`, `logs`
 - Limites : pas de livre de recettes, pas de four (verre, pierre lisse), pas d'objets non-blocs
+
+## ✅ M14 — Paysages variés
+- Modèle `Landscape` inspiré de 1.18+ : continentalité (océans, côtes, terres), érosion (plaines plates
+  « stables » ↔ montagnes à crêtes), plateaux à falaises, rivières creusées sous le niveau de la mer
+  jusqu'aux océans, lacs de plaine avec rive garantie, ravins étroits et profonds
+- Champs lents échantillonnés tous les 4 blocs puis interpolés : même hauteur en chunk ou en colonne isolée
+- 18 biomes : océan (gelé), plage, rivière (gelée), lac, plaine, plaine sèche, plaine enneigée, forêt,
+  forêt de bouleaux, forêt sombre (grands chênes), taïga, taïga enneigée, plateau, pics rocheux,
+  pics enneigés, glacier (calotte de glace compacte) ; température abaissée par l'altitude
+- Roche nue sur les pentes raides ; glace sur les eaux froides ; neige, glace, glace compacte ajoutées
+- Répartition mesurée (graine 7, 6 × 6 km) : océans 28 %, plaines 22 %, forêts 30 %, rivières/lacs 8 %,
+  plateaux 5 %, montagnes et glaciers 4 %, plages 3 %
+- Point d'apparition cherché sur la terre ferme ; biome affiché dans F3
+- Coût : génération + lumière ~0,75 ms/chunk (contre 0,65), relief plus riche (~189 quads/section)
