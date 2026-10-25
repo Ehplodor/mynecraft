@@ -6,27 +6,34 @@ import java.util.Arrays;
  * Greedy mesher for one section. Visible faces with the same block, light and ambient occlusion are
  * merged into the largest rectangles possible, so flat terrain becomes a handful of quads.
  *
- * <p>Each vertex is two ints (8 bytes):
+ * <p>Each quad is one 16-byte record (4 ints), read by the vertex shader through a texture buffer
+ * ("vertex pulling"): the shader builds the quad's 6 vertices from {@code gl_VertexID}.
  * <ol>
- *   <li>x,y,z (5 bits each, 0..16) | face (3 bits: 0-5 cube faces, 6 cross plane) | texture layer
- *       (10 bits) | tint type (2 bits) | special (2 bits: 0 none, 1 water surface 2/16 lower,
- *       2 half block 8/16 lower, 3 tinted overlay in layer + 1 over an untinted base).
- *       UVs are derived from position in the shader, so merged quads tile their texture.</li>
- *   <li>smooth sky light (6 bits) | smooth block light (6 bits) | ambient occlusion 0..3 &lt;&lt; 12
- *       | section x mod 64 &lt;&lt; 14 | section z mod 64 &lt;&lt; 20 | section index &lt;&lt; 26. Smooth light is
- *       the exact sum of the 4 cells around the vertex (0..60). The section position lets every section
- *       share one buffer and one draw call: the shader rebuilds camera-relative positions from it.</li>
+ *   <li>origin x, y, z (5 bits each, 0..16; the origin is the corner at the low u and v of the face)
+ *       | face &lt;&lt; 15 (3 bits: 0-5 cube faces, 6 cross plane) | width - 1 &lt;&lt; 18 | height - 1 &lt;&lt; 22
+ *       (4 bits each, along the face's u and v axes) | special &lt;&lt; 26 (3 bits, see SPECIAL_*) | split &lt;&lt; 29
+ *       (1: triangles share the 1-3 diagonal instead of 0-2). Cross planes reuse width/height bit 0 as
+ *       "second diagonal" and "back side".</li>
+ *   <li>texture layer (10 bits) | tint type &lt;&lt; 10 | section x mod 64 &lt;&lt; 12 | section z mod 64 &lt;&lt; 18
+ *       | section index &lt;&lt; 24.</li>
+ *   <li>light of corners 0 and 1 (12 bits each: smooth sky 0..60 | smooth block 0..60 &lt;&lt; 6)
+ *       | ambient occlusion of corners 0..3 &lt;&lt; 24 (2 bits each).</li>
+ *   <li>light of corners 2 and 3.</li>
  * </ol>
- * Quads are 4 consecutive vertices drawn with a shared index buffer (0,1,2, 2,3,0), grouped by
- * render layer: opaque, then cutout, then translucent.
+ * Corners are numbered (u0,v0), (u1,v0), (u1,v1), (u0,v1). Smooth light is the exact sum of the 4
+ * cells around a vertex. UVs are derived from position in the shader, so merged quads tile their
+ * texture. Quads are grouped by render layer: opaque, then cutout, then translucent.
  *
  * <p>Not thread-safe: use one instance per thread; buffers are reused between calls.
  */
 public final class ChunkMesher {
-    public static final int INTS_PER_VERTEX = 2, INTS_PER_QUAD = 4 * INTS_PER_VERTEX;
+    public static final int INTS_PER_QUAD = 4;
     private static final int P = Section.SIZE + 2;
     private static final int[] STRIDE = {1, P * P, P}; // padded index step along x, y, z
     private static final int CROSS_FACE = 6;
+    /** Vertex adjustments applied by the shader (3-bit field). */
+    public static final int SPECIAL_NONE = 0, SPECIAL_WATER = 1, SPECIAL_SLAB_BOTTOM = 2, SPECIAL_OVERLAY = 3,
+        SPECIAL_SLAB_TOP = 4;
 
     /**
      * Mesh of one section; {@link #data} holds the layers back to back. {@link #visibility} says which
@@ -40,6 +47,23 @@ public final class ChunkMesher {
         }
     }
 
+    // ---- quad record accessors (tests, tools) ----
+
+    public static int face(int[] d, int q) { return d[q * 4] >> 15 & 7; }
+
+    public static int special(int[] d, int q) { return d[q * 4] >> 26 & 7; }
+
+    public static int originY(int[] d, int q) { return d[q * 4] >> 5 & 31; }
+
+    public static int layer(int[] d, int q) { return d[q * 4 + 1] & 1023; }
+
+    /** Smooth light of corner k: sky sum | block sum &lt;&lt; 6. */
+    public static int light(int[] d, int q, int k) { return d[q * 4 + 2 + (k >> 1)] >> ((k & 1) * 12) & 0xFFF; }
+
+    public static int ao(int[] d, int q, int k) { return d[q * 4 + 2] >>> 24 >> (k * 2) & 3; }
+
+    public static int sectionWord(int[] d, int q) { return d[q * 4 + 1]; }
+
     /** Result for a section that is opaque and walled in: no faces, no sight through it. */
     private static final Result SOLID = new Result(new int[0], 0, 0, 0, 0);
     private final Chunk[] around = new Chunk[9];
@@ -47,8 +71,6 @@ public final class ChunkMesher {
     private final byte[] padded = new byte[P * P * P];
     private final byte[] paddedLight = new byte[P * P * P];
     private final long[] mask = new long[Section.SIZE * Section.SIZE];
-    static final int SPECIAL_WATER = 1 << 30, SPECIAL_HALF = 2 << 30, SPECIAL_OVERLAY = 3 << 30;
-    private static final int LOWERED_FLAG = SPECIAL_WATER;
     private static final int WATER_SURFACE = 0x80; // key bit on the block field (ids stay below 128)
     private final int[][] out = {new int[4096], new int[1024], new int[1024]};
     private final int[] count = new int[3];
@@ -88,12 +110,13 @@ public final class ChunkMesher {
         meshSlabs();
         int vis = visibility.compute(section);
         int total = count[0] + count[1] + count[2];
+        if (total == 0) return new Result(new int[0], 0, 0, 0, vis);
         int[] data = new int[total];
         System.arraycopy(out[0], 0, data, 0, count[0]);
         System.arraycopy(out[1], 0, data, count[0], count[1]);
         System.arraycopy(out[2], 0, data, count[0] + count[1], count[2]);
-        int sectionBits = (chunk.cx & 63) << 14 | (chunk.cz & 63) << 20 | sy << 26;
-        for (int i = 1; i < total; i += INTS_PER_VERTEX) data[i] |= sectionBits;
+        int sectionBits = (chunk.cx & 63) << 12 | (chunk.cz & 63) << 18 | sy << 24;
+        for (int i = 1; i < total; i += INTS_PER_QUAD) data[i] |= sectionBits;
         return new Result(data, count[0] / INTS_PER_QUAD, count[1] / INTS_PER_QUAD, count[2] / INTS_PER_QUAD, vis);
     }
 
@@ -226,62 +249,48 @@ public final class ChunkMesher {
         }
     }
 
-    private int[] reserve(int layer) {
-        if (count[layer] + INTS_PER_QUAD > out[layer].length) out[layer] = Arrays.copyOf(out[layer], out[layer].length * 2);
-        return out[layer];
-    }
-
     private void emitQuad(int d, int u, int v, int plane, int i, int j, int w, int h,
                           int face, long key, boolean positive) {
         int blockField = (int) (key & 0xFF), block = blockField & 0x7F;
         int a0 = (int) (key >> 8) & 3, a1 = (int) (key >> 10) & 3, a2 = (int) (key >> 12) & 3, a3 = (int) (key >> 14) & 3;
         int l0 = (int) (key >> 16) & 0xFFF, l1 = (int) (key >> 28) & 0xFFF, l2 = (int) (key >> 40) & 0xFFF, l3 = (int) (key >>> 52);
-        int layer = Blocks.LAYER[block];
-        int[] o = reserve(layer);
-        int tail = tail(face, faceInfo[block * 6 + face]);
-        int sd = d * 5, su = u * 5, sv = v * 5;
-        int base = (plane << sd) | tail;
-        // Water surface: lower the top face entirely, and the top edge of side faces (y is u or v).
-        int low0 = 0, low1 = 0, low2 = 0, low3 = 0;
-        if ((blockField & WATER_SURFACE) != 0) {
-            if (face == 3) low0 = low1 = low2 = low3 = LOWERED_FLAG;
-            else if (u == 1) low1 = low2 = LOWERED_FLAG;          // corners with u1 are on top
-            else if (v == 1) low2 = low3 = LOWERED_FLAG;          // corners with v1 are on top
-        }
-        int u0 = i << su, u1 = (i + w) << su, v0 = j << sv, v1 = (j + h) << sv;
-        int p0 = base | u0 | v0 | low0, p1 = base | u1 | v0 | low1, p2 = base | u1 | v1 | low2, p3 = base | u0 | v1 | low3;
-        int x0 = l0 | a0 << 12, x1 = l1 | a1 << 12, x2 = l2 | a2 << 12, x3 = l3 | a3 << 12;
+        int[] p = new int[3];
+        p[d] = plane;
+        p[u] = i;
+        p[v] = j;
+        int info = faceInfo[block * 6 + face];
+        int special = (blockField & WATER_SURFACE) != 0 ? SPECIAL_WATER : overlay(info);
         // Brightness per corner decides the split diagonal, otherwise light and AO look anisotropic.
-        int b0 = score(a0, l0), b1 = score(a1, l1), b2 = score(a2, l2), b3 = score(a3, l3);
-        int c = count[layer];
-        if (positive) {
-            c = quad(o, c, b0 + b2 > b1 + b3, p0, x0, p1, x1, p2, x2, p3, x3);
-        } else {
-            c = quad(o, c, b0 + b2 > b1 + b3, p0, x0, p3, x3, p2, x2, p1, x1);
-        }
-        count[layer] = c;
+        boolean split = score(a0, l0) + score(a2, l2) > score(a1, l1) + score(a3, l3);
+        put(Blocks.LAYER[block], p[0], p[1], p[2], face, w - 1, h - 1, special, split, info,
+            l0 | l1 << 12 | (a0 | a1 << 2 | a2 << 4 | a3 << 6) << 24, l2 | l3 << 12);
     }
 
-    /** Face, texture layer, tint and overlay bits of a vertex (see class doc). */
-    private static int tail(int face, int info) {
-        return face << 15 | (info & 0xFFF) << 18 | ((info >> 12 & 1) != 0 ? SPECIAL_OVERLAY : 0);
+    private static int overlay(int info) {
+        return (info >> 12 & 1) != 0 ? SPECIAL_OVERLAY : SPECIAL_NONE;
+    }
+
+    /** Appends one quad record to a layer. */
+    private void put(int layer, int x, int y, int z, int face, int wm1, int hm1, int special, boolean split,
+                     int info, int light01, int light23) {
+        if (count[layer] + INTS_PER_QUAD > out[layer].length) out[layer] = Arrays.copyOf(out[layer], out[layer].length * 2);
+        int[] o = out[layer];
+        int c = count[layer];
+        o[c] = x | y << 5 | z << 10 | face << 15 | wm1 << 18 | hm1 << 22 | special << 26 | (split ? 1 << 29 : 0);
+        o[c + 1] = info & 0xFFF; // layer + tint; section bits are added once the mesh is complete
+        o[c + 2] = light01;
+        o[c + 3] = light23;
+        count[layer] = c + INTS_PER_QUAD;
     }
 
     private static int score(int ao, int light) {
         return ao * 64 + Math.max(light & 63, light >> 6);
     }
 
-    /**
-     * Writes 4 vertices in winding order; when {@code rotate} the list starts at the second vertex,
-     * which moves the shared-index diagonal from 0-2 to 1-3 without changing the winding.
-     */
-    private static int quad(int[] o, int c, boolean rotate, int pa, int la, int pb, int lb, int pc, int lc, int pd, int ld) {
-        if (rotate) {
-            o[c++] = pb; o[c++] = lb; o[c++] = pc; o[c++] = lc; o[c++] = pd; o[c++] = ld; o[c++] = pa; o[c++] = la;
-        } else {
-            o[c++] = pa; o[c++] = la; o[c++] = pb; o[c++] = lb; o[c++] = pc; o[c++] = lc; o[c++] = pd; o[c++] = ld;
-        }
-        return c;
+    /** Uniform corner lights for a single cell value (sky &lt;&lt; 4 | block), AO fully open. */
+    private static int[] flatLight(int l) {
+        int c = (l >> 4) * 4 | (l & 15) * 4 << 6;
+        return new int[] {c | c << 12 | 0xFF << 24, c | c << 12};
     }
 
     /** Plants: two diagonal planes, each drawn from both sides, lit by their own cell, no AO. */
@@ -292,22 +301,18 @@ public final class ChunkMesher {
                     int idx = pIndex(x, y, z);
                     byte b = padded[idx];
                     if (Blocks.SHAPE[b & 0xFF] != Blocks.SHAPE_CROSS) continue;
-                    int l = paddedLight[idx] & 0xFF;
-                    int light = (l >> 4) * 4 | (l & 15) * 4 << 6 | 3 << 12;
-                    int tail = tail(CROSS_FACE, faceInfo[(b & 0xFF) * 6 + 4]);
-                    int x1 = x + 1, y1 = y + 1, z1 = z + 1;
-                    crossQuad(Blocks.LAYER[b], tail, light, x, y, z, x1, z1, y1);
-                    crossQuad(Blocks.LAYER[b], tail, light, x1, y, z1, x, z, y1);
-                    crossQuad(Blocks.LAYER[b], tail, light, x1, y, z, x, z1, y1);
-                    crossQuad(Blocks.LAYER[b], tail, light, x, y, z1, x1, z, y1);
+                    int[] light = flatLight(paddedLight[idx] & 0xFF);
+                    int info = faceInfo[(b & 0xFF) * 6 + 4];
+                    for (int diagonal = 0; diagonal < 2; diagonal++)
+                        for (int back = 0; back < 2; back++)
+                            put(Blocks.LAYER[b], x, y, z, CROSS_FACE, diagonal, back, SPECIAL_NONE, false, info, light[0], light[1]);
                 }
     }
 
     /**
-     * Slabs: six faces per block (no merging), half height through the vertex "half block" flag
-     * (8/16 lower). A top slab's lower vertices are emitted at the block top and lowered, so one flag
-     * covers both halves. The face inside the cell uses the cell's own light, outer faces the light
-     * in front of them; no AO since slabs do not occlude.
+     * Slabs: six 1x1 faces per block at the full cell's faces; the shader moves the edges at the
+     * half (bottom slab: top edge 8/16 down; top slab: bottom edge 8/16 up). The face inside the
+     * cell uses the cell's own light, outer faces the light in front of them; slabs do not occlude.
      */
     private void meshSlabs() {
         for (int y = 0; y < 16; y++)
@@ -324,46 +329,12 @@ public final class ChunkMesher {
                         int n = idx + (positive ? STRIDE[d] : -STRIDE[d]);
                         boolean inner = top ? f == 2 : f == 3;
                         if (!inner && !Blocks.faceVisible(b, padded[n])) continue;
-                        int l = paddedLight[inner ? idx : n] & 0xFF;
-                        int light = (l >> 4) * 4 | (l & 15) * 4 << 6 | 3 << 12;
-                        slabFace(b, f, d, positive, x, y, z, top, light);
+                        int[] light = flatLight(paddedLight[inner ? idx : n] & 0xFF);
+                        int[] p = {x, y, z};
+                        if (positive) p[d]++;
+                        put(Blocks.LAYER[b & 0xFF], p[0], p[1], p[2], f, 0, 0, top ? SPECIAL_SLAB_TOP : SPECIAL_SLAB_BOTTOM,
+                            false, faceInfo[(b & 0xFF) * 6 + f], light[0], light[1]);
                     }
                 }
-    }
-
-    private void slabFace(byte b, int face, int d, boolean positive, int x, int y, int z, boolean top, int light) {
-        int layer = Blocks.LAYER[b & 0xFF];
-        int[] o = reserve(layer);
-        int u = (d + 1) % 3, v = (d + 2) % 3;
-        int[] pos = {x, y, z};
-        int plane = pos[d] + (positive ? 1 : 0);
-        int i = pos[u], j = pos[v];
-        int tail = tail(face, faceInfo[(b & 0xFF) * 6 + face]);
-        int[][] corners = positive
-            ? new int[][] {{i, j}, {i + 1, j}, {i + 1, j + 1}, {i, j + 1}}
-            : new int[][] {{i, j}, {i, j + 1}, {i + 1, j + 1}, {i + 1, j}};
-        int c = count[layer];
-        for (int[] uv : corners) {
-            int[] p = new int[3];
-            p[d] = plane;
-            p[u] = uv[0];
-            p[v] = uv[1];
-            int special = 0;
-            if (!top && p[1] == y + 1) special = SPECIAL_HALF;          // bottom slab: top edge drops 8/16
-            if (top && p[1] == y) { p[1] = y + 1; special = SPECIAL_HALF; } // top slab: bottom edge at y + 8/16
-            o[c++] = tail | p[0] | p[1] << 5 | p[2] << 10 | special;
-            o[c++] = light;
-        }
-        count[layer] = c;
-    }
-
-    private void crossQuad(int layer, int tail, int light, int ax, int y0, int az, int bx, int bz, int y1) {
-        int[] o = reserve(layer);
-        int c = count[layer];
-        o[c++] = tail | ax | y0 << 5 | az << 10; o[c++] = light;
-        o[c++] = tail | bx | y0 << 5 | bz << 10; o[c++] = light;
-        o[c++] = tail | bx | y1 << 5 | bz << 10; o[c++] = light;
-        o[c++] = tail | ax | y1 << 5 | az << 10; o[c++] = light;
-        count[layer] = c;
     }
 }

@@ -252,21 +252,21 @@ public final class Main {
                 if (frames > 0 || now - fpsTimer > 0) stats.cpuFrame(frameNanos);
                 double elapsed = (System.nanoTime() - benchStart) / 1e9;
                 if (elapsed >= benchSeconds) {
-                    long[] buf = renderer.bufferUsage();
+                    long[] buf = renderer.bufferBytes();
                     System.out.println(stats.report(elapsed) + String.format(
                         " | cull+sort %.3f ms | sections drawn %d/%d meshed | %d quads | blocks+light %.1f MiB (%d chunks) | GPU buffer %.1f MiB",
                         renderer.cullNanos / 1e6 / Math.max(1, renderer.cullFrames),
                         renderer.drawnSections, renderer.meshCount(), renderer.totalQuads,
-                        world.storageBytes() / 1048576.0, world.loadedChunks().size(), buf[0] * 32 / 1048576.0));
+                        world.storageBytes() / 1048576.0, world.loadedChunks().size(), buf[0] / 1048576.0));
                     glfwSetWindowShouldClose(window, true);
                 }
             }
             if (screenshot != null && streamer.settled() && renderer.idle()) {
                 Screenshot.save(screenshot, fbW[0], fbH[0]);
-                long[] buf = renderer.bufferUsage();
+                long[] buf = renderer.bufferBytes();
                 System.out.printf("[stats] sections: %d drawn (%d in frustum, %d meshed) | quads: %d | GPU buffer %.1f/%.1f MiB%n",
                     renderer.drawnSections, renderer.frustumSections, renderer.meshCount(), renderer.totalQuads,
-                    buf[0] * 32 / 1048576.0, buf[1] * 32 / 1048576.0);
+                    buf[0] / 1048576.0, buf[1] / 1048576.0);
                 glfwSetWindowShouldClose(window, true);
             }
             glfwSwapBuffers(window);

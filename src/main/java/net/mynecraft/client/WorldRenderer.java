@@ -31,7 +31,11 @@ import static org.lwjgl.opengl.GL33.*;
  * only buffer uploads happen on the render thread.
  *
  * <p>All sections live in one shared vertex buffer (sub-allocated by {@link QuadAllocator}), so each
- * pass is a single {@code glMultiDrawElementsBaseVertex} call. Visible sections come from an
+ * pass is a single {@code glMultiDrawElementsBaseVertex} call. There are no vertex attributes: the
+ * buffer is exposed as a texture buffer of 16-byte quad records and the vertex shader builds each
+ * corner from {@code gl_VertexID / 4} ("vertex pulling"), half the memory of four 8-byte vertices.
+ * A shared index buffer (0,1,2, 2,3,0 per quad) keeps it at 4 shader runs per quad thanks to the
+ * post-transform vertex cache, instead of 6 with non-indexed draws. Visible sections come from an
  * occlusion walk ({@link OcclusionCuller}) restricted to the view frustum.
  *
  * <p>Three passes per frame: opaque sections front to back (cheap early depth rejection), cutout
@@ -40,10 +44,10 @@ import static org.lwjgl.opengl.GL33.*;
  */
 final class WorldRenderer {
     // Worst case: every block shows 6 unmerged faces (e.g. glass and leaves alternating).
-    private static final int MAX_QUADS = Section.VOLUME * 6;
-    private static final int STRIDE = ChunkMesher.INTS_PER_VERTEX * 4;
-    private static final int QUAD_BYTES = 4 * STRIDE;
-    private static final int INITIAL_QUADS = 1 << 20; // 32 MiB, grows by doubling
+    private static final int QUAD_BYTES = ChunkMesher.INTS_PER_QUAD * 4;
+    // Largest section mesh: every block shows 6 unmerged faces (e.g. glass and leaves alternating).
+    private static final int MAX_SECTION_QUADS = Section.VOLUME * 6;
+    private static final int INITIAL_QUADS = 1 << 21; // 32 MiB, grows by doubling
 
     private record Pending(long key, int cx, int sy, int cz, long seq, ChunkMesher.Result mesh) {}
 
@@ -69,6 +73,8 @@ final class WorldRenderer {
             uFogColor = shader.uniform("uFogColor");
             uFogEnd = shader.uniform("uFogEnd");
             uDaylight = shader.uniform("uDaylight");
+            glUseProgram(shader.program);
+            glUniform1i(shader.uniform("uQuads"), 2);
             uMinLight = shader.uniform("uMinLight");
             glUseProgram(shader.program);
             glUniform1i(shader.uniform("uTextures"), 0);
@@ -81,6 +87,7 @@ final class WorldRenderer {
 
     private final World world;
     private final Program opaqueProgram, cutoutProgram, translucentProgram;
+    private final int quadTexture; // GL_TEXTURE_BUFFER view (RGBA32UI) of the shared buffer
     private final int ebo;
     private final HashMap<Long, Mesh> meshes = new HashMap<>();
     private final QuadAllocator allocator = new QuadAllocator(INITIAL_QUADS);
@@ -135,37 +142,39 @@ final class WorldRenderer {
         cutoutProgram = new Program("#define CUTOUT\n");
         translucentProgram = new Program("#define TRANSLUCENT\n");
 
-        int[] indices = new int[MAX_QUADS * 6];
-        for (int q = 0, v = 0, i = 0; q < MAX_QUADS; q++, v += 4) {
+        vao = glGenVertexArrays(); // core profile needs one bound, even with no attributes
+        glBindVertexArray(vao);
+        int[] indices = new int[MAX_SECTION_QUADS * 6];
+        for (int q = 0, v = 0, i = 0; q < MAX_SECTION_QUADS; q++, v += 4) {
             indices[i++] = v; indices[i++] = v + 1; indices[i++] = v + 2;
             indices[i++] = v + 2; indices[i++] = v + 3; indices[i++] = v;
         }
-        vao = glGenVertexArrays();
-        glBindVertexArray(vao);
         ebo = glGenBuffers();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
-        vbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, (long) INITIAL_QUADS * QUAD_BYTES, GL_DYNAMIC_DRAW);
-        bindAttributes();
         glBindVertexArray(0);
+        vbo = glGenBuffers();
+        glBindBuffer(GL_TEXTURE_BUFFER, vbo);
+        glBufferData(GL_TEXTURE_BUFFER, (long) INITIAL_QUADS * QUAD_BYTES, GL_DYNAMIC_DRAW);
+        quadTexture = glGenTextures();
+        glBindTexture(GL_TEXTURE_BUFFER, quadTexture);
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, vbo);
+        maxQuads = glGetInteger(GL_MAX_TEXTURE_BUFFER_SIZE);
 
         workers = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() - 1),
             daemon("mesher"));
         editWorker = Executors.newSingleThreadExecutor(daemon("edit-mesher"));
     }
 
-    private static void bindAttributes() {
-        glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, STRIDE, 0);
-        glEnableVertexAttribArray(0);
-        glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, STRIDE, 4);
-        glEnableVertexAttribArray(1);
-    }
+    /** Largest texture buffer the driver allows, in quads (one RGBA32UI texel each). */
+    private final int maxQuads;
 
     /** Doubles the shared buffer, copying the old contents GPU-side. */
     private void grow() {
         int oldQuads = allocator.capacity(), newQuads = oldQuads * 2;
+        if (newQuads > maxQuads) {
+            throw new IllegalStateException("Quad buffer would exceed GL_MAX_TEXTURE_BUFFER_SIZE (" + maxQuads + " texels)");
+        }
         int nb = glGenBuffers();
         glBindBuffer(GL_COPY_WRITE_BUFFER, nb);
         glBufferData(GL_COPY_WRITE_BUFFER, (long) newQuads * QUAD_BYTES, GL_DYNAMIC_DRAW);
@@ -173,10 +182,8 @@ final class WorldRenderer {
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, (long) oldQuads * QUAD_BYTES);
         glDeleteBuffers(vbo);
         vbo = nb;
-        glBindVertexArray(vao);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        bindAttributes();
-        glBindVertexArray(0);
+        glBindTexture(GL_TEXTURE_BUFFER, quadTexture);
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, vbo);
         allocator.grow(newQuads);
     }
 
@@ -364,6 +371,9 @@ final class WorldRenderer {
         cullNanos += System.nanoTime() - cullStart;
         cullFrames++;
 
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_BUFFER, quadTexture);
+        glActiveTexture(GL_TEXTURE0);
         glBindVertexArray(vao);
         float offX = (float) (px - (camCx << 4)), offY = (float) (py - Chunk.MIN_Y), offZ = (float) (pz - (camCz << 4));
         pass(opaqueProgram, false, 0, fog, far, camCx, camCz, offX, offY, offZ);
@@ -407,7 +417,7 @@ final class WorldRenderer {
             if (quads == 0) continue;
             int first = m.offset + (layer == 0 ? 0 : layer == 1 ? m.opaque : m.opaque + m.cutout);
             drawCounts.put(quads * 6);
-            drawBase.put(first * 4);
+            drawBase.put(first * 4); // gl_VertexID = index + base: gl_VertexID / 4 is the quad record
             drawOffsets.put(0L);
         }
         if (drawCounts.position() == 0) return;
@@ -434,9 +444,9 @@ final class WorldRenderer {
         return meshes.size();
     }
 
-    /** GPU buffer usage: used and allocated quads. */
-    long[] bufferUsage() {
-        return new long[] {allocator.used(), allocator.capacity()};
+    /** GPU buffer usage in bytes: used and allocated. */
+    long[] bufferBytes() {
+        return new long[] {(long) allocator.used() * QUAD_BYTES, (long) allocator.capacity() * QUAD_BYTES};
     }
 
     void dispose() {
@@ -444,6 +454,7 @@ final class WorldRenderer {
         editWorker.shutdownNow();
         glDeleteBuffers(vbo);
         glDeleteVertexArrays(vao);
+        glDeleteTextures(quadTexture);
         glDeleteBuffers(ebo);
         glDeleteTextures(textures.id);
         biomes.dispose();

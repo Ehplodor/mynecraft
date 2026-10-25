@@ -1,7 +1,8 @@
 #version 330 core
-layout(location = 0) in uint aPacked;
-layout(location = 1) in uint aLight;
+// Vertex pulling: no attributes. Each quad is one RGBA32UI texel of uQuads (layout documented in
+// ChunkMesher); its 4 corners are gl_VertexID 4q..4q+3, drawn with indices 0,1,2, 2,3,0.
 
+uniform usamplerBuffer uQuads;
 uniform mat4 uViewProj;
 uniform ivec2 uCamChunk;  // camera chunk coordinates
 uniform vec3 uCamOffset;  // camera position relative to its chunk origin (y from the world bottom)
@@ -19,6 +20,8 @@ out float vDist;
 
 const float SHADE[7] = float[7](0.6, 0.6, 0.5, 1.0, 0.8, 0.8, 0.9);
 const float AO[4] = float[4](0.45, 0.65, 0.82, 1.0);
+// Corner (u, v) offsets in quad order.
+const ivec2 CORNER[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(1, 1), ivec2(0, 1));
 
 float level(float l) {
     // Each light level is ~20% darker than the next, with a small floor so caves are not pitch black.
@@ -26,14 +29,38 @@ float level(float l) {
 }
 
 void main() {
-    vec3 local = vec3(aPacked & 31u, (aPacked >> 5) & 31u, (aPacked >> 10) & 31u);
-    uint face = (aPacked >> 15) & 7u;
-    uint layer = (aPacked >> 18) & 1023u;
-    uint tint = (aPacked >> 28) & 3u;
-    uint special = aPacked >> 30;
-    if (special == 1u) local.y -= 0.125;      // water surface sits 2/16 below the block top
-    else if (special == 2u) local.y -= 0.5;   // half blocks (slabs)
-    vOverlay = special == 3u ? 1.0 : 0.0;
+    uvec4 q = texelFetch(uQuads, gl_VertexID >> 2);
+    vec3 origin = vec3(q.x & 31u, (q.x >> 5) & 31u, (q.x >> 10) & 31u);
+    uint face = (q.x >> 15) & 7u;
+    int w = int((q.x >> 18) & 15u) + 1, h = int((q.x >> 22) & 15u) + 1;
+    uint special = (q.x >> 26) & 7u;
+    // The index pattern splits along corners 0-2; shifting corners by one moves the split to 1-3.
+    int k = ((gl_VertexID & 3) + int((q.x >> 29) & 1u)) & 3;
+
+    vec3 local;
+    bool positive = (face & 1u) != 0u;
+    if (face < 6u) {
+        // Negative faces walk the corners backwards so every face winds counter-clockwise from outside.
+        int c = positive ? k : (4 - k) % 4;
+        int d = int(face) / 2, u = (d + 1) % 3, v = (d + 2) % 3;
+        local = origin;
+        local[u] += float(CORNER[c].x * w);
+        local[v] += float(CORNER[c].y * h);
+        float yMin = origin.y, yMax = origin.y + (u == 1 ? float(w) : v == 1 ? float(h) : 0.0);
+        bool top = d == 1 ? face == 3u : local.y == yMax;
+        bool bottom = d == 1 ? face == 2u : local.y == yMin;
+        if (special == 1u && top) local.y -= 0.125;        // water surface
+        else if (special == 2u && top) local.y -= 0.5;     // bottom slab
+        else if (special == 4u && bottom) local.y += 0.5;  // top slab
+        k = c;
+    } else {
+        // Cross plane: width bit = second diagonal, height bit = back side (reversed winding).
+        bool second = w == 2, back = h == 2;
+        int c = back ? (4 - k) % 4 : k;
+        float x0 = second ? 1.0 : 0.0;
+        local = origin + vec3(CORNER[c].x == 0 ? x0 : 1.0 - x0, float(CORNER[c].y), float(CORNER[c].x));
+        k = c;
+    }
 
     // UV from position so greedy-merged quads repeat the texture once per block. V grows downward.
     if (face < 2u)      vUv = vec2(face == 0u ? local.z : -local.z, -local.y);
@@ -41,15 +68,22 @@ void main() {
     else if (face < 6u) vUv = vec2(face == 5u ? local.x : -local.x, -local.y);
     else                vUv = vec2(local.x, -local.y); // cross planes: x spans exactly one block
 
+    uint lightWord = k < 2 ? q.z : q.w;
+    uint light = (lightWord >> uint((k & 1) * 12)) & 4095u;
+    uint ao = (q.z >> uint(24 + 2 * k)) & 3u;
     // Smooth light: sums of the 4 cells around the vertex (0..60), averaged here.
-    float sky = level(float(aLight & 63u) * 0.25) * uDaylight;
-    float block = level(float((aLight >> 6) & 63u) * 0.25);
-    float light = max(max(sky, block), uMinLight) * AO[(aLight >> 12) & 3u] * SHADE[face];
-    vLayer = float(layer);
+    float sky = level(float(light & 63u) * 0.25) * uDaylight;
+    float block = level(float((light >> 6) & 63u) * 0.25);
+    float lit = max(max(sky, block), uMinLight) * AO[ao] * SHADE[face];
+
+    uint tint = (q.y >> 10) & 3u;
+    vLayer = float(q.y & 1023u);
+    vOverlay = special == 3u ? 1.0 : 0.0;
+
     // Section coordinates are stored mod 64: unambiguous while the render radius stays below 32.
-    int dx = ((int((aLight >> 14) & 63u) - (uCamChunk.x & 63) + 96) & 63) - 32;
-    int dz = ((int((aLight >> 20) & 63u) - (uCamChunk.y & 63) + 96) & 63) - 32;
-    int sy = int((aLight >> 26) & 31u);
+    int dx = ((int((q.y >> 12) & 63u) - (uCamChunk.x & 63) + 96) & 63) - 32;
+    int dz = ((int((q.y >> 18) & 63u) - (uCamChunk.y & 63) + 96) & 63) - 32;
+    int sy = int((q.y >> 24) & 31u);
     vec3 tintColor = uTints[tint];
     if (tint == 1u || tint == 2u) {
         // Column coordinates mod 512 (32 chunks); linear filtering at block corners blends columns.
@@ -58,7 +92,7 @@ void main() {
         tintColor = textureLod(uBiome, vec3(column / 512.0, float(tint - 1u)), 0.0).rgb;
     }
     vTint = tintColor;
-    vLight = light;
+    vLight = lit;
     vec3 p = vec3(dx * 16, sy * 16, dz * 16) + local - uCamOffset;
     vDist = length(p);
     gl_Position = uViewProj * vec4(p, 1.0);

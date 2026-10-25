@@ -91,7 +91,7 @@ class ChunkMesherTest {
         assertTrue(r.quads() > 6 + 5);
         int darkest = 3;
         int[] d = r.data();
-        for (int i = 1; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) darkest = Math.min(darkest, (d[i] >> 12) & 3);
+        for (int q = 0; q < r.quads(); q++) for (int k = 0; k < 4; k++) darkest = Math.min(darkest, ChunkMesher.ao(d, q, k));
         assertEquals(1, darkest, "floor corner touching the bump on one side + its diagonal");
     }
 
@@ -101,16 +101,20 @@ class ChunkMesherTest {
         Chunk c = put(w, 0, 0);
         c.set(4, 4, 4, Blocks.STONE);
         c.setLight(5, 4, 4, 0xFF); // sky 15 + block light 15 east of the stone; elsewhere sky only
-        int[] d = mesh(w, c).data();
+        ChunkMesher.Result r = mesh(w, c);
+        int[] d = r.data();
         int lit = 0;
-        for (int i = 1; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) {
-            int block = (d[i] >> 6) & 63;
-            if (block != 0) {
-                lit++;
-                // East face corners: the lit front cell + 3 dark samples = sum 15 (average 3.75).
-                assertEquals(15, block);
+        for (int q = 0; q < r.quads(); q++) {
+            for (int k = 0; k < 4; k++) {
+                int l = ChunkMesher.light(d, q, k);
+                if ((l >> 6) != 0) {
+                    lit++;
+                    // East face corners: the lit front cell + 3 dark samples = sum 15 (average 3.75).
+                    assertEquals(15, l >> 6);
+                    assertEquals(1, ChunkMesher.face(d, q), "only the east face sees the lit cell");
+                }
+                assertEquals(60, l & 63, "full sky everywhere: 4 x 15");
             }
-            assertEquals(60, d[i] & 63, "full sky everywhere: 4 x 15");
         }
         assertEquals(4, lit);
     }
@@ -121,20 +125,24 @@ class ChunkMesherTest {
         Chunk c = put(w, 0, 0);
         c.set(3, 3, 3, Blocks.WATER);
         c.set(3, 2, 3, Blocks.WATER);
-        int[] d = mesh(w, c).data();
-        int lowered = 0;
-        for (int i = 0; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) {
-            if ((d[i] >>> 30) == 1) {
-                lowered++;
-                assertEquals(4, (d[i] >> 5) & 31, "only vertices at the top of the column (y = 3 + 1)");
+        ChunkMesher.Result r = mesh(w, c);
+        int[] d = r.data();
+        int surface = 0;
+        for (int q = 0; q < r.quads(); q++) {
+            if (ChunkMesher.special(d, q) == ChunkMesher.SPECIAL_WATER) {
+                surface++;
+                int f = ChunkMesher.face(d, q);
+                assertTrue(f != 2, "the bottom face is never lowered");
+                // The top face sits on y = 4 (block 3 + 1); side quads of the top block start at y = 3.
+                assertEquals(f == 3 ? 4 : 3, ChunkMesher.originY(d, q));
             }
         }
-        assertEquals(4 + 4 * 2, lowered, "top face + the top edge of 4 side faces");
+        assertEquals(1 + 4, surface, "top face + the 4 sides of the top block");
     }
 
-    private static int countSpecial(int[] d, int special) {
+    private static int countSpecial(ChunkMesher.Result r, int special) {
         int n = 0;
-        for (int i = 0; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) if ((d[i] >>> 30) == special) n++;
+        for (int q = 0; q < r.quads(); q++) if (ChunkMesher.special(r.data(), q) == special) n++;
         return n;
     }
 
@@ -146,8 +154,8 @@ class ChunkMesherTest {
         c.set(8, 2, 8, Blocks.OAK_SLAB_TOP);
         ChunkMesher.Result r = mesh(w, c);
         assertEquals(12, r.opaqueQuads());
-        // Bottom slab: top face (4) + upper edge of 4 sides (8); top slab: bottom face (4) + lower edges (8).
-        assertEquals(24, countSpecial(r.data(), 2));
+        assertEquals(6, countSpecial(r, ChunkMesher.SPECIAL_SLAB_BOTTOM));
+        assertEquals(6, countSpecial(r, ChunkMesher.SPECIAL_SLAB_TOP));
 
         // A slab on stone hides the stone's top? No: the slab is not a full cube, so the stone keeps it.
         c.set(2, 1, 2, Blocks.STONE);
@@ -160,20 +168,28 @@ class ChunkMesherTest {
         Chunk c = w.getOrGenerate(64, -64); // coordinates are stored mod 64
         ChunkMesher m = new ChunkMesher();
         for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
-            int[] d = m.mesh(w, c, sy).data();
-            for (int i = 0; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) {
-                int p = d[i];
-                assertTrue((p & 31) <= 16 && ((p >> 5) & 31) <= 16 && ((p >> 10) & 31) <= 16);
-                assertTrue(((p >> 15) & 7) < 7);
-                int layer = (p >> 18) & 1023;
+            ChunkMesher.Result r = m.mesh(w, c, sy);
+            int[] d = r.data();
+            assertEquals(r.quads() * ChunkMesher.INTS_PER_QUAD, d.length);
+            for (int q = 0; q < r.quads(); q++) {
+                int w0 = d[q * 4];
+                assertTrue((w0 & 31) <= 16 && ((w0 >> 5) & 31) <= 16 && ((w0 >> 10) & 31) <= 16);
+                assertTrue(ChunkMesher.face(d, q) < 7);
+                int special = ChunkMesher.special(d, q);
+                assertTrue(special != ChunkMesher.SPECIAL_SLAB_BOTTOM && special != ChunkMesher.SPECIAL_SLAB_TOP,
+                    "no slabs in generated terrain");
+                int layer = ChunkMesher.layer(d, q);
                 assertTrue(layer > 0 && layer < Blocks.COUNT);
-                assertTrue((p >>> 30) != 2, "no half blocks in generated terrain");
-                int l = d[i + 1];
-                assertTrue((l & 63) <= 60 && ((l >> 6) & 63) <= 60, "smooth light sums");
-                assertEquals(0, (l >> 14) & 63, "section x mod 64");
-                assertEquals(0, (l >> 20) & 63, "section z mod 64");
-                assertEquals(sy, (l >> 26) & 31, "section y");
-                assertEquals(0, l >>> 31);
+                assertEquals(0, w0 >>> 30);
+                int sw = ChunkMesher.sectionWord(d, q);
+                assertEquals(0, (sw >> 12) & 63, "section x mod 64");
+                assertEquals(0, (sw >> 18) & 63, "section z mod 64");
+                assertEquals(sy, (sw >> 24) & 31, "section y");
+                assertEquals(0, sw >>> 29);
+                for (int k = 0; k < 4; k++) {
+                    int l = ChunkMesher.light(d, q, k);
+                    assertTrue((l & 63) <= 60 && (l >> 6) <= 60, "smooth light sums");
+                }
             }
         }
     }
