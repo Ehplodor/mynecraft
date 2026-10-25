@@ -42,7 +42,9 @@ public final class FluidSimulator {
 
     /**
      * Fluid blocks of a fresh chunk that will not stay as they are: flowing levels (their pending
-     * ticks are not saved) and any fluid with air or a plant beside or below it inside the chunk.
+     * ticks are not saved) and fluid with nothing under it. A natural source next to open air at its
+     * own level is left alone: that is a river stepping down its bed, drawn as a small cascade; letting
+     * it spread like a vanilla source would create water from nothing and flood the hillside.
      * Runs on loader threads; null when the chunk is settled.
      */
     public static int[] unsettled(Chunk c) {
@@ -57,10 +59,6 @@ public final class FluidSimulator {
                         byte b = c.get(x, y, z);
                         if (Blocks.FLUID[b & 0xFF] == Blocks.FLUID_NONE) continue;
                         boolean open = Blocks.LEVEL[b & 0xFF] != 0 || (y > Chunk.MIN_Y && free(c.get(x, y - 1, z)));
-                        for (int i = 0; i < 4 && !open; i++) {
-                            int nx = x + HX[i], nz = z + HZ[i];
-                            open = nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && free(c.get(nx, y, nz));
-                        }
                         if (!open) continue;
                         if (n == out.length) out = java.util.Arrays.copyOf(out, n * 2);
                         out[n++] = (c.cx << 4) + x;

@@ -149,21 +149,32 @@ public final class Landscape {
             for (int x = 0; x < 16; x++) {
                 Column col = out[(z + 1) * 18 + x + 1];
                 if (col.river() > 0 || col.height() < SEA) continue;
-                int need = Integer.MIN_VALUE, wet = 0;
+                int need = Integer.MIN_VALUE, low = Integer.MAX_VALUE, wet = 0, sides = 0;
                 for (int k = 0; k < 4; k++) {
                     int nx = x + (k == 0 ? -1 : k == 1 ? 1 : 0), nz = z + (k == 2 ? -1 : k == 3 ? 1 : 0);
                     Column nb = out[(nz + 1) * 18 + nx + 1];
                     if (nb.river() > 0) {
                         need = Math.max(need, nb.water());
+                        low = Math.min(low, nb.water());
                         wet++;
+                        sides |= 1 << k;
                     }
                 }
-                if (need <= col.height()) continue;
+                if (wet == 0) continue;
                 int i = (z + 1) * 18 + x + 1;
-                if (wet >= 3 || (col.height() >= need - 3 && col.height() < need - 1)) // a shallow hole or a sliver of land: flooded
-                    banked[i] = new Column(col.height(), col.temperature() < 0.22f ? FROZEN_RIVER : RIVER, need, 1, col.temperature());
-                else // a bank, or the lip of a drop: raised to the water's edge so the water stays up
-                    banked[i] = new Column(need, col.biome(), col.water(), col.river(), col.temperature());
+                byte river = col.temperature() < 0.22f ? FROZEN_RIVER : RIVER;
+                boolean across = (sides & 3) == 3 || (sides & 12) == 12; // water on two opposite sides
+                if ((wet >= 3 || across) && col.height() <= need + 3) {
+                    // A post or a sliver of land standing in the water: part of the bed, at the lower
+                    // level around it; any higher water runs down into it (rapids).
+                    banked[i] = new Column(Math.min(col.height(), low - 1), river, low, 1, col.temperature());
+                } else if (col.height() < need && col.height() >= need - 2) {
+                    banked[i] = new Column(col.height(), river, need, 1, col.temperature()); // a shallow hollow: flooded
+                } else if (col.height() < need + 1) {
+                    // A bank one block above the water: what spills over a step in the river runs on
+                    // down the bed instead of over the land (and a swimmer can still climb out).
+                    banked[i] = new Column(need + 1, col.biome(), col.water(), col.river(), col.temperature());
+                }
             }
         return banked;
     }

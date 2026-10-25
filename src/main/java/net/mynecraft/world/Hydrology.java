@@ -361,6 +361,7 @@ public final class Hydrology {
                     int ii = i + di2, jj = j + dj2;
                     if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
                     int q = jj * N + ii;
+                    if (h[q] < surface[k] - 1) continue; // ground falling away (down a slope): no water standing over it
                     if (d2 < near[q] || (d2 == near[q] && surface[k] < t.level[q])) {
                         near[q] = d2;
                         t.level[q] = surface[k];
@@ -382,7 +383,7 @@ public final class Hydrology {
                 int ii = i + di[d], jj = j + dj[d];
                 if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
                 int q = jj * N + ii;
-                if (!Float.isNaN(t.level[q]) || h[q] > t.level[k] - 0.5f || h[q] <= sea) continue;
+                if (!Float.isNaN(t.level[q]) || h[q] > t.level[k] - 0.5f || h[q] < t.level[k] - 2 || h[q] <= sea) continue; // shallow hollows only
                 t.level[q] = t.level[k];
                 t.depth[q] = Math.max(1, t.level[k] - h[q]);
                 hops[q] = hops[k] + 1;

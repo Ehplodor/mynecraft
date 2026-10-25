@@ -123,13 +123,7 @@ public final class ChunkStreamer implements AutoCloseable {
             loaders.execute(() -> {
                 Chunk c = storage == null ? null : storage.load(cx, cz);
                 if (c == null) c = world.generator.generate(cx, cz);
-                int[] inside = FluidSimulator.unsettled(c), border = c.unsettledFluids;
-                if (border == null) c.unsettledFluids = inside;
-                else if (inside != null) {
-                    int[] all = java.util.Arrays.copyOf(border, border.length + inside.length);
-                    System.arraycopy(inside, 0, all, border.length, inside.length);
-                    c.unsettledFluids = all;
-                }
+                c.unsettledFluids = FluidSimulator.unsettled(c);
                 completed.add(c);
             });
         }

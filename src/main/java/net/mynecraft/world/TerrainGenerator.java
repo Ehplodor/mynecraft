@@ -105,7 +105,6 @@ public final class TerrainGenerator {
                 for (int y = h + 1; y <= water; y++) c.set(x, y, z, frozen && y == water ? Blocks.ICE : Blocks.WATER);
             }
         }
-        borderSpills(c, cols);
         carveRavines(c, cols, heights);
         carveCaves(c, heights, cols);
         ores(c, heights);
@@ -113,38 +112,6 @@ public final class TerrainGenerator {
         c.compact();
         LightEngine.initChunk(c);
         return c;
-    }
-
-    /**
-     * Water on the chunk's edge that will run into the next chunk (a river or lake above lower
-     * ground there): seen from the columns of the 1-block halo, so it is found without the neighbour
-     * loaded. Listed in {@link Chunk#unsettledFluids} for the fluid pre-computation.
-     */
-    private static void borderSpills(Chunk c, Landscape.Column[] cols) {
-        int[] out = null;
-        int n = 0;
-        int[][] side = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-        for (int z = 0; z < 16; z++)
-            for (int x = 0; x < 16; x++) {
-                if (x != 0 && x != 15 && z != 0 && z != 15) continue;
-                Landscape.Column col = cols[(z + 1) * 18 + x + 1];
-                int water = Math.max(SEA_LEVEL, col.water());
-                if (water <= col.height()) continue;
-                for (int[] o : side) {
-                    int nx = x + o[0], nz = z + o[1];
-                    if (nx >= 0 && nx < 16 && nz >= 0 && nz < 16) continue; // inside: found by the chunk scan
-                    Landscape.Column nb = cols[(nz + 1) * 18 + nx + 1];
-                    int top = Math.max(nb.height(), Math.max(SEA_LEVEL, nb.water()));
-                    for (int y = Math.max(top + 1, col.height() + 1); y <= water; y++) {
-                        if (out == null) out = new int[48];
-                        if (n == out.length) out = java.util.Arrays.copyOf(out, n * 2);
-                        out[n++] = (c.cx << 4) + x;
-                        out[n++] = y;
-                        out[n++] = (c.cz << 4) + z;
-                    }
-                }
-            }
-        c.unsettledFluids = out == null ? null : java.util.Arrays.copyOf(out, n);
     }
 
     /** Top block and the 3 blocks below it for a biome. */
