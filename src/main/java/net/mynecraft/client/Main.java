@@ -104,7 +104,7 @@ public final class Main {
         Player player = new Player();
         if (storage.playerPos != null) {
             player.x = storage.playerPos[0];
-            player.y = Math.max(1, Math.min(Chunk.HEIGHT - 2, storage.playerPos[1]));
+            player.y = Math.max(Chunk.MIN_Y + 1, Math.min(Chunk.MAX_Y - 2, storage.playerPos[1]));
             player.z = storage.playerPos[2];
         } else {
             player.x = 8.5;

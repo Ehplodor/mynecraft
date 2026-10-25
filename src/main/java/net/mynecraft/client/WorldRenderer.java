@@ -216,7 +216,7 @@ final class WorldRenderer {
      * corner with it when the block lies on a border (faces and ambient occlusion read neighbours).
      */
     void blockChanged(int x, int y, int z) {
-        int cx = x >> 4, sy = y >> 4, cz = z >> 4, lx = x & 15, ly = y & 15, lz = z & 15;
+        int cx = x >> 4, sy = Chunk.sectionIndex(y), cz = z >> 4, lx = x & 15, ly = y & 15, lz = z & 15;
         for (int dx = -1; dx <= 1; dx++) {
             if ((dx == -1 && lx != 0) || (dx == 1 && lx != 15)) continue;
             for (int dy = -1; dy <= 1; dy++) {
@@ -231,7 +231,7 @@ final class WorldRenderer {
 
     /** Re-meshes a section by key (e.g. after a light change); ignored if its chunk is not visible. */
     void sectionChanged(long key, boolean urgent) {
-        int cx = (int) (key >> 32), sy = (int) (key & 15), cz = (int) ((key << 32) >> 36);
+        int cx = (int) (key >> 32), sy = (int) (key & 31), cz = (int) ((key << 32) >> 37);
         remesh(cx, sy, cz, urgent);
     }
 
@@ -297,7 +297,7 @@ final class WorldRenderer {
 
         double px = cam.pos.x, py = cam.pos.y, pz = cam.pos.z;
         int camCx = (int) Math.floor(px) >> 4, camCz = (int) Math.floor(pz) >> 4;
-        int camSy = (int) Math.floor(py) >> 4;
+        int camSy = Chunk.sectionIndex((int) Math.floor(py));
         drawCount = 0;
         if (occlusion) {
             culler.cull(camCx, camSy, camCz, new OcclusionCuller.Graph() {
@@ -307,7 +307,7 @@ final class WorldRenderer {
                     return v == null ? SectionVisibility.ALL : v; // not meshed yet: assume open
                 }
                 public boolean inFrustum(int cx, int sy, int cz) {
-                    float ox = (float) ((cx << 4) - px), oy = (float) ((sy << 4) - py), oz = (float) ((cz << 4) - pz);
+                    float ox = (float) ((cx << 4) - px), oy = (float) (Chunk.sectionMinY(sy) - py), oz = (float) ((cz << 4) - pz);
                     return frustum.testAab(ox, oy, oz, ox + 16, oy + 16, oz + 16);
                 }
             }, (cx, sy, cz) -> addDraw(meshes.get(World.sectionKey(cx, sy, cz)), px, py, pz, false));
@@ -322,13 +322,13 @@ final class WorldRenderer {
         drawnSections = drawCount;
 
         glBindVertexArray(vao);
-        float offX = (float) (px - (camCx << 4)), offZ = (float) (pz - (camCz << 4));
-        pass(opaqueProgram, false, 0, fog, far, camCx, camCz, offX, (float) py, offZ);
-        pass(cutoutProgram, false, 1, fog, far, camCx, camCz, offX, (float) py, offZ);
+        float offX = (float) (px - (camCx << 4)), offY = (float) (py - Chunk.MIN_Y), offZ = (float) (pz - (camCz << 4));
+        pass(opaqueProgram, false, 0, fog, far, camCx, camCz, offX, offY, offZ);
+        pass(cutoutProgram, false, 1, fog, far, camCx, camCz, offX, offY, offZ);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(false);
-        pass(translucentProgram, true, 2, fog, far, camCx, camCz, offX, (float) py, offZ);
+        pass(translucentProgram, true, 2, fog, far, camCx, camCz, offX, offY, offZ);
         glDepthMask(true);
         glDisable(GL_BLEND);
         glBindVertexArray(0);
@@ -338,7 +338,7 @@ final class WorldRenderer {
 
     private void addDraw(Mesh m, double px, double py, double pz, boolean testFrustum) {
         if (m == null || m.offset < 0) return;
-        float ox = (float) ((m.cx << 4) - px), oy = (float) ((m.sy << 4) - py), oz = (float) ((m.cz << 4) - pz);
+        float ox = (float) ((m.cx << 4) - px), oy = (float) (Chunk.sectionMinY(m.sy) - py), oz = (float) ((m.cz << 4) - pz);
         if (testFrustum && !frustum.testAab(ox, oy, oz, ox + 16, oy + 16, oz + 16)) return;
         float cx = ox + 8, cy = oy + 8, cz = oz + 8;
         m.distance = cx * cx + cy * cy + cz * cz;

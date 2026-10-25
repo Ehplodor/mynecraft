@@ -47,8 +47,8 @@ class CullingTest {
         OcclusionCuller c = new OcclusionCuller(4);
         Set<Long> seen = new HashSet<>();
         int n = c.cull(0, 5, 0, ground(2), (cx, sy, cz) -> seen.add(World.sectionKey(cx, sy, cz)));
-        // Visible: open sections 3..7 of every column, plus the solid top layer sy = 2 (its faces show).
-        assertEquals(9 * 9 * 6, n);
+        // Visible: open sections 3..top of every column, plus the solid top layer sy = 2 (its faces show).
+        assertEquals(9 * 9 * (Chunk.SECTIONS - 2), n);
         assertTrue(seen.contains(World.sectionKey(3, 2, -1)));
         assertFalse(seen.contains(World.sectionKey(0, 1, 0)));
         assertFalse(seen.contains(World.sectionKey(4, 0, 4)));

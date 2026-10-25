@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class StorageTest {
     private static void assertSameBlocks(Chunk a, Chunk b) {
-        for (int y = 0; y < Chunk.HEIGHT; y++)
+        for (int y = Chunk.MIN_Y; y < Chunk.MAX_Y; y++)
             for (int z = 0; z < 16; z++)
                 for (int x = 0; x < 16; x++)
                     assertEquals(a.get(x, y, z), b.get(x, y, z), "at " + x + "," + y + "," + z);

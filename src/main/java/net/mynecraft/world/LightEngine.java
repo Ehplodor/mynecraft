@@ -29,7 +29,7 @@ public final class LightEngine {
     private final LongQueue addQueue = new LongQueue(), removeQueue = new LongQueue();
     private final Access worldAccess = new Access() {
         public int opacity(int x, int y, int z) {
-            if (y < 0 || y >= Chunk.HEIGHT) return -1;
+            if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return -1;
             Chunk c = world.chunk(x >> 4, z >> 4);
             return c == null ? -1 : Blocks.OPACITY[c.get(x & 15, y, z & 15) & 0xFF];
         }
@@ -55,12 +55,12 @@ public final class LightEngine {
         LongQueue blockSeeds = new LongQueue();
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
-                int sky = 15, t = -1;
-                for (int y = Chunk.HEIGHT - 1; y >= 0; y--) {
+                int sky = 15, t = Chunk.MIN_Y - 1;
+                for (int y = Chunk.MAX_Y - 1; y >= Chunk.MIN_Y; y--) {
                     byte b = c.get(x, y, z);
                     int op = Blocks.OPACITY[b & 0xFF];
                     if (sky != 15 || op != 0) {
-                        if (t < 0) t = y;
+                        if (t < Chunk.MIN_Y) t = y;
                         sky = Math.max(0, sky - Math.max(1, op));
                     }
                     int emission = Blocks.EMISSION[b & 0xFF];
@@ -72,7 +72,7 @@ public final class LightEngine {
         }
         Access a = new Access() {
             public int opacity(int x, int y, int z) {
-                if (x < 0 || x > 15 || z < 0 || z > 15 || y < 0 || y >= Chunk.HEIGHT) return -1;
+                if (x < 0 || x > 15 || z < 0 || z > 15 || y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return -1;
                 return Blocks.OPACITY[c.get(x, y, z) & 0xFF];
             }
             public int get(int x, int y, int z) { return c.getLight(x, y, z); }
@@ -88,7 +88,7 @@ public final class LightEngine {
                 if (x < 15) limit = Math.max(limit, top[z * 16 + x + 1]);
                 if (z > 0) limit = Math.max(limit, top[(z - 1) * 16 + x]);
                 if (z < 15) limit = Math.max(limit, top[(z + 1) * 16 + x]);
-                for (int y = Math.min(Chunk.HEIGHT - 1, limit + 1); y >= 0; y--) {
+                for (int y = Math.min(Chunk.MAX_Y - 1, limit + 1); y >= Chunk.MIN_Y; y--) {
                     int v = c.getLight(x, y, z) >> SKY;
                     if (v <= 1) {
                         if (y < top[z * 16 + x]) break; // under the column's own dimming: stays dark
@@ -123,7 +123,7 @@ public final class LightEngine {
                 write(worldAccess, shift, x, y, z, Blocks.EMISSION[b & 0xFF]);
                 addQueue.push(pack(x, y, z), 0);
             }
-            if (shift == SKY && y == Chunk.HEIGHT - 1 && Blocks.OPACITY[b & 0xFF] == 0) {
+            if (shift == SKY && y == Chunk.MAX_Y - 1 && Blocks.OPACITY[b & 0xFF] == 0) {
                 write(worldAccess, shift, x, y, z, 15);
                 addQueue.push(pack(x, y, z), 0);
             }
@@ -149,7 +149,7 @@ public final class LightEngine {
                     int ax = side == 0 ? bx : side == 1 ? bx + 15 : bx + i;
                     int az = side == 2 ? bz : side == 3 ? bz + 15 : bz + i;
                     int nx = ax + (side == 0 ? -1 : side == 1 ? 1 : 0), nz = az + (side == 2 ? -1 : side == 3 ? 1 : 0);
-                    for (int y = 0; y < Chunk.HEIGHT; y++) {
+                    for (int y = Chunk.MIN_Y; y < Chunk.MAX_Y; y++) {
                         int la = (worldAccess.get(ax, y, az) >> shift) & 15, lb = (worldAccess.get(nx, y, nz) >> shift) & 15;
                         if (la > lb + 1 && worldAccess.opacity(nx, y, nz) < 15) addQueue.push(pack(ax, y, az), 0);
                         else if (lb > la + 1 && worldAccess.opacity(ax, y, az) < 15) addQueue.push(pack(nx, y, nz), 0);
@@ -167,7 +167,7 @@ public final class LightEngine {
     }
 
     private void touch(int x, int y, int z) {
-        int cx = x >> 4, sy = y >> 4, cz = z >> 4, lx = x & 15, ly = y & 15, lz = z & 15;
+        int cx = x >> 4, sy = Chunk.sectionIndex(y), cz = z >> 4, lx = x & 15, ly = y & 15, lz = z & 15;
         touched.add(World.sectionKey(cx, sy, cz));
         // Faces of neighbouring blocks read this cell's light: mark sections across a border too.
         if (lx == 0) touched.add(World.sectionKey(cx - 1, sy, cz));
@@ -230,17 +230,17 @@ public final class LightEngine {
         }
     }
 
-    // ---- position packing: x and z on 27 signed bits, y on 8 ----
+    // ---- position packing: x and z on 27 signed bits, y - MIN_Y on 9 ----
 
     static long pack(int x, int y, int z) {
-        return ((long) (x & 0x7FFFFFF) << 35) | ((long) (z & 0x7FFFFFF) << 8) | y;
+        return ((long) (x & 0x7FFFFFF) << 36) | ((long) (z & 0x7FFFFFF) << 9) | (y - Chunk.MIN_Y);
     }
 
-    static int unpackX(long p) { return ((int) (p >>> 35) << 5) >> 5; }
+    static int unpackX(long p) { return ((int) (p >>> 36) << 5) >> 5; }
 
-    static int unpackZ(long p) { return ((int) ((p >>> 8) & 0x7FFFFFF) << 5) >> 5; }
+    static int unpackZ(long p) { return ((int) ((p >>> 9) & 0x7FFFFFF) << 5) >> 5; }
 
-    static int unpackY(long p) { return (int) (p & 0xFF); }
+    static int unpackY(long p) { return (int) (p & 0x1FF) + Chunk.MIN_Y; }
 
     /** FIFO of packed positions with an int payload, growable ring buffer: no boxing. */
     static final class LongQueue {

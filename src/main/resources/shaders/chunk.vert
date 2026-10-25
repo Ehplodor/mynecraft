@@ -4,7 +4,7 @@ layout(location = 1) in uint aLight;
 
 uniform mat4 uViewProj;
 uniform ivec2 uCamChunk;  // camera chunk coordinates
-uniform vec3 uCamOffset;  // camera position relative to its chunk origin (y absolute)
+uniform vec3 uCamOffset;  // camera position relative to its chunk origin (y from the world bottom)
 uniform vec3 uTints[4];   // none, grass, foliage, water
 
 out vec2 vUv;

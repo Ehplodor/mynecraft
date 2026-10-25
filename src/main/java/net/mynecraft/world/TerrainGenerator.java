@@ -1,7 +1,7 @@
 package net.mynecraft.world;
 
 public final class TerrainGenerator {
-    public static final int SEA_LEVEL = 40;
+    public static final int SEA_LEVEL = 63;
     private final Noise noise;
     private final long seed;
 
@@ -13,7 +13,7 @@ public final class TerrainGenerator {
     public int height(int wx, int wz) {
         float n = noise.fbm(wx / 128f, wz / 128f, 5);
         int h = SEA_LEVEL + 10 + (int) (n * 45);
-        return Math.max(1, Math.min(Chunk.HEIGHT - 12, h));
+        return Math.max(Chunk.MIN_Y + 1, Math.min(Chunk.MAX_Y - 12, h));
     }
 
     /** Deterministic per-column random in [0, 1000). */
@@ -35,9 +35,9 @@ public final class TerrainGenerator {
                 boolean beach = h <= SEA_LEVEL + 1;
                 byte top = h < SEA_LEVEL - 4 ? Blocks.GRAVEL : beach ? Blocks.SAND : Blocks.GRASS;
                 byte under = beach ? top : Blocks.DIRT;
-                c.set(x, 0, z, Blocks.BEDROCK);
-                for (int y = 1; y < h - 3; y++) c.set(x, y, z, Blocks.STONE);
-                for (int y = Math.max(1, h - 3); y < h; y++) c.set(x, y, z, under);
+                c.set(x, Chunk.MIN_Y, z, Blocks.BEDROCK);
+                for (int y = Chunk.MIN_Y + 1; y < h - 3; y++) c.set(x, y, z, Blocks.STONE);
+                for (int y = Math.max(Chunk.MIN_Y + 1, h - 3); y < h; y++) c.set(x, y, z, under);
                 c.set(x, h, z, top);
                 for (int y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, Blocks.WATER);
             }

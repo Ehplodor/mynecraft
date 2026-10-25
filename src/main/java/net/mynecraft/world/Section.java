@@ -7,6 +7,8 @@ public final class Section {
 
     final byte[] blocks = new byte[VOLUME];
     int nonAir;
+    /** Number of full opaque cubes: 4096 means nothing inside can be seen. */
+    int opaque;
 
     public static int index(int x, int y, int z) {
         return (y << 8) | (z << 4) | x;
@@ -22,7 +24,13 @@ public final class Section {
         if (old == id) return;
         if (old == Blocks.AIR) nonAir++;
         else if (id == Blocks.AIR) nonAir--;
+        if (Blocks.isOpaque(old)) opaque--;
+        if (Blocks.isOpaque(id)) opaque++;
         blocks[i] = id;
+    }
+
+    public boolean isFullyOpaque() {
+        return opaque == VOLUME;
     }
 
     public boolean isEmpty() {

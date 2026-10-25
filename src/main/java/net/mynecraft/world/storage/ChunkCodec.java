@@ -14,7 +14,7 @@ import java.util.Set;
  * <p>Reads 1.18+ ("sections" / "block_states") and 1.16–1.17 ("Level" / "Palette" + "BlockStates").
  * Block states are a palette plus a packed long[] where entries never straddle two longs, with
  * max(4, ceil(log2(palette))) bits each, indexed (y << 8) | (z << 4) | x, the same order as ours.
- * Only sections Y 0..7 fit our 0..127 height; foreign blocks are mapped to the closest known block.
+ * Height matches 1.18+ (sections Y -4..19); foreign blocks are mapped to the closest known block.
  */
 public final class ChunkCodec {
     public static final int DATA_VERSION = 3953; // 1.21
@@ -57,7 +57,7 @@ public final class ChunkCodec {
         for (Object o : sections) {
             @SuppressWarnings("unchecked")
             Map<String, Object> sec = (Map<String, Object>) o;
-            int y = Nbt.getInt(sec, "Y", -999);
+            int y = Nbt.getInt(sec, "Y", -999) - Chunk.MIN_Y / 16; // section index
             if (y < 0 || y >= Chunk.SECTIONS) continue;
             List<Object> palette;
             long[] states;
@@ -86,7 +86,7 @@ public final class ChunkCodec {
     }
 
     private static void fill(Chunk chunk, int sy, byte[] ids, long[] states) {
-        int base = sy << 4;
+        int base = Chunk.sectionMinY(sy);
         if (ids.length == 1 || states == null) {
             byte b = ids[0];
             if (b == Blocks.AIR) return;
@@ -109,7 +109,7 @@ public final class ChunkCodec {
         root.put("DataVersion", DATA_VERSION);
         root.put("xPos", chunk.cx);
         root.put("zPos", chunk.cz);
-        root.put("yPos", 0);
+        root.put("yPos", Chunk.MIN_Y / 16);
         root.put("Status", "minecraft:full");
         root.put("LastUpdate", 0L);
         Nbt.NbtList sections = new Nbt.NbtList(Nbt.COMPOUND);
@@ -117,7 +117,7 @@ public final class ChunkCodec {
             Section s = chunk.section(sy);
             if (s == null) continue;
             Map<String, Object> sec = Nbt.compound();
-            sec.put("Y", (byte) sy);
+            sec.put("Y", (byte) (sy + Chunk.MIN_Y / 16));
             sec.put("block_states", encodeStates(s));
             Map<String, Object> biomes = Nbt.compound();
             Nbt.NbtList bp = new Nbt.NbtList(Nbt.STRING);

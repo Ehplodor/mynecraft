@@ -14,7 +14,7 @@ class ChunkMesherTest {
     }
 
     private static ChunkMesher.Result mesh(World w, Chunk c) {
-        return new ChunkMesher().mesh(w, c, 0);
+        return new ChunkMesher().mesh(w, c, Chunk.sectionIndex(0)); // the section holding y 0..15
     }
 
     @Test

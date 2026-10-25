@@ -26,9 +26,9 @@ public final class World {
         return chunks.values();
     }
 
-    /** Unique key of a 16^3 section (cz on 28 bits, section index on 4). */
+    /** Unique key of a 16^3 section (cz on 27 bits, section index on 5). */
     public static long sectionKey(int cx, int sy, int cz) {
-        return ((long) cx << 32) | ((cz & 0x0FFFFFFFL) << 4) | sy;
+        return ((long) cx << 32) | ((cz & 0x7FFFFFFL) << 5) | sy;
     }
 
     public static long key(int cx, int cz) {
@@ -50,15 +50,15 @@ public final class World {
 
     /** Collision view: below the world and unloaded chunks count as solid so nobody falls out. */
     public boolean isSolid(int x, int y, int z) {
-        if (y >= Chunk.HEIGHT) return false;
-        if (y < 0) return true;
+        if (y >= Chunk.MAX_Y) return false;
+        if (y < Chunk.MIN_Y) return true;
         Chunk c = chunk(x >> 4, z >> 4);
         return c == null || Blocks.isSolid(c.get(x & 15, y, z & 15));
     }
 
     /** Sets a block in a loaded chunk; returns false if out of range or unchanged. */
     public boolean set(int x, int y, int z, byte id) {
-        if (y < 0 || y >= Chunk.HEIGHT) return false;
+        if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return false;
         Chunk c = chunk(x >> 4, z >> 4);
         if (c == null || c.get(x & 15, y, z & 15) == id) return false;
         c.set(x & 15, y, z & 15, id);
@@ -69,14 +69,14 @@ public final class World {
 
     /** sky &lt;&lt; 4 | block light; full sky above the world, darkness below or in unloaded chunks. */
     public int getLight(int x, int y, int z) {
-        if (y >= Chunk.HEIGHT) return Chunk.DEFAULT_LIGHT;
-        if (y < 0) return 0;
+        if (y >= Chunk.MAX_Y) return Chunk.DEFAULT_LIGHT;
+        if (y < Chunk.MIN_Y) return 0;
         Chunk c = chunk(x >> 4, z >> 4);
         return c == null ? Chunk.DEFAULT_LIGHT : c.getLight(x & 15, y, z & 15);
     }
 
     public byte get(int x, int y, int z) {
-        if (y < 0 || y >= Chunk.HEIGHT) return Blocks.AIR;
+        if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return Blocks.AIR;
         Chunk c = chunk(x >> 4, z >> 4);
         return c == null ? Blocks.AIR : c.get(x & 15, y, z & 15);
     }

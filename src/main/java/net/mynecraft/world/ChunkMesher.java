@@ -38,6 +38,9 @@ public final class ChunkMesher {
         }
     }
 
+    /** Result for a section that is opaque and walled in: no faces, no sight through it. */
+    private static final Result SOLID = new Result(new int[0], 0, 0, 0, 0);
+    private final Chunk[] around = new Chunk[9];
     private final int[] faceInfo;
     private final byte[] padded = new byte[P * P * P];
     private final byte[] paddedLight = new byte[P * P * P];
@@ -69,6 +72,7 @@ public final class ChunkMesher {
     public Result mesh(World world, Chunk chunk, int sy) {
         Section section = chunk.section(sy);
         if (section == null) return Result.EMPTY;
+        if (section.isFullyOpaque() && buried(world, chunk, sy)) return SOLID;
         fillPadded(world, chunk, sy, section);
         Arrays.fill(count, 0);
         for (int d = 0; d < 3; d++) {
@@ -87,19 +91,49 @@ public final class ChunkMesher {
         return new Result(data, count[0] / INTS_PER_QUAD, count[1] / INTS_PER_QUAD, count[2] / INTS_PER_QUAD, vis);
     }
 
+    /** True if all six neighbouring sections are fully opaque too (typical deep underground). */
+    private static boolean buried(World world, Chunk chunk, int sy) {
+        if (sy == 0 || sy == Chunk.SECTIONS - 1) return false;
+        if (!opaque(chunk, sy - 1) || !opaque(chunk, sy + 1)) return false;
+        return opaque(world.chunk(chunk.cx - 1, chunk.cz), sy) && opaque(world.chunk(chunk.cx + 1, chunk.cz), sy)
+            && opaque(world.chunk(chunk.cx, chunk.cz - 1), sy) && opaque(world.chunk(chunk.cx, chunk.cz + 1), sy);
+    }
+
+    private static boolean opaque(Chunk c, int sy) {
+        if (c == null) return false;
+        Section s = c.section(sy);
+        return s != null && s.isFullyOpaque();
+    }
+
+    /**
+     * Copies the section plus a one-block border into flat arrays. Neighbouring chunks are looked up
+     * once (3x3), not per cell, which keeps hash lookups out of the 5832-cell loop.
+     */
     private void fillPadded(World world, Chunk chunk, int sy, Section section) {
-        int ox = chunk.cx << 4, oy = sy << 4, oz = chunk.cz << 4;
+        for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+                around[(dz + 1) * 3 + dx + 1] = dx == 0 && dz == 0 ? chunk : world.chunk(chunk.cx + dx, chunk.cz + dz);
+        int oy = Chunk.sectionMinY(sy);
         for (int y = -1; y <= Section.SIZE; y++) {
+            int wy = oy + y;
+            boolean inWorld = wy >= Chunk.MIN_Y && wy < Chunk.MAX_Y;
             for (int z = -1; z <= Section.SIZE; z++) {
+                int cz = z < 0 ? 0 : z > 15 ? 2 : 1, lz = z & 15;
                 boolean innerYZ = y >= 0 && y < 16 && z >= 0 && z < 16;
                 for (int x = -1; x <= Section.SIZE; x++) {
                     int i = pIndex(x, y, z);
                     if (innerYZ && x >= 0 && x < 16) {
                         padded[i] = section.blocks[Section.index(x, y, z)];
-                        paddedLight[i] = (byte) chunk.getLight(x, oy + y, z);
+                        paddedLight[i] = (byte) chunk.getLight(x, wy, z);
+                        continue;
+                    }
+                    Chunk c = around[cz * 3 + (x < 0 ? 0 : x > 15 ? 2 : 1)];
+                    if (c == null || !inWorld) {
+                        padded[i] = Blocks.AIR;
+                        paddedLight[i] = (byte) (wy >= Chunk.MAX_Y || c == null ? Chunk.DEFAULT_LIGHT : 0);
                     } else {
-                        padded[i] = world.get(ox + x, oy + y, oz + z);
-                        paddedLight[i] = (byte) world.getLight(ox + x, oy + y, oz + z);
+                        padded[i] = c.get(x & 15, wy, lz);
+                        paddedLight[i] = (byte) c.getLight(x & 15, wy, lz);
                     }
                 }
             }
