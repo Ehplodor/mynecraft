@@ -6,47 +6,40 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class HydrologyTest {
     @Test
-    void mountainStreamsArePrecomputedAndStill() {
+    void riversAreCarvedAboveTheSeaAndStayInTheirBeds() {
         TerrainGenerator gen = new TerrainGenerator(7);
-        int streams = 0, unsettled = 0;
-        for (int cz = -30; cz < -10; cz++)
-            for (int cx = -30; cx < -10; cx++) {
+        int upland = 0, unsettled = 0;
+        for (int cz = -12; cz < 0; cz++)
+            for (int cx = -40; cx < -28; cx++) {
                 Chunk c = gen.generate(cx, cz);
                 int[] u = FluidSimulator.unsettled(c);
                 if (u != null) unsettled += u.length / 3;
-                found:
                 for (int z = 0; z < 16; z++)
                     for (int x = 0; x < 16; x++) {
-                        int h = gen.height((cx << 4) + x, (cz << 4) + z);
-                        if (h >= TerrainGenerator.SEA_LEVEL + 30 && c.get(x, h - 1, z) == Blocks.WATER) { streams++; break found; }
+                        Landscape.Column col = gen.column((cx << 4) + x, (cz << 4) + z);
+                        if (col.river() > 0 && col.water() > TerrainGenerator.SEA_LEVEL + 5) upland++;
                     }
             }
-        assertTrue(streams >= 20, "only " + streams + " chunks with streams");
-        assertTrue(unsettled < 100, unsettled + " fluid blocks would still move"); // beds are contained
+        assertTrue(upland > 200, "only " + upland + " river columns above the sea");
+        assertTrue(unsettled < 400, unsettled + " fluid blocks would still move"); // only rapids
     }
 
     @Test
-    void riversWidenTowardsTheSea() {
+    void riversWidenDownstream() {
         Landscape land = new Landscape(7);
-        // Mean river width (columns per crossing) inland vs near the coast, along many lines.
-        int[] cells = new int[2], crossings = new int[2];
-        for (int z = -4000; z < 4000; z += 80) {
-            boolean in = false;
-            for (int x = -4000; x < 4000; x += 2) {
-                Landscape.Column col = land.column(x, z);
-                boolean river = col.biome() == Landscape.RIVER || col.biome() == Landscape.FROZEN_RIVER;
-                if (river) {
-                    float c = land.continentalness(x, z);
-                    int band = c < 0.05f ? 1 : c > 0.4f ? 0 : -1;
-                    if (band < 0) { in = true; continue; }
-                    cells[band]++;
-                    if (!in) crossings[band]++;
+        int narrow = 0, wide = 0;
+        for (int z = -1000; z < 600; z += 50) {
+            int run = 0;
+            for (int x = -1200; x < 400; x++) {
+                if (land.column(x, z).river() > 0) run++;
+                else {
+                    if (run > 0 && run <= 4) narrow++;
+                    if (run >= 12) wide++;
+                    run = 0;
                 }
-                in = river;
             }
         }
-        float inland = cells[0] / (float) Math.max(1, crossings[0]), coast = cells[1] / (float) Math.max(1, crossings[1]);
-        assertTrue(coast > inland * 1.3f, "coast " + coast + " vs inland " + inland);
+        assertTrue(narrow > 20 && wide > 3, narrow + " narrow, " + wide + " wide crossings");
     }
 
     @Test

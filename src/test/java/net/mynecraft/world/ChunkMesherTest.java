@@ -229,6 +229,10 @@ class ChunkMesherTest {
         Chunk[] fresh = new Chunk[n];
         // Warm-up pass so the JIT does not dominate the numbers.
         for (int i = 0; i < 64; i++) w.generator.generate(100 + i, 100);
+        // River tiles are computed once per 1024-block tile and cached: measured apart.
+        long th = System.nanoTime();
+        for (int tx = -1; tx <= 0; tx++) for (int tz = -1; tz <= 0; tz++) w.generator.column(tx * 1024 + 8, tz * 1024 + 8);
+        System.out.printf("hydrology: %.0f ms/tile%n", (System.nanoTime() - th) / 4e6);
 
         long t0 = System.nanoTime();
         int k = 0;

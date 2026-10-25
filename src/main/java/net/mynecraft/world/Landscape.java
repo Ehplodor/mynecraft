@@ -30,6 +30,7 @@ public final class Landscape {
     public record Column(int height, byte biome, int water, float river, float temperature) {}
 
     private static final int GRID = 4;
+    private final Hydrology hydrology;
     private final Noise continental, erosion, ridges, plateau, river, lake, detail, roughness, ravine, ravineMask,
         temperature, downfall, forestKind;
 
@@ -47,6 +48,15 @@ public final class Landscape {
         temperature = new Noise(seed ^ 0x5DEECE66DL);
         downfall = new Noise(seed * 31 + 17);
         forestKind = new Noise(seed + 99);
+        hydrology = new Hydrology(new Hydrology.Ground() {
+            public float height(int wx, int wz) { return baseHeight(wx, wz); }
+
+            public float downfall(int wx, int wz) { return Landscape.this.downfall(wx, wz); }
+        }, seed, SEA);
+    }
+
+    public Hydrology hydrology() {
+        return hydrology;
     }
 
     public float temperature(int wx, int wz) {
@@ -131,10 +141,36 @@ public final class Landscape {
                 out[(z + 1) * 18 + x + 1] = column(wx, wz, interpolate(g, fx, fz));
             }
         }
-        return out;
+        // Banks: dry ground next to a river is raised to its water level, so the water stays in its
+        // bed. Each column looks at its 4 neighbours only, so chunks on both sides of a border agree
+        // (the halo columns are left as they are: they are only read for slopes).
+        Column[] banked = out.clone();
+        for (int z = 0; z < 16; z++)
+            for (int x = 0; x < 16; x++) {
+                Column col = out[(z + 1) * 18 + x + 1];
+                if (col.river() > 0 || col.height() < SEA) continue;
+                int need = Integer.MIN_VALUE;
+                for (int k = 0; k < 4; k++) {
+                    int nx = x + (k == 0 ? -1 : k == 1 ? 1 : 0), nz = z + (k == 2 ? -1 : k == 3 ? 1 : 0);
+                    Column nb = out[(nz + 1) * 18 + nx + 1];
+                    if (nb.river() > 0) need = Math.max(need, nb.water());
+                }
+                if (need > col.height())
+                    banked[(z + 1) * 18 + x + 1] = new Column(need, col.biome(), col.water(), col.river(), col.temperature());
+            }
+        return banked;
     }
 
     private Column column(int wx, int wz, float[] f) {
+        return column(wx, wz, f, false);
+    }
+
+    /** Terrain height before the rivers are carved (what the droplets roll on). */
+    float baseHeight(int wx, int wz) {
+        return column(wx, wz, fields(wx, wz), true).river();
+    }
+
+    private Column column(int wx, int wz, float[] f, boolean base) {
         float c = f[F_CONT], e = f[F_EROS];
         float flat = smoothstep(-0.15f, 0.45f, e);              // 1 = plains
         float mountain = 1 - smoothstep(-0.55f, -0.05f, e);     // 1 = mountain range
@@ -158,24 +194,9 @@ public final class Landscape {
         float plat = smoothstep(0.33f, 0.37f, f[F_PLAT]) * inland * (1 - mountain);
         if (plat > 0) h = h + (SEA + 48 + hills * 0.15f - h) * plat;
 
-        // Rivers: carved down below sea level, with sloping banks; they fade out in high ground.
-        // Narrow streams far inland and in high ground, wide rivers near the coast; in the coastal
-        // band the river fans out into a delta: extra arms where the river field crosses higher
-        // levels, with low islands between them.
-        float wide = 0.4f + 1.6f * (1 - smoothstep(-0.1f, 0.45f, c)) * (1 - smoothstep(SEA + 12f, SEA + 40f, h));
-        float fr = f[F_RIVER];
-        float riverMask = (1 - smoothstep(0.012f * wide, 0.05f * wide, fr));
-        float delta = smoothstep(-0.25f, -0.18f, c) * (1 - smoothstep(-0.1f, -0.02f, c)) * (1 - smoothstep(SEA + 6f, SEA + 14f, h));
-        if (delta > 0) {
-            for (float arm = 0.09f; arm < 0.3f; arm += 0.09f)
-                riverMask = Math.max(riverMask, (1 - smoothstep(0.008f, 0.025f, Math.abs(fr - arm))) * delta);
-        }
-        riverMask *= inland * (1 - smoothstep(SEA + 28f, SEA + 55f, h)) * (1 - plat);
-        if (riverMask > 0) h = h + (SEA - 4 - h) * riverMask;
-
         // Lakes: lowland basins at sea level; the rim never drops below the water.
         float lowland = 1 - smoothstep(SEA + 10f, SEA + 20f, h);
-        float lakeMask = smoothstep(0.32f, 0.45f, f[F_LAKE]) * inland * lowland * (0.4f + 0.6f * flat) * (1 - riverMask);
+        float lakeMask = smoothstep(0.32f, 0.45f, f[F_LAKE]) * inland * lowland * (0.4f + 0.6f * flat) * (1 - plat);
         boolean lake = false;
         if (lakeMask > 0.35f) {
             h = SEA - 1 - 6 * (lakeMask - 0.35f) / 0.65f;
@@ -184,10 +205,29 @@ public final class Landscape {
             h = Math.max(h, SEA + 1);
         }
 
+        if (base) return new Column(0, (byte) 0, 0, h, 0); // the height before rivers, for the hydrology
+
+        // Rivers carved by the hydrology: the ground is dug or filled where the water rolled, and
+        // where it gathered into a stream the bed is cut under a still water surface.
+        int water = SEA;
+        float riverMask = 0;
+        if (hydrology != null && !lake && h > SEA) {
+            h += hydrology.carve(wx, wz);
+            float[] w = hydrology.water(wx, wz);
+            if (w != null && w[0] > SEA) {
+                water = Math.round(w[0]);
+                h = Math.min(h, water - w[1]);
+                riverMask = 1;
+            } else if (h < SEA + 1) {
+                h = SEA + 1; // carved below the sea without a river: keep it dry land
+            }
+        }
+
         int height = Math.max(Chunk.MIN_Y + 1, Math.min(Chunk.MAX_Y - 12, Math.round(h)));
         float t = temperature(wx, wz) - Math.max(0, height - 100) / 160f; // colder with altitude
-        byte biome = biome(wx, wz, height, t, downfall(wx, wz), c, riverMask, lake, plat, mountain);
-        return new Column(height, biome, SEA, riverMask, t);
+        byte biome = riverMask > 0 ? (t < 0.22f ? FROZEN_RIVER : RIVER)
+            : biome(wx, wz, height, t, downfall(wx, wz), c, 0, lake, plat, mountain);
+        return new Column(height, biome, water, riverMask, t);
     }
 
     private byte biome(int wx, int wz, int h, float t, float d, float c, float river, boolean lake, float plat,

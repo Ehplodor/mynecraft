@@ -29,7 +29,7 @@ fait réapparaître au point d'apparition.
 `E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
 `E` ouvre la palette de tous les blocs.
 
-Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `Échap` pause (`Q` y quitte), souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
+Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `M` minimap (relief, biomes, eaux, nuages, température), `Échap` pause (`Q` y quitte), souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
 `1`–`9` choisir l'emplacement de la barre, molette changer son bloc (dalles et bûches s'orientent selon la face visée).
 
@@ -39,6 +39,8 @@ Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `
 | `world/Section`, `Chunk`, `World` | Stockage : 1 octet/bloc, sections 16³ vides = `null` |
 | `world/TerrainGenerator`, `Noise` | Relief fBm + chaînes de montagnes, grottes (bruit 3D interpolé), filons, arbres ; déterministe par seed |
 | `world/weather/Atmosphere`, `Weather` | Météo dynamique : masses d'air, vent, pressions, nuages, pluie/neige/grêle, brouillard ; neige et gel au sol |
+| `world/Hydrology` | Bassins versants : érosion par boulets d'eau, lacs, débit cumulé, lits de rivières par tuiles de 1024 blocs |
+| `client/Minimap` | Minimap à couches (relief, biomes, eaux, nuages, température), calculée en arrière-plan |
 | `client/WeatherRenderer` | Nuages en blocs depuis le champ nuageux, précipitations abritées par les toits, éclairs |
 | `world/Player`, `Raycast` | Physique AABB par balayage d'axe sur les vraies boîtes (dalles), montée de marche 0,6, raycast DDA |
 | `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |

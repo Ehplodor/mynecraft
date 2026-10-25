@@ -6,7 +6,6 @@ public final class TerrainGenerator {
     public static final int ROCK_LINE = 135;
     private final Noise tunnelA, tunnelB, cavern;
     private final Landscape landscape;
-    private final Streams streams;
     private final long seed;
 
     public TerrainGenerator(long seed) {
@@ -14,7 +13,6 @@ public final class TerrainGenerator {
         this.tunnelB = new Noise(seed + 202);
         this.cavern = new Noise(seed + 303);
         this.landscape = new Landscape(seed);
-        this.streams = new Streams(landscape, seed);
         this.seed = seed;
     }
 
@@ -29,6 +27,10 @@ public final class TerrainGenerator {
 
     public int height(int wx, int wz) {
         return landscape.column(wx, wz).height();
+    }
+
+    public Landscape landscape() {
+        return landscape;
     }
 
     public Landscape.Column column(int wx, int wz) {
@@ -99,14 +101,14 @@ public final class TerrainGenerator {
                     for (int y = h - cap + 1; y <= h; y++) c.set(x, y, z, Blocks.PACKED_ICE);
                 }
                 boolean frozen = biome == Landscape.FROZEN_OCEAN || biome == Landscape.FROZEN_RIVER;
-                for (int y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, frozen && y == SEA_LEVEL ? Blocks.ICE : Blocks.WATER);
+                int water = Math.max(SEA_LEVEL, cols[(z + 1) * 18 + x + 1].water()); // rivers and lakes above the sea
+                for (int y = h + 1; y <= water; y++) c.set(x, y, z, frozen && y == water ? Blocks.ICE : Blocks.WATER);
             }
         }
         carveRavines(c, cols, heights);
         carveCaves(c, heights);
         ores(c, heights);
         decorate(c, heights, biomes);
-        streams.carve(c);
         c.compact();
         LightEngine.initChunk(c);
         return c;

@@ -221,3 +221,21 @@
   identique quel que soit le chunk qui le demande (continu aux frontières), mis en cache
 - Fluides au chargement : écoulements interrompus (ticks non sauvegardés) et eau suspendue repris ;
   au démarrage, simulation accélérée (`fastForward`) avec barre de progression ; F3 : en attente, mises à jour/s
+
+## ✅ M16 — Bassins versants et minimap
+- `Hydrology` : des boulets d'eau partent de sources procédurales (plus nombreuses en altitude et sous
+  climat humide) et dévalent le relief avec inertie ; rapides en pente, ils creusent et emportent des
+  sédiments ; lents, ils les déposent (cônes, deltas) ; piégés dans un creux, ils le comblent jusqu'à
+  déborder : aucun ne s'arrête avant la mer ou un lac
+- Écoulement sur le relief creusé : remplissage des cuvettes depuis la mer (elles deviennent des lacs avec
+  leur exutoire), débit = pluie cumulée vers l'aval ; les ruisseaux se rejoignent en rivières ; lit plus
+  large et plus profond avec le débit, plus étroit en pente ; surface plate en travers, ne remontant
+  jamais vers l'aval (gorges creusées à travers les bosses) ; berges relevées au niveau de l'eau
+- Monde infini : tuiles de 1024 blocs sur une grille de 4 blocs, simulées avec une marge de 512 blocs,
+  sources liées à la position (tuiles voisines cohérentes), cœur seul conservé en cache (~1 Mo/tuile) ;
+  ~0,5 s par tuile sur les fils de chargement, puis génération inchangée (0,75 ms/chunk)
+- Remplace les rivières au bruit, les deltas à bras et les ruisseaux tracés de la version précédente
+- Minimap (touche M) : relief ombré, biomes, eaux (rivières colorées selon le débit), nuages et
+  précipitations, température ; calculée en arrière-plan depuis le générateur (terres inexplorées
+  comprises), recoloriée deux fois par seconde avec la météo ; `--minimap <couche>` pour les captures
+- Affichage du creusement des tuiles en cours ; F3 : débit et surface de la rivière sous le joueur

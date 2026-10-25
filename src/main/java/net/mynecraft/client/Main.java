@@ -101,9 +101,11 @@ public final class Main {
                 Math.floorMod((long) Math.round(yawDeg), 360), Math.toDegrees(cam.pitch)),
             "Bloc visé : " + target,
             String.format("Lumière : ciel %d | bloc %d", light >> 4, light & 15),
-            String.format("Biome : %s | température %.2f | humidité %.2f",
+            String.format("Biome : %s | température %.2f | humidité %.2f%s",
                 Landscape.BIOME_NAMES[world.generator.column(bx, bz).biome()], world.generator.temperature(bx, bz),
-                world.generator.downfall(bx, bz)),
+                world.generator.downfall(bx, bz), world.generator.column(bx, bz).river() > 0
+                    ? String.format(" | rivière : débit %.0f, surface %d", world.generator.landscape().hydrology().flow(bx, bz),
+                        world.generator.column(bx, bz).water()) : ""),
             String.format("Météo : %.1f °C | humidité %d %% | nuages %.2f g/kg (base %d) | %s %.3f",
                 w.temperature(), Math.round(w.relativeHumidity() * 100), w.cloud(), w.cloudBase(),
                 PRECIPITATION[w.type().ordinal()], w.precipitation()),
@@ -331,6 +333,9 @@ public final class Main {
         if (forced >= 0 && forced + 1 < args.length) weather.force(args[forced + 1]);
         weather.second(player.x, player.y, player.z, (float) Math.max(0, DayCycle.sunHeight(ticks)), false);
         WeatherRenderer weatherRenderer = new WeatherRenderer();
+        Minimap minimap = new Minimap(world.generator);
+        String mapMode = option(args, "--minimap", null); // scripted shots: relief, biomes, waters, clouds, weather
+        if (mapMode != null) minimap.mode = Minimap.Mode.valueOf(mapMode.toUpperCase());
         double weatherClock = 0;
         // Start-up: the water of the first chunks settles at full speed, with a progress bar.
         boolean settling = true;
@@ -377,6 +382,7 @@ public final class Main {
                     }
                 }
                 if (input.pressed(GLFW_KEY_F3)) debug = !debug;
+                if (input.pressed(GLFW_KEY_M)) minimap.cycle();
                 if (!paused && input.pressed(GLFW_KEY_F4)) {
                     creative = !creative; // like vanilla's game mode switch
                     input.creative = creative;
@@ -541,6 +547,11 @@ public final class Main {
                 double[] m = screenshot != null ? new double[] {hud.width() * 0.62, hud.height() * 0.42} : input.mouseInFramebuffer();
                 inventoryScreen.draw(hud, menu, inventory, input.hotbar, input.slot, m[0], m[1]);
             }
+            int basins = world.generator.landscape().hydrology().computing.get();
+            if (basins > 0) { // river tiles being carved (the chunks there wait for them)
+                hud.textCentered(String.format("Creusement des bassins versants : %d tuile%s de 1024 blocs en calcul...", basins,
+                    basins > 1 ? "s" : ""), hud.width() / 2f, hud.height() * 0.3f - 3 * hud.lineHeight(), 0.85f, 0.95f, 1);
+            }
             if (survival.dead) {
                 hud.rect(0, 0, hud.width(), hud.height(), 0.5f, 0, 0, 0.45f);
                 float cy = hud.height() / 2f;
@@ -563,6 +574,13 @@ public final class Main {
                 hud.textCentered("Q : sauvegarder et quitter", hud.width() / 2f, cy + hud.lineHeight(), 0.85f, 0.85f, 0.85f);
             }
             hud.end(textures.id);
+            minimap.update(player.x, player.z, weather, now);
+            if (minimap.ready()) {
+                minimap.draw(hud);
+                hud.begin(fbW[0], fbH[0]);
+                minimap.overlay(hud, player.x, player.z, cam.yaw);
+                hud.end(textures.id);
+            }
             if (stats != null) {
                 stats.endGpu();
                 if (frames > 0 || now - fpsTimer > 0) stats.cpuFrame(frameNanos);
@@ -589,7 +607,8 @@ public final class Main {
                 fluids.blockChanged(ox - 4, oy, oz - 6);
                 fluidDemo = false;
             }
-            if (screenshot != null && streamer.settled() && renderer.idle() && fluids.pending() == 0 && !fluidDemo) {
+            if (screenshot != null && streamer.settled() && renderer.idle() && fluids.pending() == 0 && !fluidDemo
+                && (minimap.mode == Minimap.Mode.OFF || minimap.ready())) {
                 Screenshot.save(screenshot, fbW[0], fbH[0]);
                 long[] buf = renderer.bufferBytes();
                 System.out.printf("[stats] sections: %d drawn (%d in frustum, %d meshed) | quads: %d | GPU buffer %.1f/%.1f MiB%n",
@@ -631,6 +650,7 @@ public final class Main {
         gpuTimer.dispose();
         skyRenderer.dispose();
         weatherRenderer.dispose();
+        minimap.dispose();
         renderer.dispose();
         glfwDestroyWindow(window);
         glfwTerminate();
