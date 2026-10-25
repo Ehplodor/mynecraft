@@ -21,13 +21,14 @@ import java.util.concurrent.TimeUnit;
  */
 public final class ChunkStreamer implements AutoCloseable {
     public interface Listener {
-        /** The chunk and its 4 neighbours are loaded and it is within render distance. */
+        /** The chunk and its 8 neighbours are loaded and it is within render distance. */
         void chunkVisible(int cx, int cz);
 
         /** The chunk left render distance (its meshes can be freed). */
         void chunkHidden(int cx, int cz);
     }
 
+    private static final long JOIN_BUDGET_NANOS = 2_000_000L;
     private final World world;
     private final WorldStorage storage;
     private final Listener listener;
@@ -73,21 +74,22 @@ public final class ChunkStreamer implements AutoCloseable {
     }
 
     public void update(int pcx, int pcz) {
-        for (Chunk c; (c = completed.poll()) != null; ) {
+        // Joining runs cross-border light on this thread: spread it over frames with a time budget.
+        long deadline = System.nanoTime() + JOIN_BUDGET_NANOS;
+        for (Chunk c; System.nanoTime() < deadline && (c = completed.poll()) != null; ) {
             inFlight.remove(World.key(c.cx, c.cz));
             world.put(c);
             world.light.chunkJoined(c);
         }
 
-        // Visibility: needs all 4 neighbours so border faces are culled correctly.
+        // Visibility: needs all 8 neighbours (faces read the 4 sides, ambient occlusion the corners).
         for (int i = 0; i < offsets.length; i += 2) {
             int dx = offsets[i], dz = offsets[i + 1];
             if (Math.max(Math.abs(dx), Math.abs(dz)) > renderRadius) continue;
             int cx = pcx + dx, cz = pcz + dz;
             long k = World.key(cx, cz);
             if (visible.contains(k)) continue;
-            if (world.chunk(cx, cz) != null && world.chunk(cx - 1, cz) != null && world.chunk(cx + 1, cz) != null
-                && world.chunk(cx, cz - 1) != null && world.chunk(cx, cz + 1) != null) {
+            if (neighbourhoodLoaded(cx, cz)) {
                 visible.add(k);
                 listener.chunkVisible(cx, cz);
             }
@@ -123,6 +125,13 @@ public final class ChunkStreamer implements AutoCloseable {
                 completed.add(c != null ? c : world.generator.generate(cx, cz));
             });
         }
+    }
+
+    private boolean neighbourhoodLoaded(int cx, int cz) {
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+                if (world.chunk(cx + dx, cz + dz) == null) return false;
+        return true;
     }
 
     private void save(Chunk c) {

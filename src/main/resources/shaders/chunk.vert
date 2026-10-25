@@ -3,7 +3,8 @@ layout(location = 0) in uint aPacked;
 layout(location = 1) in uint aLight;
 
 uniform mat4 uViewProj;
-uniform vec3 uOrigin;     // section origin relative to the camera (camera-relative rendering)
+uniform ivec2 uCamChunk;  // camera chunk coordinates
+uniform vec3 uCamOffset;  // camera position relative to its chunk origin (y absolute)
 uniform vec3 uTints[4];   // none, grass, foliage, water
 
 out vec2 vUv;
@@ -35,7 +36,11 @@ void main() {
     float light = max(sky, block) * AO[(aLight >> 8) & 3u] * SHADE[face];
     vLayer = float(layer);
     vLight = uTints[tint] * light;
-    vec3 p = local + uOrigin;
+    // Section coordinates are stored mod 64: unambiguous while the render radius stays below 32.
+    int dx = ((int((aLight >> 10) & 63u) - (uCamChunk.x & 63) + 96) & 63) - 32;
+    int dz = ((int((aLight >> 16) & 63u) - (uCamChunk.y & 63) + 96) & 63) - 32;
+    int sy = int((aLight >> 22) & 31u);
+    vec3 p = vec3(dx * 16, sy * 16, dz * 16) + local - uCamOffset;
     vDist = length(p);
     gl_Position = uViewProj * vec4(p, 1.0);
 }

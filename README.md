@@ -12,7 +12,8 @@ Voir l'[étude de faisabilité](docs/ETUDE_FAISABILITE.md) et la [feuille de rou
 ```bash
 gradle run                                   # jeu
 gradle run --args="--no-vsync"               # FPS non plafonnés (affichés dans le titre)
-gradle run --args="--screenshot shot.png"    # rend une image puis quitte (avec --view lacet,tangage en degrés)
+gradle run --args="--screenshot shot.png"    # rend une image, affiche des stats, quitte
+                                             #   (--view lacet,tangage en degrés, --pos x,y,z, --no-occlusion)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
 gradle test                                  # tests + micro-benchmark génération/maillage
@@ -36,7 +37,9 @@ Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches)
 | `resource/PackSource`, `ResourceManager` | Packs dossier/zip/classpath empilés (le dernier gagne) |
 | `resource/BlockAppearance` | `blockstates` → `models` (héritage `parent`, refs `#`) → textures + `tintindex` |
 | `client/TextureArray` | Toutes les textures dans un `GL_TEXTURE_2D_ARRAY` (mipmaps, répétition sur quads fusionnés) |
-| `client/WorldRenderer` | Maillage multi-thread, 3 passes (opaque avant→arrière, cutout, translucide arrière→avant), frustum culling, rendu relatif caméra, remaillage incrémental versionné |
+| `world/SectionVisibility`, `OcclusionCuller` | Connexions entre faces de chaque section, parcours de visibilité par image (occlusion culling) |
+| `world/QuadAllocator` | Allocateur first-fit avec fusion des blocs libres, pour le tampon GPU partagé |
+| `client/WorldRenderer` | Un seul VBO pour tout le monde, **1 appel de dessin par passe** (`glMultiDrawElementsBaseVertex`), 3 passes triées, remaillage incrémental versionné |
 | `client/Overlay` | Réticule et contour du bloc visé |
 
 ## Resource packs

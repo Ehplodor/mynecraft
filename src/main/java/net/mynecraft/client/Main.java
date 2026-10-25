@@ -89,7 +89,9 @@ public final class Main {
                 + " block properties would be lost).");
         }
         World world = new World(storage.seed);
-        WorldRenderer renderer = new WorldRenderer(world, appearance.faceInfo, textures);
+        WorldRenderer renderer = new WorldRenderer(world, appearance.faceInfo, textures, RENDER_RADIUS + 1);
+        renderer.occlusion = !argv.contains("--no-occlusion");
+        renderer.measureFrustum = screenshot != null;
         ChunkStreamer streamer = new ChunkStreamer(world, storage, RENDER_RADIUS,
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2), new ChunkStreamer.Listener() {
                 public void chunkVisible(int cx, int cz) { renderer.chunkVisible(cx, cz); }
@@ -108,6 +110,14 @@ public final class Main {
             player.x = 8.5;
             player.z = 8.5;
             player.y = world.generator.height(8, 8) + 1;
+        }
+        String pos = option(args, "--pos", null); // "x,y,z": start there, flying (scripted views)
+        if (pos != null) {
+            String[] xyz = pos.split(",");
+            player.x = Double.parseDouble(xyz[0]);
+            player.y = Double.parseDouble(xyz[1]);
+            player.z = Double.parseDouble(xyz[2]);
+            player.flying = true;
         }
         long lastAutosave = System.nanoTime();
         if (screenshot != null) cam.pitch = -0.35f;
@@ -186,6 +196,10 @@ public final class Main {
             overlay.crosshair(fbW[0], fbH[0]);
             if (screenshot != null && streamer.settled() && renderer.idle()) {
                 Screenshot.save(screenshot, fbW[0], fbH[0]);
+                long[] buf = renderer.bufferUsage();
+                System.out.printf("[stats] sections: %d drawn (%d in frustum, %d meshed) | quads: %d | GPU buffer %.1f/%.1f MiB%n",
+                    renderer.drawnSections, renderer.frustumSections, renderer.meshCount(), renderer.totalQuads,
+                    buf[0] * 32 / 1048576.0, buf[1] * 32 / 1048576.0);
                 glfwSetWindowShouldClose(window, true);
             }
             glfwSwapBuffers(window);

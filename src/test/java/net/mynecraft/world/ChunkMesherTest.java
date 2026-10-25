@@ -98,7 +98,7 @@ class ChunkMesherTest {
     @Test
     void packedVerticesStayInRange() {
         World w = new World(42);
-        Chunk c = w.getOrGenerate(0, 0);
+        Chunk c = w.getOrGenerate(64, -64); // coordinates are stored mod 64
         ChunkMesher m = new ChunkMesher();
         for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
             int[] d = m.mesh(w, c, sy).data();
@@ -109,7 +109,11 @@ class ChunkMesherTest {
                 int layer = (p >> 18) & 1023;
                 assertTrue(layer > 0 && layer < Blocks.COUNT);
                 assertEquals(0, p >>> 30);
-                assertEquals(0, d[i + 1] >>> 10);
+                int l = d[i + 1];
+                assertEquals(0, (l >> 10) & 63, "section x mod 64");
+                assertEquals(0, (l >> 16) & 63, "section z mod 64");
+                assertEquals(sy, (l >> 22) & 31, "section y");
+                assertEquals(0, l >>> 27);
             }
         }
     }

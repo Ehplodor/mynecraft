@@ -2,11 +2,17 @@ package net.mynecraft.client;
 
 import net.mynecraft.world.Chunk;
 import net.mynecraft.world.ChunkMesher;
+import net.mynecraft.world.OcclusionCuller;
+import net.mynecraft.world.QuadAllocator;
+import net.mynecraft.world.SectionVisibility;
 import net.mynecraft.world.Section;
 import net.mynecraft.world.World;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.PointerBuffer;
 
+import java.nio.IntBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +30,10 @@ import static org.lwjgl.opengl.GL33.*;
  * Owns GPU buffers for section meshes. Generation and meshing run on worker threads;
  * only buffer uploads happen on the render thread.
  *
+ * <p>All sections live in one shared vertex buffer (sub-allocated by {@link QuadAllocator}), so each
+ * pass is a single {@code glMultiDrawElementsBaseVertex} call. Visible sections come from an
+ * occlusion walk ({@link OcclusionCuller}) restricted to the view frustum.
+ *
  * <p>Three passes per frame: opaque sections front to back (cheap early depth rejection), cutout
  * (alpha-tested leaves, glass, plants) with a separate program so the opaque one never pays for
  * {@code discard}, then translucent sections back to front with blending and no depth writes.
@@ -32,26 +42,30 @@ final class WorldRenderer {
     // Worst case: every block shows 6 unmerged faces (e.g. glass and leaves alternating).
     private static final int MAX_QUADS = Section.VOLUME * 6;
     private static final int STRIDE = ChunkMesher.INTS_PER_VERTEX * 4;
+    private static final int QUAD_BYTES = 4 * STRIDE;
+    private static final int INITIAL_QUADS = 1 << 20; // 32 MiB, grows by doubling
 
     private record Pending(long key, int cx, int sy, int cz, long seq, ChunkMesher.Result mesh) {}
 
     private static final class Mesh {
-        final int cx, sy, cz, vao, vbo;
-        int opaque, cutout, translucent; // quad counts, stored back to back in the VBO
+        final int cx, sy, cz;
+        int offset = -1, size;          // allocation in the shared buffer, in quads
+        int opaque, cutout, translucent; // quad counts, stored back to back in the allocation
         float distance;
-        Mesh(int cx, int sy, int cz, int vao, int vbo) {
-            this.cx = cx; this.sy = sy; this.cz = cz; this.vao = vao; this.vbo = vbo;
+        Mesh(int cx, int sy, int cz) {
+            this.cx = cx; this.sy = sy; this.cz = cz;
         }
     }
 
     /** One chunk shader variant and its uniform locations. */
     private static final class Program {
         final Shader shader;
-        final int uViewProj, uOrigin, uFogColor, uFogEnd;
+        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd;
         Program(String defines) {
             shader = new Shader("/shaders/chunk.vert", "/shaders/chunk.frag", defines);
             uViewProj = shader.uniform("uViewProj");
-            uOrigin = shader.uniform("uOrigin");
+            uCamChunk = shader.uniform("uCamChunk");
+            uCamOffset = shader.uniform("uCamOffset");
             uFogColor = shader.uniform("uFogColor");
             uFogEnd = shader.uniform("uFogEnd");
             glUseProgram(shader.program);
@@ -66,6 +80,17 @@ final class WorldRenderer {
     private final Program opaqueProgram, cutoutProgram, translucentProgram;
     private final int ebo;
     private final HashMap<Long, Mesh> meshes = new HashMap<>();
+    /** Face connectivity of every meshed section, including ones that produced no quads. */
+    private final HashMap<Long, Integer> visibility = new HashMap<>();
+    private final QuadAllocator allocator = new QuadAllocator(INITIAL_QUADS);
+    private final int vao;
+    private int vbo;
+    private final OcclusionCuller culler;
+    boolean occlusion = true;
+    int frustumSections = -1; // sections passing the frustum alone (stats), -1 when not measured
+    boolean measureFrustum;
+    private IntBuffer drawCounts = BufferUtils.createIntBuffer(1024), drawBase = BufferUtils.createIntBuffer(1024);
+    private PointerBuffer drawOffsets = BufferUtils.createPointerBuffer(1024);
     /** Latest requested version per section: a slower, older job must never overwrite a newer mesh. */
     private final ConcurrentHashMap<Long, Long> latest = new ConcurrentHashMap<>();
     private final AtomicLong sequence = new AtomicLong();
@@ -85,8 +110,9 @@ final class WorldRenderer {
     private final AtomicInteger pendingJobs = new AtomicInteger();
     int drawnSections, totalQuads;
 
-    WorldRenderer(World world, int[] faceInfo, TextureArray textures) {
+    WorldRenderer(World world, int[] faceInfo, TextureArray textures, int cullRadius) {
         this.world = world;
+        this.culler = new OcclusionCuller(cullRadius);
         this.textures = textures;
         this.meshers = ThreadLocal.withInitial(() -> new ChunkMesher(faceInfo));
         opaqueProgram = new Program("");
@@ -98,18 +124,44 @@ final class WorldRenderer {
             indices[i++] = v; indices[i++] = v + 1; indices[i++] = v + 2;
             indices[i++] = v + 2; indices[i++] = v + 3; indices[i++] = v;
         }
-        // Core profile needs a bound VAO to touch GL_ELEMENT_ARRAY_BUFFER.
-        int initVao = glGenVertexArrays();
-        glBindVertexArray(initVao);
+        vao = glGenVertexArrays();
+        glBindVertexArray(vao);
         ebo = glGenBuffers();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
+        vbo = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, (long) INITIAL_QUADS * QUAD_BYTES, GL_DYNAMIC_DRAW);
+        bindAttributes();
         glBindVertexArray(0);
-        glDeleteVertexArrays(initVao);
 
         workers = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() - 1),
             daemon("mesher"));
         editWorker = Executors.newSingleThreadExecutor(daemon("edit-mesher"));
+    }
+
+    private static void bindAttributes() {
+        glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, STRIDE, 0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, STRIDE, 4);
+        glEnableVertexAttribArray(1);
+    }
+
+    /** Doubles the shared buffer, copying the old contents GPU-side. */
+    private void grow() {
+        int oldQuads = allocator.capacity(), newQuads = oldQuads * 2;
+        int nb = glGenBuffers();
+        glBindBuffer(GL_COPY_WRITE_BUFFER, nb);
+        glBufferData(GL_COPY_WRITE_BUFFER, (long) newQuads * QUAD_BYTES, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_COPY_READ_BUFFER, vbo);
+        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, (long) oldQuads * QUAD_BYTES);
+        glDeleteBuffers(vbo);
+        vbo = nb;
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        bindAttributes();
+        glBindVertexArray(0);
+        allocator.grow(newQuads);
     }
 
     private static ThreadFactory daemon(String name) {
@@ -138,11 +190,11 @@ final class WorldRenderer {
         for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
             long k = World.sectionKey(cx, sy, cz);
             latest.remove(k);
+            visibility.remove(k);
             Mesh m = meshes.remove(k);
             if (m != null) {
                 totalQuads -= m.opaque + m.cutout + m.translucent;
-                glDeleteBuffers(m.vbo);
-                glDeleteVertexArrays(m.vao);
+                if (m.offset >= 0) allocator.release(m.offset, m.size);
             }
         }
     }
@@ -204,31 +256,31 @@ final class WorldRenderer {
     private void upload(Pending p) {
         Long want = latest.get(p.key);
         if (want == null || p.seq < want) return; // stale, or chunk hidden meanwhile
-        Mesh m = meshes.get(p.key);
         ChunkMesher.Result r = p.mesh;
+        visibility.put(p.key, r.visibility());
+        Mesh m = meshes.get(p.key);
         if (m == null) {
             if (r.quads() == 0) return;
-            int vao = glGenVertexArrays();
-            glBindVertexArray(vao);
-            int vbo = glGenBuffers();
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, STRIDE, 0);
-            glEnableVertexAttribArray(0);
-            glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, STRIDE, 4);
-            glEnableVertexAttribArray(1);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-            m = new Mesh(p.cx, p.sy, p.cz, vao, vbo);
+            m = new Mesh(p.cx, p.sy, p.cz);
             meshes.put(p.key, m);
         } else {
             totalQuads -= m.opaque + m.cutout + m.translucent;
-            glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
+            if (m.offset >= 0) allocator.release(m.offset, m.size);
+            m.offset = -1;
         }
-        // Reallocating the store (orphaning) avoids stalling on a buffer the GPU may still read.
-        glBufferData(GL_ARRAY_BUFFER, r.data(), GL_STATIC_DRAW);
+        int quads = r.quads();
+        if (quads > 0) {
+            int off;
+            while ((off = allocator.allocate(quads)) < 0) grow();
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferSubData(GL_ARRAY_BUFFER, (long) off * QUAD_BYTES, r.data());
+            m.offset = off;
+            m.size = quads;
+        }
         m.opaque = r.opaqueQuads();
         m.cutout = r.cutoutQuads();
         m.translucent = r.translucentQuads();
-        totalQuads += r.quads();
+        totalQuads += quads;
     }
 
     Matrix4f viewProj() {
@@ -243,46 +295,89 @@ final class WorldRenderer {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, textures.id);
 
-        // Cull and sort once; the three passes walk the same list.
         double px = cam.pos.x, py = cam.pos.y, pz = cam.pos.z;
-        int n = 0;
-        for (Mesh m : meshes.values()) {
-            float ox = (float) ((m.cx << 4) - px), oy = (float) ((m.sy << 4) - py), oz = (float) ((m.cz << 4) - pz);
-            if (!frustum.testAab(ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
-            float cx = ox + 8, cy = oy + 8, cz = oz + 8;
-            m.distance = cx * cx + cy * cy + cz * cz;
-            if (n == drawList.length) drawList = Arrays.copyOf(drawList, n * 2);
-            drawList[n++] = m;
+        int camCx = (int) Math.floor(px) >> 4, camCz = (int) Math.floor(pz) >> 4;
+        int camSy = (int) Math.floor(py) >> 4;
+        drawCount = 0;
+        if (occlusion) {
+            culler.cull(camCx, camSy, camCz, new OcclusionCuller.Graph() {
+                public int visibility(int cx, int sy, int cz) {
+                    if (!visibleChunks.contains(World.key(cx, cz))) return -1;
+                    Integer v = visibility.get(World.sectionKey(cx, sy, cz));
+                    return v == null ? SectionVisibility.ALL : v; // not meshed yet: assume open
+                }
+                public boolean inFrustum(int cx, int sy, int cz) {
+                    float ox = (float) ((cx << 4) - px), oy = (float) ((sy << 4) - py), oz = (float) ((cz << 4) - pz);
+                    return frustum.testAab(ox, oy, oz, ox + 16, oy + 16, oz + 16);
+                }
+            }, (cx, sy, cz) -> addDraw(meshes.get(World.sectionKey(cx, sy, cz)), px, py, pz, false));
         }
-        Arrays.sort(drawList, 0, n, (a, b) -> Float.compare(a.distance, b.distance));
-        drawnSections = n;
+        if (!occlusion || measureFrustum) {
+            int before = drawCount;
+            for (Mesh m : meshes.values()) addDraw(m, px, py, pz, true);
+            frustumSections = drawCount - before;
+            if (occlusion) drawCount = before; // only measuring
+        }
+        Arrays.sort(drawList, 0, drawCount, (a, b) -> Float.compare(a.distance, b.distance));
+        drawnSections = drawCount;
 
-        pass(opaqueProgram, n, false, 0, fog, far, px, py, pz);
-        pass(cutoutProgram, n, false, 1, fog, far, px, py, pz);
+        glBindVertexArray(vao);
+        float offX = (float) (px - (camCx << 4)), offZ = (float) (pz - (camCz << 4));
+        pass(opaqueProgram, false, 0, fog, far, camCx, camCz, offX, (float) py, offZ);
+        pass(cutoutProgram, false, 1, fog, far, camCx, camCz, offX, (float) py, offZ);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(false);
-        pass(translucentProgram, n, true, 2, fog, far, px, py, pz);
+        pass(translucentProgram, true, 2, fog, far, camCx, camCz, offX, (float) py, offZ);
         glDepthMask(true);
         glDisable(GL_BLEND);
         glBindVertexArray(0);
     }
 
-    private void pass(Program p, int n, boolean backToFront, int layer, float[] fog, float far,
-                      double px, double py, double pz) {
-        glUseProgram(p.shader.program);
-        glUniformMatrix4fv(p.uViewProj, false, matrixBuf);
-        glUniform3f(p.uFogColor, fog[0], fog[1], fog[2]);
-        glUniform1f(p.uFogEnd, far);
-        for (int k = 0; k < n; k++) {
-            Mesh m = drawList[backToFront ? n - 1 - k : k];
+    private int drawCount;
+
+    private void addDraw(Mesh m, double px, double py, double pz, boolean testFrustum) {
+        if (m == null || m.offset < 0) return;
+        float ox = (float) ((m.cx << 4) - px), oy = (float) ((m.sy << 4) - py), oz = (float) ((m.cz << 4) - pz);
+        if (testFrustum && !frustum.testAab(ox, oy, oz, ox + 16, oy + 16, oz + 16)) return;
+        float cx = ox + 8, cy = oy + 8, cz = oz + 8;
+        m.distance = cx * cx + cy * cy + cz * cz;
+        if (drawCount == drawList.length) drawList = Arrays.copyOf(drawList, drawCount * 2);
+        drawList[drawCount++] = m;
+    }
+
+    /** One multi-draw for the whole layer: per-section counts and base vertices, shared indices. */
+    private void pass(Program p, boolean backToFront, int layer, float[] fog, float far,
+                      int camCx, int camCz, float offX, float offY, float offZ) {
+        if (drawCounts.capacity() < drawCount) {
+            int cap = Integer.highestOneBit(drawCount) << 1;
+            drawCounts = BufferUtils.createIntBuffer(cap);
+            drawBase = BufferUtils.createIntBuffer(cap);
+            drawOffsets = BufferUtils.createPointerBuffer(cap);
+        }
+        drawCounts.clear();
+        drawBase.clear();
+        drawOffsets.clear();
+        for (int k = 0; k < drawCount; k++) {
+            Mesh m = drawList[backToFront ? drawCount - 1 - k : k];
             int quads = layer == 0 ? m.opaque : layer == 1 ? m.cutout : m.translucent;
             if (quads == 0) continue;
-            int first = layer == 0 ? 0 : layer == 1 ? m.opaque : m.opaque + m.cutout;
-            glUniform3f(p.uOrigin, (float) ((m.cx << 4) - px), (float) ((m.sy << 4) - py), (float) ((m.cz << 4) - pz));
-            glBindVertexArray(m.vao);
-            glDrawElementsBaseVertex(GL_TRIANGLES, quads * 6, GL_UNSIGNED_INT, 0, first * 4);
+            int first = m.offset + (layer == 0 ? 0 : layer == 1 ? m.opaque : m.opaque + m.cutout);
+            drawCounts.put(quads * 6);
+            drawBase.put(first * 4);
+            drawOffsets.put(0L);
         }
+        if (drawCounts.position() == 0) return;
+        drawCounts.flip();
+        drawBase.flip();
+        drawOffsets.flip();
+        glUseProgram(p.shader.program);
+        glUniformMatrix4fv(p.uViewProj, false, matrixBuf);
+        glUniform2i(p.uCamChunk, camCx, camCz);
+        glUniform3f(p.uCamOffset, offX, offY, offZ);
+        glUniform3f(p.uFogColor, fog[0], fog[1], fog[2]);
+        glUniform1f(p.uFogEnd, far);
+        glMultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts, GL_UNSIGNED_INT, drawOffsets, drawBase);
     }
 
     /** True once all scheduled meshing work has been uploaded. */
@@ -294,13 +389,16 @@ final class WorldRenderer {
         return meshes.size();
     }
 
+    /** GPU buffer usage: used and allocated quads. */
+    long[] bufferUsage() {
+        return new long[] {allocator.used(), allocator.capacity()};
+    }
+
     void dispose() {
         workers.shutdownNow();
         editWorker.shutdownNow();
-        for (Mesh m : meshes.values()) {
-            glDeleteBuffers(m.vbo);
-            glDeleteVertexArrays(m.vao);
-        }
+        glDeleteBuffers(vbo);
+        glDeleteVertexArrays(vao);
         glDeleteBuffers(ebo);
         glDeleteTextures(textures.id);
         for (Program p : new Program[] {opaqueProgram, cutoutProgram, translucentProgram}) glDeleteProgram(p.shader.program);

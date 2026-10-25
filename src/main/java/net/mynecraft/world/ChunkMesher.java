@@ -11,7 +11,9 @@ import java.util.Arrays;
  *   <li>x,y,z (5 bits each, 0..16) | face (3 bits: 0-5 cube faces, 6 cross plane) | texture layer
  *       (10 bits) | tint type (2 bits). UVs are derived from position in the shader, so merged quads
  *       tile their texture.</li>
- *   <li>light (sky &lt;&lt; 4 | block) | ambient occlusion level 0..3 &lt;&lt; 8.</li>
+ *   <li>light (sky &lt;&lt; 4 | block) | ambient occlusion level 0..3 &lt;&lt; 8 | section x mod 64 &lt;&lt; 10
+ *       | section z mod 64 &lt;&lt; 16 | section y &lt;&lt; 22. The section position lets every section share one
+ *       buffer and one draw call: the shader rebuilds camera-relative positions from it.</li>
  * </ol>
  * Quads are 4 consecutive vertices drawn with a shared index buffer (0,1,2, 2,3,0), grouped by
  * render layer: opaque, then cutout, then translucent.
@@ -24,9 +26,12 @@ public final class ChunkMesher {
     private static final int[] STRIDE = {1, P * P, P}; // padded index step along x, y, z
     private static final int CROSS_FACE = 6;
 
-    /** Mesh of one section; {@link #data} holds the layers back to back. */
-    public record Result(int[] data, int opaqueQuads, int cutoutQuads, int translucentQuads) {
-        public static final Result EMPTY = new Result(new int[0], 0, 0, 0);
+    /**
+     * Mesh of one section; {@link #data} holds the layers back to back. {@link #visibility} says which
+     * pairs of section faces see each other through non-opaque blocks (see {@link SectionVisibility}).
+     */
+    public record Result(int[] data, int opaqueQuads, int cutoutQuads, int translucentQuads, int visibility) {
+        public static final Result EMPTY = new Result(new int[0], 0, 0, 0, SectionVisibility.ALL);
 
         public int quads() {
             return opaqueQuads + cutoutQuads + translucentQuads;
@@ -39,6 +44,7 @@ public final class ChunkMesher {
     private final int[] mask = new int[Section.SIZE * Section.SIZE];
     private final int[][] out = {new int[4096], new int[1024], new int[1024]};
     private final int[] count = new int[3];
+    private final SectionVisibility visibility = new SectionVisibility();
 
     /** @param faceInfo per (blockId * 6 + face): texture layer | tint type &lt;&lt; 10, see BlockAppearance. */
     public ChunkMesher(int[] faceInfo) {
@@ -70,13 +76,15 @@ public final class ChunkMesher {
             meshAxis(d, true);
         }
         meshCrosses();
+        int vis = visibility.compute(section);
         int total = count[0] + count[1] + count[2];
-        if (total == 0) return Result.EMPTY;
         int[] data = new int[total];
         System.arraycopy(out[0], 0, data, 0, count[0]);
         System.arraycopy(out[1], 0, data, count[0], count[1]);
         System.arraycopy(out[2], 0, data, count[0] + count[1], count[2]);
-        return new Result(data, count[0] / INTS_PER_QUAD, count[1] / INTS_PER_QUAD, count[2] / INTS_PER_QUAD);
+        int sectionBits = (chunk.cx & 63) << 10 | (chunk.cz & 63) << 16 | sy << 22;
+        for (int i = 1; i < total; i += INTS_PER_VERTEX) data[i] |= sectionBits;
+        return new Result(data, count[0] / INTS_PER_QUAD, count[1] / INTS_PER_QUAD, count[2] / INTS_PER_QUAD, vis);
     }
 
     private void fillPadded(World world, Chunk chunk, int sy, Section section) {

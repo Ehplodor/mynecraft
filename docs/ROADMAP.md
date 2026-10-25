@@ -51,10 +51,22 @@
 - Reste à faire : surface de l'eau abaissée, cycle jour/nuit (uniforme déjà séparé ciel/blocs),
   lumière lisse, couleurs de biome, propriétés de blocs (orientation des bûches…)
 
-## M5 — Proposé
-- Multi-draw indirect + un seul gros VBO (1 appel de dessin par passe)
-- Occlusion culling par graphe de visibilité des sections
-- Lumière de jointure de chunk déplacée hors du thread principal
+## ✅ M5 — Performance du rendu
+- Un seul VBO partagé (allocateur first-fit + fusion, agrandissement par copie GPU) et un seul VAO
+- **1 appel de dessin par passe** (`glMultiDrawElementsBaseVertex`, OpenGL 3.3) au lieu d'un par section :
+  chaque sommet porte sa section (x, z mod 64, y), le shader reconstruit la position relative à la caméra
+- Occlusion culling « cave culling » : connectivité des 6 faces par section (15 bits, calculée au maillage),
+  parcours en largeur depuis la caméra sans demi-tour, combiné au frustum
+- Mesures (rayon 12, même vue, images identiques au pixel) : 543 → 324 sections dessinées en surface (−40 %),
+  527 → 1 caméra dans la roche
+- Lumière de jointure des chunks découpée dans le temps (budget 2 ms/image)
+- Correctif : un chunk n'est maillé qu'avec ses 8 voisins chargés (AO des coins exacte, maillage déterministe)
+- Reste à faire : mesurer le temps GPU/CPU par image sur une vraie carte (requêtes timer GL),
+  lumière de jointure sur un thread dédié
+
+## M6 — Proposé
+- Cycle jour/nuit, lumière lisse, couleurs de biome, surface de l'eau abaissée
+- Hauteur de monde -64..319 (compatibilité totale des mondes 1.18+)
 
 ## Pistes d'optimisation continues
 - Multi-draw indirect (`glMultiDrawElementsIndirect`) + un seul gros VBO → 1 draw call
