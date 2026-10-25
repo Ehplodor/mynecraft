@@ -15,8 +15,13 @@
 - Sommet toujours sur 32 bits (couche de texture 10 bits + bit de teinte)
 - Reste à faire : modèles non cubiques (dalles, escaliers, plantes), rotations, animations, couleurs de biome
 
-## M2 — Interaction
-- Collisions AABB, gravité, raycast (DDA), casser/poser, remaillage incrémental d'une section
+## ✅ M2 — Interaction
+- Joueur AABB 0,6×1,8, gravité, saut (~1,25 bloc), mode vol, pas physique fixe 120 Hz
+- Raycast DDA (portée 5), casser (bedrock incassable) / poser (interdit dans le joueur), répétition au maintien
+- Remaillage incrémental : seule la section touchée (+ voisines si le bloc est en bordure)
+- File dédiée aux modifications du joueur (jamais bloquée par le chargement), uploads prioritaires
+- Versionnage par section : un maillage obsolète ne peut pas écraser un plus récent
+- Réticule et contour du bloc visé
 
 ## M3 — Monde infini & persistance
 - Chargement/déchargement dynamique autour du joueur, priorité par distance

@@ -17,18 +17,22 @@ gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossie
 gradle test                                  # tests + micro-benchmark génération/maillage
 ```
 
-Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace`/`Maj` monter/descendre, `Ctrl` sprint, `Échap` quitter.
+Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
+`F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
+`1`–`5` choisir le bloc, `Échap` quitter.
 
 ## Architecture
 | Fichier | Rôle |
 |---|---|
 | `world/Section`, `Chunk`, `World` | Stockage : 1 octet/bloc, sections 16³ vides = `null` |
 | `world/TerrainGenerator`, `Noise` | Génération par bruit fBm, déterministe par seed |
+| `world/Player`, `Raycast` | Physique AABB axe par axe (pas fixe 120 Hz), raycast DDA |
 | `world/ChunkMesher` | **Greedy meshing**, sommet compacté sur **un seul `int`** (4 o/sommet) |
 | `resource/PackSource`, `ResourceManager` | Packs dossier/zip/classpath empilés (le dernier gagne) |
 | `resource/BlockAppearance` | `blockstates` → `models` (héritage `parent`, refs `#`) → textures + `tintindex` |
 | `client/TextureArray` | Toutes les textures dans un `GL_TEXTURE_2D_ARRAY` (mipmaps, répétition sur quads fusionnés) |
-| `client/WorldRenderer` | Génération/maillage multi-thread, upload GPU avec budget/frame, frustum culling, rendu relatif caméra |
+| `client/WorldRenderer` | Génération/maillage multi-thread, upload GPU avec budget/frame, frustum culling, rendu relatif caméra, remaillage incrémental versionné |
+| `client/Overlay` | Réticule et contour du bloc visé |
 
 ## Resource packs
 Format Java Edition (`pack.mcmeta`, `assets/<ns>/blockstates|models|textures`). Le pack intégré

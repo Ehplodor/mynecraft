@@ -8,8 +8,13 @@ import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -23,21 +28,28 @@ final class WorldRenderer {
     // Worst case for greedy meshing is a 3D checkerboard: half the blocks, 6 unmerged faces each.
     private static final int MAX_QUADS = Section.VOLUME / 2 * 6;
 
-    private record Pending(int cx, int sy, int cz, int[] vertices) {}
+    private record Pending(long key, int cx, int sy, int cz, long seq, int[] vertices) {}
 
     private static final class Mesh {
-        final int cx, sy, cz, vao, vbo, indexCount;
-        Mesh(int cx, int sy, int cz, int vao, int vbo, int indexCount) {
-            this.cx = cx; this.sy = sy; this.cz = cz; this.vao = vao; this.vbo = vbo; this.indexCount = indexCount;
+        final int cx, sy, cz, vao, vbo;
+        int indexCount;
+        Mesh(int cx, int sy, int cz, int vao, int vbo) {
+            this.cx = cx; this.sy = sy; this.cz = cz; this.vao = vao; this.vbo = vbo;
         }
     }
 
     private final World world;
     private final Shader shader;
     private final int ebo;
-    private final List<Mesh> meshes = new ArrayList<>();
+    private final HashMap<Long, Mesh> meshes = new HashMap<>();
+    /** Latest requested version per section: a slower, older job must never overwrite a newer mesh. */
+    private final ConcurrentHashMap<Long, Long> latest = new ConcurrentHashMap<>();
+    private final AtomicLong sequence = new AtomicLong();
     private final ConcurrentLinkedQueue<Pending> uploads = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<Pending> urgentUploads = new ConcurrentLinkedQueue<>();
     private final ExecutorService workers;
+    /** Player edits get their own thread so they never wait behind bulk world loading. */
+    private final ExecutorService editWorker;
     private final ThreadLocal<ChunkMesher> meshers;
     private final TextureArray textures;
     private final FrustumIntersection frustum = new FrustumIntersection();
@@ -45,7 +57,7 @@ final class WorldRenderer {
     private final float[] matrixBuf = new float[16];
     private final int uViewProj, uOrigin, uFogColor, uFogEnd;
 
-    private final java.util.concurrent.atomic.AtomicInteger pendingJobs = new java.util.concurrent.atomic.AtomicInteger();
+    private final AtomicInteger pendingJobs = new AtomicInteger();
     int drawnSections, totalQuads;
 
     WorldRenderer(World world, int[] faceInfo, TextureArray textures) {
@@ -77,11 +89,21 @@ final class WorldRenderer {
         // Plains-like grass colour; replaced by per-biome colormaps later.
         glUniform3f(shader.uniform("uTint"), 0.57f, 0.74f, 0.35f);
 
-        workers = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() - 1), r -> {
-            Thread t = new Thread(r, "mesher");
+        workers = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() - 1),
+            daemon("mesher"));
+        editWorker = Executors.newSingleThreadExecutor(daemon("edit-mesher"));
+    }
+
+    private static ThreadFactory daemon(String name) {
+        return r -> {
+            Thread t = new Thread(r, name);
             t.setDaemon(true);
             return t;
-        });
+        };
+    }
+
+    private static long sectionKey(int cx, int sy, int cz) {
+        return ((long) cx << 32) | ((cz & 0x0FFFFFFFL) << 4) | sy;
     }
 
     /** Generates a square of chunks around the origin, then meshes each once its neighbours exist. */
@@ -97,35 +119,89 @@ final class WorldRenderer {
         for (int cx = -radius; cx <= radius; cx++)
             for (int cz = -radius; cz <= radius; cz++) {
                 int x = cx, z = cz;
+                long[] seqs = new long[Chunk.SECTIONS];
+                for (int sy = 0; sy < Chunk.SECTIONS; sy++) seqs[sy] = request(sectionKey(x, sy, z));
                 pendingJobs.incrementAndGet();
                 workers.execute(() -> {
-                    Chunk c = world.chunk(x, z);
-                    ChunkMesher mesher = meshers.get();
-                    for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
-                        int[] v = mesher.mesh(world, c, sy);
-                        if (v.length > 0) uploads.add(new Pending(x, sy, z, v));
-                    }
+                    for (int sy = 0; sy < Chunk.SECTIONS; sy++) meshSection(x, sy, z, seqs[sy], uploads);
                     pendingJobs.decrementAndGet();
                 });
             }
     }
 
+    private long request(long key) {
+        long seq = sequence.incrementAndGet();
+        latest.put(key, seq);
+        return seq;
+    }
+
+    private void meshSection(int cx, int sy, int cz, long seq, ConcurrentLinkedQueue<Pending> queue) {
+        Chunk c = world.chunk(cx, cz);
+        if (c == null) return;
+        int[] v = meshers.get().mesh(world, c, sy);
+        queue.add(new Pending(sectionKey(cx, sy, cz), cx, sy, cz, seq, v));
+    }
+
+    /**
+     * Re-meshes the section holding block (x, y, z), plus neighbouring sections when the block
+     * lies on a section border (their faces against it may appear or disappear).
+     */
+    void blockChanged(int x, int y, int z) {
+        int cx = x >> 4, sy = y >> 4, cz = z >> 4, lx = x & 15, ly = y & 15, lz = z & 15;
+        remesh(cx, sy, cz);
+        if (lx == 0) remesh(cx - 1, sy, cz);
+        if (lx == 15) remesh(cx + 1, sy, cz);
+        if (ly == 0 && sy > 0) remesh(cx, sy - 1, cz);
+        if (ly == 15 && sy < Chunk.SECTIONS - 1) remesh(cx, sy + 1, cz);
+        if (lz == 0) remesh(cx, sy, cz - 1);
+        if (lz == 15) remesh(cx, sy, cz + 1);
+    }
+
+    private void remesh(int cx, int sy, int cz) {
+        long seq = request(sectionKey(cx, sy, cz));
+        pendingJobs.incrementAndGet();
+        editWorker.execute(() -> {
+            meshSection(cx, sy, cz, seq, urgentUploads);
+            pendingJobs.decrementAndGet();
+        });
+    }
+
     private void drainUploads(long budgetNanos) {
-        long deadline = System.nanoTime() + budgetNanos;
         Pending p;
-        while (System.nanoTime() < deadline && (p = uploads.poll()) != null) {
+        while ((p = urgentUploads.poll()) != null) upload(p);
+        long deadline = System.nanoTime() + budgetNanos;
+        while (System.nanoTime() < deadline && (p = uploads.poll()) != null) upload(p);
+        glBindVertexArray(0);
+    }
+
+    private void upload(Pending p) {
+        Long want = latest.get(p.key);
+        if (want != null && p.seq < want) return; // stale
+        Mesh m = meshes.get(p.key);
+        int quads = p.vertices.length / 4;
+        if (m == null) {
+            if (quads == 0) return;
             int vao = glGenVertexArrays();
             glBindVertexArray(vao);
             int vbo = glGenBuffers();
             glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            glBufferData(GL_ARRAY_BUFFER, p.vertices, GL_STATIC_DRAW);
             glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, 4, 0);
             glEnableVertexAttribArray(0);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-            meshes.add(new Mesh(p.cx, p.sy, p.cz, vao, vbo, p.vertices.length / 4 * 6));
-            totalQuads += p.vertices.length / 4;
+            m = new Mesh(p.cx, p.sy, p.cz, vao, vbo);
+            meshes.put(p.key, m);
+        } else {
+            totalQuads -= m.indexCount / 6;
+            glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
         }
-        glBindVertexArray(0);
+        // Reallocating the store (orphaning) avoids stalling on a buffer the GPU may still read.
+        glBufferData(GL_ARRAY_BUFFER, p.vertices, GL_STATIC_DRAW);
+        m.indexCount = quads * 6;
+        totalQuads += quads;
+    }
+
+    Matrix4f viewProj() {
+        return viewProj;
     }
 
     void render(Camera cam, float aspect, float far, float[] fog) {
@@ -141,7 +217,8 @@ final class WorldRenderer {
 
         double px = cam.pos.x, py = cam.pos.y, pz = cam.pos.z;
         drawnSections = 0;
-        for (Mesh m : meshes) {
+        for (Mesh m : meshes.values()) {
+            if (m.indexCount == 0) continue;
             float ox = (float) ((m.cx << 4) - px), oy = (float) ((m.sy << 4) - py), oz = (float) ((m.cz << 4) - pz);
             if (!frustum.testAab(ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
             glUniform3f(uOrigin, ox, oy, oz);
@@ -154,7 +231,7 @@ final class WorldRenderer {
 
     /** True once all scheduled meshing work has been uploaded. */
     boolean idle() {
-        return pendingJobs.get() == 0 && uploads.isEmpty();
+        return pendingJobs.get() == 0 && uploads.isEmpty() && urgentUploads.isEmpty();
     }
 
     int meshCount() {
@@ -163,7 +240,8 @@ final class WorldRenderer {
 
     void dispose() {
         workers.shutdownNow();
-        for (Mesh m : meshes) {
+        editWorker.shutdownNow();
+        for (Mesh m : meshes.values()) {
             glDeleteBuffers(m.vbo);
             glDeleteVertexArrays(m.vao);
         }

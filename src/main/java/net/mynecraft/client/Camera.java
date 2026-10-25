@@ -15,9 +15,4 @@ final class Camera {
             .rotateY(-yaw);
     }
 
-    void forward(double[] out) {
-        out[0] = -Math.sin(yaw);
-        out[1] = 0;
-        out[2] = -Math.cos(yaw);
-    }
 }

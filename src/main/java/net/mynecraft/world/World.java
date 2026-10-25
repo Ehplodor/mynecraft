@@ -27,6 +27,23 @@ public final class World {
         return chunks.computeIfAbsent(key(cx, cz), k -> new Chunk(cx, cz));
     }
 
+    /** Collision view: below the world and unloaded chunks count as solid so nobody falls out. */
+    public boolean isSolid(int x, int y, int z) {
+        if (y >= Chunk.HEIGHT) return false;
+        if (y < 0) return true;
+        Chunk c = chunk(x >> 4, z >> 4);
+        return c == null || Blocks.isOpaque(c.get(x & 15, y, z & 15));
+    }
+
+    /** Sets a block in a loaded chunk; returns false if out of range or unchanged. */
+    public boolean set(int x, int y, int z, byte id) {
+        if (y < 0 || y >= Chunk.HEIGHT) return false;
+        Chunk c = chunk(x >> 4, z >> 4);
+        if (c == null || c.get(x & 15, y, z & 15) == id) return false;
+        c.set(x & 15, y, z & 15, id);
+        return true;
+    }
+
     public byte get(int x, int y, int z) {
         if (y < 0 || y >= Chunk.HEIGHT) return Blocks.AIR;
         Chunk c = chunk(x >> 4, z >> 4);
