@@ -1,6 +1,5 @@
 package net.mynecraft.client;
 
-import net.mynecraft.world.Blocks;
 import net.mynecraft.world.Chunk;
 import net.mynecraft.world.ChunkMesher;
 import net.mynecraft.world.Section;
@@ -39,7 +38,8 @@ final class WorldRenderer {
     private final List<Mesh> meshes = new ArrayList<>();
     private final ConcurrentLinkedQueue<Pending> uploads = new ConcurrentLinkedQueue<>();
     private final ExecutorService workers;
-    private final ThreadLocal<ChunkMesher> meshers = ThreadLocal.withInitial(ChunkMesher::new);
+    private final ThreadLocal<ChunkMesher> meshers;
+    private final TextureArray textures;
     private final FrustumIntersection frustum = new FrustumIntersection();
     private final Matrix4f viewProj = new Matrix4f();
     private final float[] matrixBuf = new float[16];
@@ -48,8 +48,10 @@ final class WorldRenderer {
     private final java.util.concurrent.atomic.AtomicInteger pendingJobs = new java.util.concurrent.atomic.AtomicInteger();
     int drawnSections, totalQuads;
 
-    WorldRenderer(World world) {
+    WorldRenderer(World world, int[] faceInfo, TextureArray textures) {
         this.world = world;
+        this.textures = textures;
+        this.meshers = ThreadLocal.withInitial(() -> new ChunkMesher(faceInfo));
         this.shader = new Shader("/shaders/chunk.vert", "/shaders/chunk.frag");
         uViewProj = shader.uniform("uViewProj");
         uOrigin = shader.uniform("uOrigin");
@@ -71,9 +73,9 @@ final class WorldRenderer {
         glDeleteVertexArrays(initVao);
 
         glUseProgram(shader.program);
-        float[] colors = new float[16 * 3];
-        System.arraycopy(Blocks.COLORS, 0, colors, 0, Blocks.COLORS.length);
-        glUniform3fv(shader.uniform("uColors"), colors);
+        glUniform1i(shader.uniform("uTextures"), 0);
+        // Plains-like grass colour; replaced by per-biome colormaps later.
+        glUniform3f(shader.uniform("uTint"), 0.57f, 0.74f, 0.35f);
 
         workers = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() - 1), r -> {
             Thread t = new Thread(r, "mesher");
@@ -131,6 +133,8 @@ final class WorldRenderer {
         cam.viewProj(viewProj, aspect, far);
         frustum.set(viewProj);
         glUseProgram(shader.program);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, textures.id);
         glUniformMatrix4fv(uViewProj, false, viewProj.get(matrixBuf));
         glUniform3f(uFogColor, fog[0], fog[1], fog[2]);
         glUniform1f(uFogEnd, far);
@@ -164,6 +168,7 @@ final class WorldRenderer {
             glDeleteVertexArrays(m.vao);
         }
         glDeleteBuffers(ebo);
+        glDeleteTextures(textures.id);
         glDeleteProgram(shader.program);
     }
 }

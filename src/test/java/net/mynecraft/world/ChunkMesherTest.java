@@ -61,8 +61,9 @@ class ChunkMesherTest {
             for (int p : m.mesh(w, c, sy)) {
                 assertTrue((p & 31) <= 16 && ((p >> 5) & 31) <= 16 && ((p >> 10) & 31) <= 16);
                 assertTrue(((p >> 15) & 7) < 6);
-                int block = (p >> 18) & 255;
-                assertTrue(block > 0 && block < Blocks.COUNT);
+                int layer = (p >> 18) & 1023;
+                assertTrue(layer > 0 && layer < Blocks.COUNT);
+                assertEquals(0, p >>> 29);
             }
         }
     }

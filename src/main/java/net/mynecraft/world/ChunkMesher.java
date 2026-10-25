@@ -6,7 +6,8 @@ import java.util.Arrays;
  * Greedy mesher for one section. Visible faces with the same block id are merged into the
  * largest rectangles possible, so flat terrain becomes a handful of quads instead of thousands.
  *
- * <p>Each vertex is one packed int: x,y,z (5 bits each, 0..16) | face (3 bits) | block id (8 bits).
+ * <p>Each vertex is one packed int: x,y,z (5 bits each, 0..16) | face (3 bits) | texture layer (10 bits)
+ * | tint flag (1 bit). UVs are derived from position in the shader, so merged quads tile their texture.
  * Quads are 4 consecutive vertices drawn with a shared index buffer (0,1,2, 2,3,0).
  *
  * <p>Not thread-safe: use one instance per thread; buffers are reused between calls.
@@ -14,10 +15,27 @@ import java.util.Arrays;
 public final class ChunkMesher {
     private static final int P = Section.SIZE + 2;
 
+    private final int[] faceInfo;
     private final byte[] padded = new byte[P * P * P];
     private final byte[] mask = new byte[Section.SIZE * Section.SIZE];
     private int[] out = new int[4096];
     private int count;
+
+    /** @param faceInfo per (blockId * 6 + face): texture layer | tint bit, see BlockAppearance. */
+    public ChunkMesher(int[] faceInfo) {
+        this.faceInfo = faceInfo;
+    }
+
+    /** Uses the block id as texture layer for every face (tests, tools). */
+    public ChunkMesher() {
+        this(identityFaceInfo());
+    }
+
+    private static int[] identityFaceInfo() {
+        int[] t = new int[Blocks.COUNT * 6];
+        for (int i = 0; i < t.length; i++) t[i] = i / 6;
+        return t;
+    }
 
     private static int pIndex(int x, int y, int z) {
         return ((y + 1) * P + (z + 1)) * P + (x + 1);
@@ -96,7 +114,7 @@ public final class ChunkMesher {
     private void emitQuad(int d, int u, int v, int plane, int i, int j, int w, int h,
                           int face, byte block, boolean positive) {
         if (count + 4 > out.length) out = Arrays.copyOf(out, out.length * 2);
-        int tail = (face << 15) | ((block & 0xFF) << 18);
+        int tail = (face << 15) | (faceInfo[(block & 0xFF) * 6 + face] << 18);
         int sd = d * 5, su = u * 5, sv = v * 5;
         int base = (plane << sd) | tail;
         int u0 = i << su, u1 = (i + w) << su, v0 = j << sv, v1 = (j + h) << sv;

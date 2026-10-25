@@ -10,15 +10,8 @@ public final class Blocks {
     public static final byte BEDROCK = 5;
     public static final int COUNT = 6;
 
-    /** Linear RGB per block id, used by the M0 renderer until textures land. */
-    public static final float[] COLORS = {
-        0f, 0f, 0f,
-        0.45f, 0.45f, 0.47f,
-        0.47f, 0.33f, 0.22f,
-        0.30f, 0.62f, 0.22f,
-        0.86f, 0.80f, 0.55f,
-        0.15f, 0.15f, 0.15f,
-    };
+    /** Resource names (namespace minecraft), used to look up blockstates in resource packs. */
+    public static final String[] NAMES = {"air", "stone", "dirt", "grass_block", "sand", "bedrock"};
 
     private Blocks() {}
 

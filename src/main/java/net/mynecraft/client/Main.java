@@ -1,6 +1,12 @@
 package net.mynecraft.client;
 
+import net.mynecraft.resource.BlockAppearance;
+import net.mynecraft.resource.PackSource;
+import net.mynecraft.resource.ResourceManager;
 import net.mynecraft.world.World;
+
+import java.io.IOException;
+import java.nio.file.Path;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 
@@ -35,8 +41,23 @@ public final class Main {
         glEnable(GL_CULL_FACE);
         glClearColor(SKY[0], SKY[1], SKY[2], 1);
 
+        ResourceManager resources = new ResourceManager().add(PackSource.classpath("defaultpack"));
+        for (int i = 0; i < args.length - 1; i++) {
+            if (args[i].equals("--pack")) {
+                try {
+                    resources.add(PackSource.open(Path.of(args[i + 1])));
+                } catch (IOException e) {
+                    System.err.println("Cannot open pack " + args[i + 1] + ": " + e.getMessage());
+                }
+            }
+        }
+        BlockAppearance appearance = new BlockAppearance(resources);
+        TextureArray textures = new TextureArray(appearance, resources);
+        appearance.warnings.forEach(w -> System.err.println("[resources] " + w));
+        textures.warnings.forEach(w -> System.err.println("[resources] " + w));
+
         World world = new World(1337L);
-        WorldRenderer renderer = new WorldRenderer(world);
+        WorldRenderer renderer = new WorldRenderer(world, appearance.faceInfo, textures);
         renderer.loadArea(RENDER_RADIUS);
 
         Camera cam = new Camera();
