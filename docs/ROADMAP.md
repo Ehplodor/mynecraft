@@ -249,3 +249,10 @@
   vers le chunk voisin sont repérés dès la génération (colonnes du halo) ; seuls les creux peu profonds
   sont inondés, les ruptures de pente gardent une berge ; l'écoulement des terres chargées est
   pré-calculé sans délai (3 ms par image) : 400 chunks de rivières réglés en ~0,3 s de calcul
+
+## ✅ M17 — Menu de redémarrage
+- Échap ouvre un menu cliquable : reprendre, réapparaître au point de départ, recharger ce monde,
+  nouveau monde (graine aléatoire, même graine, graine saisie : nombre ou texte haché comme vanilla),
+  ouvrir un autre monde sauvegardé (clic droit pour passer au suivant), sauvegarder et quitter
+- Les nouveaux mondes vont dans `monde-2`, `monde-3`… à côté du monde courant ; changer de monde
+  sauvegarde puis relance le jeu avec les nouveaux arguments (mêmes options JVM, packs et réglages)

@@ -186,6 +186,8 @@ public final class Main {
                 + " block properties would be lost).");
         }
         World world = new World(storage.seed);
+        PauseMenu pauseMenu = new PauseMenu(worldDir, storage.seed);
+        java.util.List<String> restart = null; // arguments to relaunch with (another world), set by the menu
         BiomeMap biomes = new BiomeMap(world.generator,
             Colormap.load(resources, "grass", 0x91BD59), Colormap.load(resources, "foliage", 0x77AB2F));
         WorldRenderer renderer = new WorldRenderer(world, appearance.faceInfo, textures, biomes, RENDER_RADIUS + 1);
@@ -395,7 +397,50 @@ public final class Main {
                     player.z = storage.spawn[2] + 0.5;
                     player.vx = player.vy = player.vz = 0;
                 }
-                if (paused && input.pressed(GLFW_KEY_Q)) glfwSetWindowShouldClose(window, true);
+                if (paused) {
+                    PauseMenu.Action action = PauseMenu.Action.NONE;
+                    if (pauseMenu.typing) {
+                        for (char ch : input.takeTyped().toCharArray())
+                            if (ch >= ' ' && pauseMenu.seedText.length() < 32) pauseMenu.seedText.append(ch);
+                        if (input.pressed(GLFW_KEY_BACKSPACE) && pauseMenu.seedText.length() > 0)
+                            pauseMenu.seedText.setLength(pauseMenu.seedText.length() - 1);
+                        if (input.pressed(GLFW_KEY_ENTER) && pauseMenu.seedText.length() > 0) {
+                            pauseMenu.typing = false;
+                            action = PauseMenu.Action.NEW_TYPED_SEED;
+                        }
+                    } else {
+                        input.takeTyped();
+                    }
+                    boolean left = input.clicked(GLFW_MOUSE_BUTTON_LEFT), right = input.clicked(GLFW_MOUSE_BUTTON_RIGHT);
+                    if (left || right) {
+                        double[] m = input.mouseInFramebuffer();
+                        action = pauseMenu.click(hud, m[0], m[1], right);
+                    }
+                    switch (action) {
+                        case RESUME -> {
+                            paused = false;
+                            input.capture(true);
+                        }
+                        case RESPAWN -> {
+                            player.x = storage.spawn[0] + 0.5;
+                            player.y = storage.spawn[1];
+                            player.z = storage.spawn[2] + 0.5;
+                            player.vx = player.vy = player.vz = 0;
+                            paused = false;
+                            input.capture(true);
+                        }
+                        case RELOAD -> restart = relaunchArgs(args, worldDir, null);
+                        case NEW_RANDOM -> restart = relaunchArgs(args, pauseMenu.newWorldDir(), new java.util.Random().nextLong());
+                        case NEW_SAME_SEED -> restart = relaunchArgs(args, pauseMenu.newWorldDir(), storage.seed);
+                        case NEW_TYPED_SEED -> restart = relaunchArgs(args, pauseMenu.newWorldDir(), pauseMenu.typedSeed());
+                        case OPEN_WORLD -> restart = relaunchArgs(args, pauseMenu.chosenWorld(), null);
+                        case QUIT -> glfwSetWindowShouldClose(window, true);
+                        default -> { }
+                    }
+                    if (restart != null) glfwSetWindowShouldClose(window, true);
+                } else {
+                    input.takeTyped();
+                }
             }
             if (paused || survival.dead) dt = 0; // the world stands still: no physics, no time, no edits
             if (stats == null && dt > 0 && !screenOpen) input.frame(cam, player, dt);
@@ -569,11 +614,8 @@ public final class Main {
                 hud.rect(x, y, w, 3 * hud.scale, 0, 0, 0, 0.6f);
                 hud.rect(x, y, w * f, 3 * hud.scale, 0.3f, 0.55f, 1, 0.9f);
             } else if (paused) {
-                hud.rect(0, 0, hud.width(), hud.height(), 0, 0, 0, 0.5f);
-                float cy = hud.height() / 2f;
-                hud.textCentered("Pause", hud.width() / 2f, cy - 2 * hud.lineHeight(), 1, 1, 1);
-                hud.textCentered("Échap : reprendre", hud.width() / 2f, cy, 0.85f, 0.85f, 0.85f);
-                hud.textCentered("Q : sauvegarder et quitter", hud.width() / 2f, cy + hud.lineHeight(), 0.85f, 0.85f, 0.85f);
+                double[] m = screenshot != null ? new double[] {hud.width() / 2.0, hud.height() / 2.0} : input.mouseInFramebuffer();
+                pauseMenu.draw(hud, m[0], m[1]);
             }
             hud.end(textures.id);
             minimap.update(player.x, player.z, weather, now);
@@ -656,5 +698,44 @@ public final class Main {
         renderer.dispose();
         glfwDestroyWindow(window);
         glfwTerminate();
+        if (restart != null) relaunch(restart);
+    }
+
+    /** Options naming the world or the start position: replaced or dropped when relaunching. */
+    private static final java.util.Set<String> WORLD_OPTIONS = java.util.Set.of("--world", "--seed", "--pos", "--view",
+        "--time", "--screenshot", "--weather", "--minimap", "--benchmark");
+
+    /** The current arguments with another world (and a seed, for a new one). */
+    private static java.util.List<String> relaunchArgs(String[] args, Path world, Long seed) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (int i = 0; i < args.length; i++) {
+            if (WORLD_OPTIONS.contains(args[i])) { i++; continue; }
+            if (args[i].equals("--paused")) continue;
+            out.add(args[i]);
+        }
+        out.add("--world");
+        out.add(world.toString());
+        if (seed != null) {
+            out.add("--seed");
+            out.add(Long.toString(seed));
+        }
+        return out;
+    }
+
+    /** Starts the game again in a new process (same JVM options and class path), with these arguments. */
+    private static void relaunch(java.util.List<String> args) {
+        java.util.List<String> cmd = new java.util.ArrayList<>();
+        cmd.add(ProcessHandle.current().info().command().orElse("java"));
+        cmd.addAll(java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments());
+        cmd.add("-cp");
+        cmd.add(System.getProperty("java.class.path"));
+        cmd.add(Main.class.getName());
+        cmd.addAll(args);
+        System.out.println("[menu] restarting: " + String.join(" ", args));
+        try {
+            new ProcessBuilder(cmd).inheritIO().start();
+        } catch (IOException e) {
+            System.err.println("[menu] cannot restart: " + e.getMessage());
+        }
     }
 }
