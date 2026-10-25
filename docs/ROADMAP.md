@@ -197,3 +197,21 @@
   plateaux 5 %, montagnes et glaciers 4 %, plages 3 %
 - Point d'apparition cherché sur la terre ferme ; biome affiché dans F3
 - Coût : génération + lumière ~0,75 ms/chunk (contre 0,65), relief plus riche (~189 quads/section)
+
+## ✅ M15 — Cycle de l'eau et météo dynamique
+- Modèle `Atmosphere` (grille de 48 × 48 cellules de 32 blocs autour du joueur) : température, vapeur,
+  eau nuageuse et vent par cellule ; advection semi-lagrangienne ; saturation de Clausius-Clapeyron ;
+  évaporation des mers et lacs (plus forte au chaud, au sec et au vent), transpiration des forêts
+- Soulèvement orographique (pluie au vent des montagnes, ombre pluviométrique sous le vent), convection
+  l'après-midi (averses, orages), dépressions et anticyclones qui dérivent (fronts, temps sec) ;
+  gradient de 6,5 °C par 1000 blocs ; seuil de précipitation abaissé dans les nuages froids (Bergeron)
+- Précipitations : pluie, neige fondue, neige, grêle (orages chauds) ; brouillard près de la saturation
+  par vent faible, et dans les nuages au sommet des montagnes
+- Rendu : nuages en blocs construits depuis le champ (base au niveau de condensation, épais et sombres
+  en orage) qui glissent avec le vent ; pluie / neige / grêle autour de la caméra, arrêtées par les toits ;
+  éclairs et flashs ; ciel gris, lumière baissée et brouillard rapproché par mauvais temps
+- Effets au sol : la neige recouvre l'herbe, l'eau dormante gèle, l'une et l'autre fondent au dégel
+- Hydrologie : sources de montagne coulant vers l'aval par le simulateur de fluides, rivières fines en
+  amont et larges près des côtes, deltas à plusieurs bras et îlots
+- F3 : bulletin météo (°C, humidité relative, nuages, base, précipitations, vent, hPa, brouillard, orage) ;
+  `--weather rain|sleet|snow|hail|storm` fixe la météo pour les captures

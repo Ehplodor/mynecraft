@@ -5,6 +5,8 @@ import net.mynecraft.resource.Colormap;
 import net.mynecraft.resource.FontLoader;
 import net.mynecraft.resource.PackSource;
 import net.mynecraft.resource.ResourceManager;
+import net.mynecraft.world.weather.Atmosphere;
+import net.mynecraft.world.weather.Weather;
 import net.mynecraft.world.Blocks;
 import net.mynecraft.world.Chunk;
 import net.mynecraft.world.ChunkStreamer;
@@ -53,10 +55,32 @@ public final class Main {
 
     private static final String[] FACING = {"sud (+Z)", "ouest (-X)", "nord (-Z)", "est (+X)"};
 
+    private static final String[] PRECIPITATION = {"sec", "pluie", "neige fondue", "neige", "grêle"};
+
+    private static String compass(float x, float z) {
+        String[] names = {"l'est", "le sud-est", "le sud", "le sud-ouest", "l'ouest", "le nord-ouest", "le nord", "le nord-est"};
+        return names[Math.floorMod(Math.round((float) (Math.atan2(z, x) / (Math.PI / 4))), 8)];
+    }
+
+    /**
+     * Bad weather on screen: an overcast sky turns grey and dims the daylight, fog and falling
+     * precipitation pull the fog distance in, and lightning flashes light everything up for an instant.
+     */
+    private static void applyWeather(Atmosphere.Sample w, float flash, float[] sky, WorldRenderer renderer) {
+        float wet = Math.min(1, w.precipitation() / 0.03f);
+        float overcast = Math.min(1, Math.max(0, w.cloud() - 0.1f) * 0.8f + wet * 0.6f);
+        float d = renderer.daylight;
+        renderer.daylight = Math.min(1, Math.max(0.15f, d * (1 - 0.4f * overcast)) + flash * 0.5f);
+        float grey = 0.12f + 0.55f * (d - 0.15f) / 0.85f * (1 - 0.35f * w.storm());
+        for (int i = 0; i < 3; i++) sky[i] = Math.min(1, sky[i] + ((grey + i * 0.02f) - sky[i]) * overcast * 0.85f + flash * 0.4f);
+        float thick = w.type() == Atmosphere.Precipitation.SNOW ? 0.6f : 0.35f;
+        renderer.fogScale = Math.max(0.12f, 1 - 0.85f * w.fog() - thick * wet);
+    }
+
     /** F3 screen: the figures needed to judge performance live, plus position and target. */
     private static void debugScreen(Hud hud, World world, WorldRenderer renderer, ChunkStreamer streamer, Player player,
                                     Camera cam, Raycast.Hit hit, double ticks, int fps, double frameMillis, double gpuMillis,
-                                    int fluidsPending) {
+                                    int fluidsPending, Atmosphere.Sample w) {
         Runtime rt = Runtime.getRuntime();
         long[] buf = renderer.bufferBytes();
         int bx = (int) Math.floor(player.x), by = (int) Math.floor(cam.pos.y), bz = (int) Math.floor(player.z);
@@ -80,6 +104,12 @@ public final class Main {
             String.format("Biome : %s | température %.2f | humidité %.2f",
                 Landscape.BIOME_NAMES[world.generator.column(bx, bz).biome()], world.generator.temperature(bx, bz),
                 world.generator.downfall(bx, bz)),
+            String.format("Météo : %.1f °C | humidité %d %% | nuages %.2f g/kg (base %d) | %s %.3f",
+                w.temperature(), Math.round(w.relativeHumidity() * 100), w.cloud(), w.cloudBase(),
+                PRECIPITATION[w.type().ordinal()], w.precipitation()),
+            String.format("Vent : %.1f blocs/s vers %s | %d hPa | brouillard %d %% | orage %d %%",
+                Math.hypot(w.windX(), w.windZ()), compass(w.windX(), w.windZ()), w.hectopascals(),
+                Math.round(w.fog() * 100), Math.round(w.storm() * 100)),
             String.format("Heure : %d ticks | jour %d", (long) ticks % DayCycle.DAY_TICKS, (long) ticks / DayCycle.DAY_TICKS),
             String.format("Sections : %d dessinées / %d maillées | %d quads", renderer.drawnSections,
                 renderer.meshCount(), renderer.totalQuads),
@@ -159,9 +189,19 @@ public final class Main {
         renderer.occlusion = !argv.contains("--no-occlusion");
         renderer.measureFrustum = screenshot != null;
         if (argv.contains("--fullbright")) renderer.minLight = 1;
+        // Mountain springs of newly visible chunks, handed to the fluid simulation on the main thread.
+        java.util.concurrent.ConcurrentLinkedQueue<int[]> springs = new java.util.concurrent.ConcurrentLinkedQueue<>();
         ChunkStreamer streamer = new ChunkStreamer(world, storage, RENDER_RADIUS,
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2), new ChunkStreamer.Listener() {
-                public void chunkVisible(int cx, int cz) { renderer.chunkVisible(cx, cz); }
+                public void chunkVisible(int cx, int cz) {
+                    renderer.chunkVisible(cx, cz);
+                    Chunk c = world.chunk(cx, cz);
+                    int[] spring = c == null ? null : c.springs;
+                    if (spring != null) {
+                        c.springs = null;
+                        springs.add(spring);
+                    }
+                }
                 public void chunkHidden(int cx, int cz) { renderer.chunkHidden(cx, cz); }
             });
 
@@ -282,6 +322,16 @@ public final class Main {
         double accumulator = 0, tickAccumulator = 0;
         FluidSimulator fluids = new FluidSimulator(world, renderer::blockChanged);
         float far = RENDER_RADIUS * 16f;
+        Weather weather = new Weather(world, (x, y, z) -> {
+            renderer.blockChanged(x, y, z);
+            fluids.blockChanged(x, y, z);
+        });
+        int forced = argv.indexOf("--weather"); // scripted shots: rain, snow, sleet, hail or storm
+        if (forced >= 0 && forced + 1 < args.length) weather.force(args[forced + 1]);
+        weather.second(player.x, player.y, player.z, (float) Math.max(0, DayCycle.sunHeight(ticks)), false);
+        WeatherRenderer weatherRenderer = new WeatherRenderer();
+        double weatherClock = 0;
+        int weatherTicks = 0;
 
         while (!glfwWindowShouldClose(window)) {
             long now = System.nanoTime();
@@ -345,6 +395,11 @@ public final class Main {
             tickAccumulator += dt;
             while (tickAccumulator >= TICK) {
                 fluids.tick();
+                if (++weatherTicks == 20) { // the air moves once per game second
+                    weatherTicks = 0;
+                    weather.second(player.x, player.y, player.z, (float) Math.max(0, DayCycle.sunHeight(ticks)),
+                        screenshot == null);
+                }
                 if (screenshot == null) survival.tick(player, world, creative); // scripted shots stay reproducible
                 if (survival.lastDamage > 0) hurtFlashUntil = now + 300_000_000L;
                 tickAccumulator -= TICK;
@@ -423,9 +478,13 @@ public final class Main {
 
             world.light.drainTouched(k -> renderer.sectionChanged(k, true));
 
+            for (int[] spring; (spring = springs.poll()) != null; ) fluids.blockChanged(spring[0], spring[1], spring[2]);
+
             if (!timeFrozen) ticks += dt * 20;
+            weatherClock += dt;
             DayCycle.skyColor(ticks, sky);
             renderer.daylight = DayCycle.daylight(ticks);
+            applyWeather(weather.here(), weatherRenderer.flash, sky, renderer);
             glClearColor(sky[0], sky[1], sky[2], 1);
 
             glfwGetFramebufferSize(window, fbW, fbH);
@@ -437,7 +496,8 @@ public final class Main {
             skyRenderer.drawCelestial(skyViewProj, ticks);
             if (debug) gpuTimer.begin();
             renderer.render(cam, aspect, far, sky);
-            skyRenderer.drawClouds(skyViewProj, cam.pos.x, cam.pos.y, cam.pos.z, ticks, renderer.daylight, far);
+            weatherRenderer.draw(skyViewProj, weather, world, cam.pos.x, cam.pos.y, cam.pos.z, weatherClock,
+                renderer.daylight, far, timeFrozen);
             if (hit != null) {
                 byte target = world.get(hit.x(), hit.y(), hit.z());
                 float lo = Blocks.isSlab(target) ? Blocks.BOX_MIN[target & 0xFF] / 16f : 0;
@@ -465,7 +525,7 @@ public final class Main {
             }
             if (debug) {
                 debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis,
-                    fluids.pending());
+                    fluids.pending(), weather.here());
             }
             if (screenOpen) {
                 double[] m = screenshot != null ? new double[] {hud.width() * 0.62, hud.height() * 0.42} : input.mouseInFramebuffer();
@@ -549,6 +609,7 @@ public final class Main {
         hud.dispose();
         gpuTimer.dispose();
         skyRenderer.dispose();
+        weatherRenderer.dispose();
         renderer.dispose();
         glfwDestroyWindow(window);
         glfwTerminate();

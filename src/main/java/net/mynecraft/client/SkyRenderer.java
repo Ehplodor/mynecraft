@@ -14,14 +14,13 @@ import java.nio.FloatBuffer;
 import static org.lwjgl.opengl.GL33.*;
 
 /**
- * Sun, moon and clouds from the pack's environment textures. Everything is drawn around the camera
- * (camera-relative), so it costs three tiny draws per frame and never needs world-space precision.
+ * Sun and moon from the pack's environment textures. Everything is drawn around the camera
+ * (camera-relative), so it costs two tiny draws per frame and never needs world-space precision.
  */
 final class SkyRenderer {
     private static final float SUN_DISTANCE = 100, SUN_SIZE = 30, MOON_SIZE = 20;
-    private static final float CLOUD_Y = 192, CLOUD_SCALE = 12; // one cloud texel spans 12 blocks
     private final Shader shader;
-    private final int vao, vbo, sun, moon, clouds, uViewProj, uColor, uFadeEnd;
+    private final int vao, vbo, sun, moon, uViewProj, uColor, uFadeEnd;
     private final FloatBuffer quad = BufferUtils.createFloatBuffer(4 * 5);
     private final float[] matrix = new float[16];
 
@@ -32,7 +31,6 @@ final class SkyRenderer {
         uFadeEnd = shader.uniform("uFadeEnd");
         sun = load(resources, "sun", false);
         moon = load(resources, "moon_phases", false);
-        clouds = load(resources, "clouds", true);
         vao = glGenVertexArrays();
         glBindVertexArray(vao);
         vbo = glGenBuffers();
@@ -113,34 +111,6 @@ final class SkyRenderer {
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     }
 
-    /** Flat cloud layer: one quad around the camera, UVs from world position (double precision). */
-    void drawClouds(Matrix4f viewProj, double camX, double camY, double camZ, double ticks, float daylight, float radius) {
-        begin(viewProj);
-        double period = 256 * CLOUD_SCALE;
-        double drift = ticks * 0.03; // blocks moved by the wind
-        float u = (float) (((camX + drift) / period) % 1.0), v = (float) ((camZ / period) % 1.0);
-        float y = (float) (CLOUD_Y - camY), r = radius, d = r / (float) period;
-        quad.clear();
-        quad.put(-r).put(y).put(-r).put(u - d).put(v - d);
-        quad.put(r).put(y).put(-r).put(u + d).put(v - d);
-        quad.put(r).put(y).put(r).put(u + d).put(v + d);
-        quad.put(-r).put(y).put(r).put(u - d).put(v + d);
-        quad.flip();
-        glBufferSubData(GL_ARRAY_BUFFER, 0, quad);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(false);
-        glDisable(GL_CULL_FACE);
-        float b = 0.25f + 0.75f * (daylight - 0.15f) / 0.85f;
-        glUniform4f(uColor, b, b, b, 0.8f);
-        glUniform1f(uFadeEnd, radius);
-        glBindTexture(GL_TEXTURE_2D, clouds);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        glEnable(GL_CULL_FACE);
-        glDepthMask(true);
-        glDisable(GL_BLEND);
-    }
-
     private void begin(Matrix4f viewProj) {
         glUseProgram(shader.program);
         glUniformMatrix4fv(uViewProj, false, viewProj.get(matrix));
@@ -150,7 +120,7 @@ final class SkyRenderer {
     }
 
     void dispose() {
-        glDeleteTextures(new int[] {sun, moon, clouds});
+        glDeleteTextures(new int[] {sun, moon});
         glDeleteBuffers(vbo);
         glDeleteVertexArrays(vao);
         glDeleteProgram(shader.program);

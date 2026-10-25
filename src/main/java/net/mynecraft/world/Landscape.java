@@ -100,6 +100,11 @@ public final class Landscape {
         return f;
     }
 
+    /** How far inland a point is: below about -0.25 open sea, around 0 the coast, high far inland. */
+    public float continentalness(int wx, int wz) {
+        return fields(wx, wz)[F_CONT];
+    }
+
     // ---- columns ----
 
     public Column column(int wx, int wz) {
@@ -154,8 +159,18 @@ public final class Landscape {
         if (plat > 0) h = h + (SEA + 48 + hills * 0.15f - h) * plat;
 
         // Rivers: carved down below sea level, with sloping banks; they fade out in high ground.
-        float riverMask = (1 - smoothstep(0.012f, 0.05f, f[F_RIVER])) * inland
-            * (1 - smoothstep(SEA + 28f, SEA + 55f, h)) * (1 - plat);
+        // Narrow streams far inland and in high ground, wide rivers near the coast; in the coastal
+        // band the river fans out into a delta: extra arms where the river field crosses higher
+        // levels, with low islands between them.
+        float wide = 0.4f + 1.6f * (1 - smoothstep(-0.1f, 0.45f, c)) * (1 - smoothstep(SEA + 12f, SEA + 40f, h));
+        float fr = f[F_RIVER];
+        float riverMask = (1 - smoothstep(0.012f * wide, 0.05f * wide, fr));
+        float delta = smoothstep(-0.25f, -0.18f, c) * (1 - smoothstep(-0.1f, -0.02f, c)) * (1 - smoothstep(SEA + 6f, SEA + 14f, h));
+        if (delta > 0) {
+            for (float arm = 0.09f; arm < 0.3f; arm += 0.09f)
+                riverMask = Math.max(riverMask, (1 - smoothstep(0.008f, 0.025f, Math.abs(fr - arm))) * delta);
+        }
+        riverMask *= inland * (1 - smoothstep(SEA + 28f, SEA + 55f, h)) * (1 - plat);
         if (riverMask > 0) h = h + (SEA - 4 - h) * riverMask;
 
         // Lakes: lowland basins at sea level; the rim never drops below the water.

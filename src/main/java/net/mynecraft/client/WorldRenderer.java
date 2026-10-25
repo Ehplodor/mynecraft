@@ -328,6 +328,8 @@ final class WorldRenderer {
 
     /** Sky light multiplier, see {@link DayCycle}. */
     float daylight = 1;
+    /** Fog distance as a fraction of the view distance (weather: fog, rain, snow). */
+    float fogScale = 1;
     /** Debug: lowest light level shown (1 = everything fully lit). */
     float minLight;
 
@@ -429,7 +431,7 @@ final class WorldRenderer {
         glUniform2i(p.uCamChunk, camCx, camCz);
         glUniform3f(p.uCamOffset, offX, offY, offZ);
         glUniform3f(p.uFogColor, fog[0], fog[1], fog[2]);
-        glUniform1f(p.uFogEnd, far);
+        glUniform1f(p.uFogEnd, far * fogScale);
         glUniform1f(p.uDaylight, daylight);
         glUniform1f(p.uMinLight, minLight);
         glMultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts, GL_UNSIGNED_INT, drawOffsets, drawBase);

@@ -14,7 +14,7 @@ gradle run                                   # jeu
 gradle run --args="--no-vsync"               # FPS non plafonnés (affichés dans le titre)
 gradle run --args="--screenshot shot.png"    # rend une image, affiche des stats, quitte
                                              #   (--view lacet,tangage en degrés, --pos x,y,z, --time ticks,
-                                             #    --no-occlusion, --fullbright)
+                                             #    --no-occlusion, --fullbright, --weather rain/snow/hail/storm)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
 gradle run --args="--datapack MonData.zip"   # data pack (recettes, tags) ; aussi lus depuis <monde>/datapacks/
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
@@ -38,6 +38,8 @@ Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `
 |---|---|
 | `world/Section`, `Chunk`, `World` | Stockage : 1 octet/bloc, sections 16³ vides = `null` |
 | `world/TerrainGenerator`, `Noise` | Relief fBm + chaînes de montagnes, grottes (bruit 3D interpolé), filons, arbres ; déterministe par seed |
+| `world/weather/Atmosphere`, `Weather` | Météo dynamique : masses d'air, vent, pressions, nuages, pluie/neige/grêle, brouillard ; neige et gel au sol |
+| `client/WeatherRenderer` | Nuages en blocs depuis le champ nuageux, précipitations abritées par les toits, éclairs |
 | `world/Player`, `Raycast` | Physique AABB par balayage d'axe sur les vraies boîtes (dalles), montée de marche 0,6, raycast DDA |
 | `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |
 | `world/storage/*` | NBT, fichiers région Anvil `.mca`, codec de chunk 1.16+/1.18+, `level.dat` |
