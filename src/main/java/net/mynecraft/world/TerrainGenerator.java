@@ -2,7 +2,9 @@ package net.mynecraft.world;
 
 public final class TerrainGenerator {
     public static final int SEA_LEVEL = 63;
-    private final Noise noise, temperatureNoise, downfallNoise, tunnelA, tunnelB, cavern;
+    private final Noise noise, temperatureNoise, downfallNoise, tunnelA, tunnelB, cavern, mountainMask, ridges;
+    /** Above this height the surface is bare rock. */
+    public static final int ROCK_LINE = 135;
     private final long seed;
 
     public TerrainGenerator(long seed) {
@@ -12,6 +14,8 @@ public final class TerrainGenerator {
         this.tunnelA = new Noise(seed + 101);
         this.tunnelB = new Noise(seed + 202);
         this.cavern = new Noise(seed + 303);
+        this.mountainMask = new Noise(seed + 404);
+        this.ridges = new Noise(seed + 505);
         this.seed = seed;
     }
 
@@ -24,13 +28,25 @@ public final class TerrainGenerator {
         return clamp01(0.5f + downfallNoise.fbm(wx / 500f, wz / 500f, 3) * 1.1f);
     }
 
+    private static float smoothstep(float e0, float e1, float v) {
+        float t = clamp01((v - e0) / (e1 - e0));
+        return t * t * (3 - 2 * t);
+    }
+
     private static float clamp01(float v) {
         return Math.max(0, Math.min(1, v));
     }
 
     public int height(int wx, int wz) {
         float n = noise.fbm(wx / 128f, wz / 128f, 5);
-        int h = SEA_LEVEL + 10 + (int) (n * 45);
+        // Mountain ranges: a slow mask selects where they rise, ridged noise shapes crests and peaks.
+        float mask = smoothstep(0.05f, 0.45f, mountainMask.fbm(wx / 700f, wz / 700f, 2));
+        float mountains = 0;
+        if (mask > 0) {
+            float r = 1 - Math.abs(ridges.fbm(wx / 220f, wz / 220f, 4));
+            mountains = mask * r * r * 110;
+        }
+        int h = SEA_LEVEL + 10 + (int) (n * 45 + mountains);
         return Math.max(Chunk.MIN_Y + 1, Math.min(Chunk.MAX_Y - 12, h));
     }
 
@@ -64,8 +80,9 @@ public final class TerrainGenerator {
             for (int x = 0; x < 16; x++) {
                 int h = heights[z * 16 + x];
                 boolean beach = h <= SEA_LEVEL + 1;
-                byte top = h < SEA_LEVEL - 4 ? Blocks.GRAVEL : beach ? Blocks.SAND : Blocks.GRASS;
-                byte under = beach ? top : Blocks.DIRT;
+                boolean rock = h > ROCK_LINE;
+                byte top = rock ? Blocks.STONE : h < SEA_LEVEL - 4 ? Blocks.GRAVEL : beach ? Blocks.SAND : Blocks.GRASS;
+                byte under = rock ? Blocks.STONE : beach ? top : Blocks.DIRT;
                 c.set(x, Chunk.MIN_Y, z, Blocks.BEDROCK);
                 for (int y = stoneFrom; y < h - 3; y++) c.set(x, y, z, y < DEEPSLATE_TOP ? Blocks.DEEPSLATE : Blocks.STONE);
                 for (int y = Math.max(Chunk.MIN_Y + 1, h - 3); y < h; y++) c.set(x, y, z, under);
