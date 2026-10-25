@@ -10,6 +10,8 @@ import net.mynecraft.world.Chunk;
 import net.mynecraft.world.ChunkStreamer;
 import net.mynecraft.world.storage.WorldStorage;
 import net.mynecraft.world.FluidSimulator;
+import net.mynecraft.world.crafting.CraftingMenu;
+import net.mynecraft.world.crafting.RecipeBook;
 import net.mynecraft.world.Inventory;
 import net.mynecraft.world.Survival;
 import net.mynecraft.world.storage.PlayerData;
@@ -197,6 +199,37 @@ public final class Main {
         int[] mining = null; // block being mined in survival
         double miningProgress = 0;
         long hurtFlashUntil = 0;
+        // Data packs (recipes, tags): built-in, the world's datapacks/ folder (vanilla), then --datapack.
+        java.util.List<PackSource> dataPacks = new java.util.ArrayList<>();
+        dataPacks.add(PackSource.classpath("defaultdata"));
+        try (var dir = java.nio.file.Files.list(worldDir.resolve("datapacks"))) {
+            for (Path p : dir.sorted().toList()) dataPacks.add(PackSource.open(p));
+        } catch (IOException ignored) {
+            // no datapacks folder
+        }
+        for (int i = 0; i < args.length - 1; i++) {
+            if (args[i].equals("--datapack")) {
+                try { dataPacks.add(PackSource.open(Path.of(args[i + 1]))); }
+                catch (IOException e) { System.err.println("Cannot open data pack " + args[i + 1] + ": " + e.getMessage()); }
+            }
+        }
+        RecipeBook recipes = RecipeBook.load(dataPacks);
+        recipes.warnings.forEach(w -> System.err.println("[data] " + w));
+        InventoryScreen inventoryScreen = new InventoryScreen(Input.placeableBlocks());
+        CraftingMenu menu = null;   // open survival screen (2x2 inventory or 3x3 table)
+        boolean screenOpen = false; // any screen, including the creative palette (menu == null)
+        if (argv.contains("--inventory-demo")) { // scripted screenshot: a crafting grid in use
+            inventory.add(Blocks.OAK_LOG, 8);
+            inventory.add(Blocks.BIRCH_PLANKS, 3);
+            inventory.add(Blocks.COBBLESTONE, 40);
+            inventory.add(Blocks.GLASS, 6);
+            if (!creative) {
+                menu = new CraftingMenu(inventory, recipes, 2);
+                menu.click(0, true, false);                 // half the logs on the cursor
+                menu.click(menu.gridStart(), false, false); // into the grid: 4 planks offered
+            }
+            screenOpen = true;
+        }
         if (argv.contains("--survival-demo")) { // scripted HUD check: some loot, some damage, some air
             inventory.add(Blocks.COBBLESTONE, 37);
             inventory.add(Blocks.OAK_LOG, 12);
@@ -261,9 +294,29 @@ public final class Main {
                 lastAutosave = now;
             }
             if (stats == null && screenshot == null) {
-                if (input.pressed(GLFW_KEY_ESCAPE)) {
+                boolean escape = input.pressed(GLFW_KEY_ESCAPE), inventoryKey = input.pressed(GLFW_KEY_E);
+                if (screenOpen && (escape || inventoryKey)) {
+                    if (menu != null && menu.close() > 0) System.err.println("[inventory] full: items lost");
+                    menu = null;
+                    screenOpen = false;
+                    input.capture(true);
+                } else if (escape) {
                     paused = !paused;
                     input.capture(!paused);
+                } else if (inventoryKey && !paused && !survival.dead) {
+                    menu = creative ? null : new CraftingMenu(inventory, recipes, 2);
+                    screenOpen = true;
+                    input.capture(false);
+                }
+                if (screenOpen) {
+                    double[] m = input.mouseInFramebuffer();
+                    boolean left = input.clicked(GLFW_MOUSE_BUTTON_LEFT), right = input.clicked(GLFW_MOUSE_BUTTON_RIGHT);
+                    int slot = (left || right) ? inventoryScreen.slotAt(hud, menu, m[0], m[1]) : -1;
+                    if (slot >= 0) {
+                        if (menu != null) menu.click(slot, right, input.shiftDown());
+                        else if (inventoryScreen.isPalette(null, slot)) input.hotbar[input.slot] = inventoryScreen.paletteBlock(slot);
+                        else if (slot < Inventory.HOTBAR) input.slot = slot;
+                    }
                 }
                 if (input.pressed(GLFW_KEY_F3)) debug = !debug;
                 if (!paused && input.pressed(GLFW_KEY_F4)) {
@@ -281,7 +334,7 @@ public final class Main {
                 if (paused && input.pressed(GLFW_KEY_Q)) glfwSetWindowShouldClose(window, true);
             }
             if (paused || survival.dead) dt = 0; // the world stands still: no physics, no time, no edits
-            if (stats == null && dt > 0) input.frame(cam, player, dt);
+            if (stats == null && dt > 0 && !screenOpen) input.frame(cam, player, dt);
             else { input.breakRequested = false; input.placeRequested = false; input.breakHeld = false; }
             if (!creative) input.selected = inventory.id(input.slot);
             // Fixed physics step: frame-rate independent and stable collisions.
@@ -295,7 +348,8 @@ public final class Main {
             }
             accumulator += dt;
             while (accumulator >= PHYSICS_STEP) {
-                if (stats == null) input.move(cam, player);
+                if (stats == null && !screenOpen) input.move(cam, player);
+                else if (stats == null) { player.vx = 0; player.vz = 0; }
                 else { player.vx = BENCH_SPEED; player.vz = 0; player.vy = 0; }
                 player.step(world, PHYSICS_STEP);
                 accumulator -= PHYSICS_STEP;
@@ -330,7 +384,12 @@ public final class Main {
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                 }
             }
-            if (hit != null && input.placeRequested && input.selected != Blocks.AIR) {
+            if (hit != null && input.placeRequested && !creative && !input.shiftDown()
+                && world.get(hit.x(), hit.y(), hit.z()) == Blocks.CRAFTING_TABLE) {
+                menu = new CraftingMenu(inventory, recipes, 3); // like vanilla: sneak to place against it instead
+                screenOpen = true;
+                input.capture(false);
+            } else if (hit != null && input.placeRequested && input.selected != Blocks.AIR) {
                 double dirX = -Math.sin(cam.yaw) * cp, dirY = Math.sin(cam.pitch), dirZ = -Math.cos(cam.yaw) * cp;
                 int[] placed = Placement.place(world, player, hit, hitHeight(hit, cam.pos.x, cam.pos.y, cam.pos.z, dirX, dirY, dirZ), input.selected);
                 if (placed != null) {
@@ -404,6 +463,10 @@ public final class Main {
             if (debug) {
                 debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis,
                     fluids.pending());
+            }
+            if (screenOpen) {
+                double[] m = screenshot != null ? new double[] {hud.width() * 0.62, hud.height() * 0.42} : input.mouseInFramebuffer();
+                inventoryScreen.draw(hud, menu, inventory, input.hotbar, input.slot, m[0], m[1]);
             }
             if (survival.dead) {
                 hud.rect(0, 0, hud.width(), hud.height(), 0.5f, 0, 0, 0.45f);

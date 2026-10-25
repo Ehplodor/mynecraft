@@ -16,6 +16,7 @@ gradle run --args="--screenshot shot.png"    # rend une image, affiche des stats
                                              #   (--view lacet,tangage en degrés, --pos x,y,z, --time ticks,
                                              #    --no-occlusion, --fullbright)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
+gradle run --args="--datapack MonData.zip"   # data pack (recettes, tags) ; aussi lus depuis <monde>/datapacks/
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
 gradle run --args="--benchmark 20"           # vol scripté 20 s : FPS, percentiles, temps GPU, mémoire
 gradle test                                  # tests + micro-benchmark génération/lumière/maillage
@@ -24,6 +25,9 @@ gradle test                                  # tests + micro-benchmark générat
 Modes : **survie** par défaut (vie, chutes, noyade, lave, minage chronométré, inventaire), **créatif** avec
 `F4` ou `--creative` (blocs illimités, vol avec `F`). En survie, la molette change d'emplacement ; à la mort, `R`
 fait réapparaître au point d'apparition.
+
+`E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
+`E` ouvre la palette de tous les blocs.
 
 Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `Échap` pause (`Q` y quitte), souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
@@ -41,6 +45,8 @@ Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `
 | `world/FluidSimulator` | Eau et lave qui coulent (ticks programmés, niveaux vanilla, sources infinies, obsidienne/pierre) |
 | `world/Survival`, `Inventory` | Vie, chutes, lave, noyade, régénération ; 36 emplacements de 64 ; butins vanilla |
 | `world/storage/PlayerData` | Joueur dans `level.dat` avec les clés vanilla (`Health`, `Air`, `Inventory`, `playerGameType`) |
+| `world/crafting/RecipeBook`, `CraftingMenu` | Recettes de data packs (formes, sans forme, tags, formats 1.21 et anciens) ; règles de clic vanilla |
+| `client/InventoryScreen` | Écrans inventaire / établi / palette créative |
 | `world/Placement` | Règles de pose vanilla (axe des bûches, demi-dalles, fusion en dalle double) |
 | `world/LightEngine` | Lumière ciel + blocs (BFS ajout/retrait incrémental, traverse les chunks) |
 | `world/ChunkMesher` | **Greedy meshing** (fusion à lumière et AO égales), lumière lisse + AO par sommet, eau abaissée, plantes en croix, **16 o/quad** (vertex pulling) |

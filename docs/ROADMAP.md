@@ -168,4 +168,18 @@
 - `level.dat` : `Health`, `Air`, `Inventory` (format 1.21 `{Slot, id, count}`, ancien `Count` lu),
   `SelectedItemSlot`, `SpawnX/Y/Z`
 - Simplifications : pas d'outils (tout se mine à la main et donne son butin), pas de faim, pas
-  d'objets non-blocs, inventaire conservé à la mort, pas d'écran d'inventaire (E)
+  d'objets non-blocs, inventaire conservé à la mort
+
+## ✅ M13 — Inventaire, fabrication et data packs
+- Data packs au format vanilla : `data/<ns>/recipe/*.json` et `tags/item/*.json` (et les dossiers au
+  pluriel d'avant 1.21), lus depuis le pack intégré, `<monde>/datapacks/` (comme vanilla) et `--datapack` ;
+  remplacement fichier par fichier dans l'ordre des packs
+- Recettes `crafting_shaped` (avec miroir) et `crafting_shapeless` ; ingrédients en id, `#tag`, objets
+  `{"item"}`/`{"tag"}` ou listes ; résultats `id` (1.20.5+) ou `item` ; recettes à objets non-blocs ignorées
+  et signalées
+- Écran d'inventaire (`E`) : 36 emplacements + grille 2×2 ; établi (nouveau bloc) : grille 3×3 ;
+  règles de clic vanilla (prendre, poser, fusionner, échanger, clic droit, Maj-clic, Maj-clic sur le
+  résultat = tout fabriquer) ; fermer rend le contenu de la grille et du curseur
+- Créatif : `E` ouvre la palette de tous les blocs, un clic remplit l'emplacement choisi
+- Pack de données intégré : planches (chêne, bouleau, épicéa), établi, dalles ; tags `planks`, `logs`
+- Limites : pas de livre de recettes, pas de four (verre, pierre lisse), pas d'objets non-blocs

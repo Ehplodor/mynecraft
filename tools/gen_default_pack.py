@@ -136,6 +136,24 @@ def main():
     save("obsidian", rgba(lambda x, y, r: (lambda v: (clamp(v + 12), clamp(v), clamp(v + 28), 255))(
         18 + r.randint(0, 22) + (30 if r.random() < 0.05 else 0)), 37))
 
+    # Crafting table: planks frame with a tool grid on top, tools hanging on the sides.
+    def table(top):
+        def px(x, y, r):
+            g = r.randint(-8, 8)
+            if x in (0, 15) or y in (0, 15):
+                return (clamp(90 + g), clamp(64 + g), clamp(36 + g), 255)
+            if top:
+                return (clamp(120 + g), clamp(84 + g), clamp(48 + g), 255) if (x % 5 == 0 or y % 5 == 0) else (clamp(170 + g), clamp(130 + g), clamp(80 + g), 255)
+            if y < 3:
+                return (clamp(150 + g), clamp(110 + g), clamp(65 + g), 255)
+            if 4 <= x <= 6 and 5 <= y <= 12:
+                return (140, 140, 150, 255) if y < 8 else (110, 80, 45, 255)
+            return (clamp(160 + g), clamp(122 + g), clamp(74 + g), 255)
+        return px
+    save("crafting_table_top", rgba(table(True), 38))
+    save("crafting_table_side", rgba(table(False), 39))
+    save("crafting_table_front", rgba(lambda x, y, r: (60, 60, 64, 255) if 9 <= x <= 12 and 4 <= y <= 7 else table(False)(x, y, r), 40))
+
     # Biome colormaps (vanilla layout: x = 1 - temperature, y = 1 - downfall * temperature).
     def colormap(name, hot_dry, cold, wet):
         img = Image.new("RGB", (256, 256))
@@ -290,6 +308,12 @@ def main():
                  "rotation": {"origin": [8, 8, 8], "axis": "y", "angle": 45, "rescale": True},
                  "faces": {"west": face, "east": face}}]})
     write_json("models/block/water.json", {"textures": {"particle": "block/water_still"}})
+    write_json("models/block/crafting_table.json", {
+        "parent": "block/cube",
+        "textures": {"particle": "block/crafting_table_front", "down": "block/oak_planks", "up": "block/crafting_table_top",
+                     "north": "block/crafting_table_front", "south": "block/crafting_table_side",
+                     "east": "block/crafting_table_side", "west": "block/crafting_table_front"}})
+    write_json("blockstates/crafting_table.json", {"variants": {"": {"model": "minecraft:block/crafting_table"}}})
     write_json("models/block/lava.json", {"textures": {"particle": "block/lava_still"}})
     write_json("blockstates/lava.json", {"variants": {"": {"model": "minecraft:block/lava"}}})
     for name in ("granite", "diorite", "andesite", "deepslate", "coal_ore", "iron_ore", "gold_ore", "diamond_ore",
@@ -340,5 +364,50 @@ def main():
         write_json(f"blockstates/{name}.json", {"variants": {"": {"model": f"minecraft:block/{name}"}}})
 
 
+
+
+
+# ---- built-in data pack (recipes and item tags, vanilla 1.21 layout) ----
+
+DATA = os.path.join(os.path.dirname(__file__), "..", "src", "main", "resources", "defaultdata")
+
+
+def write_data(rel, obj):
+    path = os.path.join(DATA, "data", "minecraft", rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(obj, f, indent=2)
+        f.write("\n")
+
+
+def gen_data():
+    os.makedirs(DATA, exist_ok=True)
+    with open(os.path.join(DATA, "pack.mcmeta"), "w") as f:
+        json.dump({"pack": {"pack_format": 48, "description": "Mynecraft built-in data"}}, f, indent=2)
+        f.write("\n")
+    woods = ("oak", "birch", "spruce")
+    for w in woods:
+        write_data(f"tags/item/{w}_logs.json", {"values": [f"minecraft:{w}_log"]})
+        write_data(f"recipe/{w}_planks.json", {"type": "minecraft:crafting_shapeless", "group": "planks",
+                                               "ingredients": [f"#minecraft:{w}_logs"],
+                                               "result": {"id": f"minecraft:{w}_planks", "count": 4}})
+    write_data("tags/item/planks.json", {"values": [f"minecraft:{w}_planks" for w in woods]})
+    write_data("tags/item/logs.json", {"values": [f"#minecraft:{w}_logs" for w in woods]})
+    write_data("recipe/crafting_table.json", {"type": "minecraft:crafting_shaped", "pattern": ["##", "##"],
+                                              "key": {"#": "#minecraft:planks"},
+                                              "result": {"id": "minecraft:crafting_table", "count": 1}})
+    write_data("recipe/oak_slab.json", {"type": "minecraft:crafting_shaped", "pattern": ["###"],
+                                        "key": {"#": "minecraft:oak_planks"},
+                                        "result": {"id": "minecraft:oak_slab", "count": 6}})
+    files = []
+    for root, _, names in os.walk(DATA):
+        for n in names:
+            if n != "index.txt":
+                files.append(os.path.relpath(os.path.join(root, n), DATA).replace(os.sep, "/"))
+    with open(os.path.join(DATA, "index.txt"), "w") as f:
+        f.write("\n".join(sorted(files)) + "\n")
+
+
 if __name__ == "__main__":
     main()
+    gen_data()

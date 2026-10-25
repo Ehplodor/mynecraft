@@ -70,6 +70,34 @@ final class Input {
         return edge;
     }
 
+    private final boolean[] mouseWasDown = new boolean[8];
+    private final double[] wx = new double[1], wy = new double[1];
+    private final int[] ww = new int[1], wh = new int[1], fw = new int[1], fh = new int[1];
+
+    /** True once when a mouse button goes down (screens use clicks, not held buttons). */
+    boolean clicked(int button) {
+        boolean d = mouse(button), edge = d && !mouseWasDown[button];
+        mouseWasDown[button] = d;
+        return edge;
+    }
+
+    boolean shiftDown() {
+        return down(GLFW_KEY_LEFT_SHIFT) || down(GLFW_KEY_RIGHT_SHIFT);
+    }
+
+    /** Mouse position in framebuffer pixels (window coordinates scaled for HiDPI screens). */
+    double[] mouseInFramebuffer() {
+        glfwGetCursorPos(window, wx, wy);
+        glfwGetWindowSize(window, ww, wh);
+        glfwGetFramebufferSize(window, fw, fh);
+        double sx = ww[0] > 0 ? fw[0] / (double) ww[0] : 1, sy = wh[0] > 0 ? fh[0] / (double) wh[0] : 1;
+        return new double[] {wx[0] * sx, wy[0] * sy};
+    }
+
+    static byte[] placeableBlocks() {
+        return PLACEABLE.clone();
+    }
+
     /** Grabs the mouse for looking around, or releases it (pause). */
     void capture(boolean captured) {
         glfwSetInputMode(window, GLFW_CURSOR, captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);

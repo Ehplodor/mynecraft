@@ -1,0 +1,11 @@
+data/minecraft/recipe/birch_planks.json
+data/minecraft/recipe/crafting_table.json
+data/minecraft/recipe/oak_planks.json
+data/minecraft/recipe/oak_slab.json
+data/minecraft/recipe/spruce_planks.json
+data/minecraft/tags/item/birch_logs.json
+data/minecraft/tags/item/logs.json
+data/minecraft/tags/item/oak_logs.json
+data/minecraft/tags/item/planks.json
+data/minecraft/tags/item/spruce_logs.json
+pack.mcmeta

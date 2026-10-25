@@ -13,8 +13,9 @@ public final class Blocks {
         BIRCH_LOG_Z = 31, BIRCH_PLANKS = 32, BIRCH_LEAVES = 33, SPRUCE_LOG = 34, SPRUCE_LOG_X = 35,
         SPRUCE_LOG_Z = 36, SPRUCE_PLANKS = 37, SPRUCE_LEAVES = 38,
         WATER_FLOW_1 = 39, /* ... WATER_FLOW_7 = 45 */ WATER_FALLING = 46,
-        LAVA = 47, LAVA_FLOW_2 = 48, LAVA_FLOW_4 = 49, LAVA_FLOW_6 = 50, LAVA_FALLING = 51, OBSIDIAN = 52;
-    public static final int COUNT = 53; // must stay below 128: the mesher uses bit 7 of the id as a flag
+        LAVA = 47, LAVA_FLOW_2 = 48, LAVA_FLOW_4 = 49, LAVA_FLOW_6 = 50, LAVA_FALLING = 51, OBSIDIAN = 52,
+        CRAFTING_TABLE = 53;
+    public static final int COUNT = 54; // must stay below 128: the mesher uses bit 7 of the id as a flag
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -26,13 +27,13 @@ public final class Blocks {
         "coal_ore", "iron_ore", "gold_ore", "diamond_ore", "birch_log", "birch_log", "birch_log", "birch_planks",
         "birch_leaves", "spruce_log", "spruce_log", "spruce_log", "spruce_planks", "spruce_leaves",
         "water", "water", "water", "water", "water", "water", "water", "water",
-        "lava", "lava", "lava", "lava", "lava", "obsidian"};
+        "lava", "lava", "lava", "lava", "lava", "obsidian", "crafting_table"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
         "", "axis=y", "axis=x", "axis=z", "", "",
         "level=1", "level=2", "level=3", "level=4", "level=5", "level=6", "level=7", "level=8",
-        "level=0", "level=2", "level=4", "level=6", "level=8", ""};
+        "level=0", "level=2", "level=4", "level=6", "level=8", "", ""};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4;
@@ -133,6 +134,7 @@ public final class Blocks {
         hardness(0f, SHORT_GRASS, POPPY);
         hardness(3f, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, DEEPSLATE);
         hardness(50f, OBSIDIAN);
+        hardness(2.5f, CRAFTING_TABLE);
         hardness(-1f, BEDROCK);
         DROP[STONE] = COBBLESTONE;
         DROP[GRASS] = DIRT;

@@ -256,6 +256,18 @@ final class Hud {
         vertex(x, y + h, u0, v1, layer, r, g, b, a);
     }
 
+    /** Block icon centred on (cx, cy), {@code size} pixels wide. */
+    void item(byte block, float cx, float cy, float size) {
+        if (block != Blocks.AIR) icon(block, cx, cy, size);
+    }
+
+    /** Stack count in the bottom-right corner of a slot (hidden for single items). */
+    void count(int n, float slotX, float slotY, float slotSize) {
+        if (n <= 1) return;
+        String t = Integer.toString(n);
+        text(t, slotX + slotSize - textWidth(t) - scale, slotY + slotSize - 8 * scale, 1, 1, 1);
+    }
+
     /** Isometric cube (top, left, right faces with simple shading), or a flat square for plants. */
     private void icon(byte block, float cx, float cy, float s) {
         if (Blocks.SHAPE[block & 0xFF] == Blocks.SHAPE_CROSS) {
