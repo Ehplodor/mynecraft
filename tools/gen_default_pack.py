@@ -115,6 +115,45 @@ def main():
     colormap("grass", (190, 182, 72), (112, 172, 84), (62, 196, 40))
     colormap("foliage", (170, 160, 40), (90, 150, 70), (30, 170, 10))
 
+    # Sky (vanilla layout): sun, 8 moon phases in a 4x2 grid, cloud map (white = cloud).
+    env = os.path.join(NS, "textures", "environment")
+    os.makedirs(env, exist_ok=True)
+    sun = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+    for y in range(32):
+        for x in range(32):
+            d = max(abs(x - 15.5), abs(y - 15.5))
+            if d < 8:
+                sun.putpixel((x, y), (255, 250, 200, 255))
+            elif d < 12:
+                sun.putpixel((x, y), (255, 210, 90, int(200 * (12 - d) / 4)))
+    sun.save(os.path.join(env, "sun.png"))
+    moon = Image.new("RGBA", (128, 64), (0, 0, 0, 0))
+    for phase in range(8):
+        ox, oy = (phase % 4) * 32, (phase // 4) * 32
+        # Lit fraction: full at phase 0, new at 4; the terminator sweeps across the disc.
+        lit = abs(4 - phase) / 4
+        for y in range(32):
+            for x in range(32):
+                dx, dy = x - 15.5, y - 15.5
+                if dx * dx + dy * dy < 100:
+                    side = (dx + 10) / 20 if phase < 4 else (10 - dx) / 20
+                    if side <= lit + 1e-6:
+                        v = 220 - (15 if (x * 7 + y * 3) % 11 == 0 else 0)
+                        moon.putpixel((ox + x, oy + y), (v, v, v + 10, 255))
+    moon.save(os.path.join(env, "moon_phases.png"))
+    rnd = random.Random(42)
+    blobs = [(rnd.randint(0, 255), rnd.randint(0, 255), rnd.randint(4, 14), rnd.randint(2, 6)) for _ in range(140)]
+    clouds = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+    for y in range(256):
+        for x in range(256):
+            for bx, by, rx, ry in blobs:
+                ddx = min(abs(x - bx), 256 - abs(x - bx)) / rx
+                ddy = min(abs(y - by), 256 - abs(y - by)) / ry
+                if ddx * ddx + ddy * ddy < 1:
+                    clouds.putpixel((x, y), (255, 255, 255, 255))
+                    break
+    clouds.save(os.path.join(env, "clouds.png"))
+
     with open(os.path.join(ROOT, "pack.mcmeta"), "w") as f:
         json.dump({"pack": {"pack_format": 34, "description": "Mynecraft default (original art)"}}, f, indent=2)
         f.write("\n")

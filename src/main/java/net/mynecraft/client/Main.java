@@ -101,6 +101,8 @@ public final class Main {
 
         boolean editDemo = argv.contains("--edit-demo");
         Overlay overlay = new Overlay();
+        SkyRenderer skyRenderer = new SkyRenderer(resources);
+        org.joml.Matrix4f skyViewProj = new org.joml.Matrix4f();
         Camera cam = new Camera();
         Player player = new Player();
         if (storage.playerPos != null) {
@@ -198,7 +200,11 @@ public final class Main {
             glfwGetFramebufferSize(window, fbW, fbH);
             glViewport(0, 0, fbW[0], fbH[0]);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            renderer.render(cam, fbW[0] / (float) Math.max(1, fbH[0]), far, sky);
+            float aspect = fbW[0] / (float) Math.max(1, fbH[0]);
+            cam.viewProj(skyViewProj, aspect, far);
+            skyRenderer.drawCelestial(skyViewProj, ticks);
+            renderer.render(cam, aspect, far, sky);
+            skyRenderer.drawClouds(skyViewProj, cam.pos.x, cam.pos.y, cam.pos.z, ticks, renderer.daylight, far);
             if (hit != null) {
                 overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y), (float) (hit.z() - cam.pos.z));
             }
@@ -232,6 +238,7 @@ public final class Main {
         }
         streamer.close();
         overlay.dispose();
+        skyRenderer.dispose();
         renderer.dispose();
         glfwDestroyWindow(window);
         glfwTerminate();
