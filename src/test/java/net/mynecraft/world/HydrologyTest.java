@@ -112,4 +112,27 @@ class HydrologyTest {
         }
         assertTrue(p.x > 8.5 && p.y >= y + 3 - 1e-6, "still in the water at " + p.x + ", " + p.y);
     }
+
+    @Test
+    void aWaterfallJoinsThePoolBelowWithoutASheetOnTop() {
+        World w = new World(1);
+        for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++) {
+                Chunk n = new Chunk(dx, dz);
+                n.fillSection(0, Blocks.STONE);
+                w.put(n);
+            }
+        int y = Chunk.MIN_Y + 16;
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) w.set(x, y, z, Blocks.WATER); // the pool
+        for (int k = 1; k <= 4; k++) w.set(1, y + k, 8, Blocks.STONE);
+        w.set(1, y + 5, 8, Blocks.WATER); // a source on a pillar, spilling over its edges
+        FluidSimulator f = new FluidSimulator(w, (a, b, c) -> {});
+        f.blockChanged(1, y + 5, 8);
+        for (int i = 0; i < 400; i++) f.tick();
+        int sheet = 0;
+        for (int x = 0; x < 16; x++)
+            for (int z = 0; z < 16; z++) if (Blocks.isFluid(w.get(x, y + 1, z)) && Blocks.LEVEL[w.get(x, y + 1, z)] < 8) sheet++;
+        assertEquals(0, sheet, "falling water lands in the pool and stops there");
+        assertEquals(8, Blocks.LEVEL[w.get(2, y + 1, 8)], "a falling column reaches the pool");
+    }
 }

@@ -42,9 +42,9 @@ public final class FluidSimulator {
 
     /**
      * Fluid blocks of a fresh chunk that will not stay as they are: flowing levels (their pending
-     * ticks are not saved) and fluid with nothing under it. A natural source next to open air at its
-     * own level is left alone: that is a river stepping down its bed, drawn as a small cascade; letting
-     * it spread like a vanilla source would create water from nothing and flood the hillside.
+     * ticks are not saved) and fluid with air or a plant beside or below it inside the chunk (a river
+     * stepping down its bed spills over the step and falls into the stretch below, where it stops).
+     * Water on the chunk's edge is woken by the neighbour's scan or by {@link #blockChanged}.
      * Runs on loader threads; null when the chunk is settled.
      */
     public static int[] unsettled(Chunk c) {
@@ -59,6 +59,10 @@ public final class FluidSimulator {
                         byte b = c.get(x, y, z);
                         if (Blocks.FLUID[b & 0xFF] == Blocks.FLUID_NONE) continue;
                         boolean open = Blocks.LEVEL[b & 0xFF] != 0 || (y > Chunk.MIN_Y && free(c.get(x, y - 1, z)));
+                        for (int i = 0; i < 4 && !open; i++) {
+                            int nx = x + HX[i], nz = z + HZ[i];
+                            open = nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && free(c.get(nx, y, nz));
+                        }
                         if (!open) continue;
                         if (n == out.length) out = java.util.Arrays.copyOf(out, n * 2);
                         out[n++] = (c.cx << 4) + x;
@@ -180,7 +184,9 @@ public final class FluidSimulator {
 
         byte below = world.get(x, y - 1, z);
         if (flowInto(x, y - 1, z, below, type, 8, true)) return; // falling takes priority
-        if (Blocks.FLUID[below & 0xFF] == type && Blocks.LEVEL[below & 0xFF] != 0) return; // feeding a column
+        // Moving fluid resting on the same fluid does not spread over it (like vanilla): a fall into a
+        // lake or a spill onto a lower stretch of river joins it instead of laying a sheet on top.
+        if (Blocks.FLUID[below & 0xFF] == type && (Blocks.LEVEL[below & 0xFF] != 0 || Blocks.LEVEL[b & 0xFF] != 0)) return;
         int level = Blocks.LEVEL[b & 0xFF];
         int next = (level >= 8 ? 0 : level) + step;
         if (next > max) return;

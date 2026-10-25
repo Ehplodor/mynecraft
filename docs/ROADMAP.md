@@ -268,3 +268,9 @@
   8 colonnes calculée seulement près d'une rivière : génération inchangée, 0,75 ms/chunk)
 - Mesures (montagnes, graine 7) : roche nue près de l'eau 6,6 % → 1,6 % ; berges à 1 bloc ou moins 91 %
 - L'eau naturelle ne déborde plus de ses paliers (quantité finie) : cascades dessinées dans le lit
+- Eau suspendue et écoulements : l'eau en mouvement posée sur de l'eau ne s'étale plus dessus (comme
+  vanilla) : une chute rejoint le bassin, un palier de rivière déborde en cascade dans le tronçon
+  suivant ; les paliers sont donc de nouveau simulés (et pré-calculés) au lieu d'être figés ; les ravins
+  ne tranchent plus le flanc d'un lit, les grottes restent sous le fond du lit voisin le plus profond ;
+  un creux n'est inondé que s'il est fermé de tous côtés. Zone de test en montagne : écoulements hors
+  des lits 3 843 → 0 blocs

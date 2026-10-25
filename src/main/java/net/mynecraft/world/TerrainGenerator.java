@@ -144,11 +144,22 @@ public final class TerrainGenerator {
             for (int x = 0; x < 16; x++) {
                 Landscape.Column col = cols[(z + 1) * 18 + x + 1];
                 int depth = landscape.ravineDepth((c.cx << 4) + x, (c.cz << 4) + z, col);
-                if (depth <= 0) continue;
+                if (depth <= 0 || lowestBedNear(cols, x, z) != Integer.MAX_VALUE) continue; // never cut a river's side
                 int h = heights[z * 16 + x];
                 for (int y = h; y > h - depth && y > Chunk.MIN_Y + 5; y--) c.set(x, y, z, Blocks.AIR);
                 heights[z * 16 + x] = h - depth; // decorations go on the ravine floor (none: no grass there)
             }
+    }
+
+    /** Height of the deepest water bed among a column and its 8 neighbours, MAX_VALUE if all are dry. */
+    private static int lowestBedNear(Landscape.Column[] cols, int x, int z) {
+        int bed = Integer.MAX_VALUE;
+        for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++) {
+                Landscape.Column nb = cols[(z + 1 + dz) * 18 + x + 1 + dx];
+                if (Math.max(SEA_LEVEL, nb.water()) > nb.height()) bed = Math.min(bed, nb.height());
+            }
+        return bed;
     }
 
     /** Trees and plants, with densities and species per biome. Trees stay inside the chunk. */
@@ -252,15 +263,10 @@ public final class TerrainGenerator {
                 int ix = x / GRID_XZ;
                 float fx = (x % GRID_XZ) / (float) GRID_XZ;
                 int h = heights[z * 16 + x];
-                // Under the sea, a river or a lake (or beside one), caves stay well below the bed.
-                int water = SEA_LEVEL + 2;
-                for (int dz = -1; dz <= 1; dz++)
-                    for (int dx = -1; dx <= 1; dx++) {
-                        Landscape.Column nb = cols[(z + 1 + dz) * 18 + x + 1 + dx];
-                        if (nb.water() > nb.height()) water = Math.max(water, nb.water());
-                    }
-                boolean wet = h <= water;
-                int top = wet ? Math.min(h - 8, h <= SEA_LEVEL + 2 ? SEA_LEVEL - 10 : h - 8) : h;
+                // Under the sea, a river or a lake, or beside one: caves stay well below the deepest bed
+                // around, so they never open a bed's floor or side.
+                int bed = lowestBedNear(cols, x, z);
+                int top = h <= SEA_LEVEL + 2 ? Math.min(h - 8, SEA_LEVEL - 10) : bed != Integer.MAX_VALUE ? Math.min(h - 8, bed - 5) : h;
                 if (top < CAVE_FLOOR) continue;
                 int levels = Math.min(ny, (top - CAVE_FLOOR) / GRID_Y + 2);
                 for (int iy = 0; iy < levels; iy++) {

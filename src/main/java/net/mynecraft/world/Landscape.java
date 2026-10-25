@@ -215,11 +215,19 @@ public final class Landscape {
                 if (wet == 0) continue;
                 byte river = col.temperature() < 0.22f ? FROZEN_RIVER : RIVER;
                 boolean across = (sides & 3) == 3 || (sides & 12) == 12; // water on two opposite sides
-                if ((wet >= 3 || across) && col.height() <= need + 3) {
+                // Water added here must be held on every side (river, or ground at least as high).
+                boolean heldLow = true, heldNeed = true;
+                for (int nb : nbs) {
+                    Column o = out[nb];
+                    if (o.river() > 0) continue;
+                    if (o.height() < low) heldLow = false;
+                    if (o.height() < need) heldNeed = false;
+                }
+                if ((wet >= 3 || across) && col.height() <= need + 3 && heldLow) {
                     // A post or a sliver of land standing in the water: part of the bed, at the lower
                     // level around it; any higher water runs down into it (rapids).
                     banked[i] = new Column(Math.min(col.height(), low - 1), river, low, 1, col.temperature());
-                } else if (col.height() < need && col.height() >= need - 2) {
+                } else if (col.height() < need && col.height() >= need - 2 && heldNeed) {
                     banked[i] = new Column(col.height(), river, need, 1, col.temperature()); // a shallow hollow: flooded
                 } else if (col.height() < need + 1) {
                     // A bank one block above the water: what spills over a step in the river runs on
