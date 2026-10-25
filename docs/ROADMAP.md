@@ -256,3 +256,6 @@
   ouvrir un autre monde sauvegardé (clic droit pour passer au suivant), sauvegarder et quitter
 - Les nouveaux mondes vont dans `monde-2`, `monde-3`… à côté du monde courant ; changer de monde
   sauvegarde puis relance le jeu avec les nouveaux arguments (mêmes options JVM, packs et réglages)
+- Berges praticables : profil de vallée calculé par tuile (le sol près de l'eau ne dépasse pas le niveau
+  de l'eau + 1, puis remonte en pente douce, plus douce le long des grandes rivières) ; mesuré sur
+  1,4 × 1,4 km : 87 % des bords de rivière à 1 bloc ou moins au-dessus de l'eau (34 % avant)

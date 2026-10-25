@@ -71,4 +71,23 @@ class HydrologyTest {
         p.step(w, 0.01);
         assertEquals(Blocks.FLUID_WATER, p.fluid);
     }
+
+    @Test
+    void riverBanksCanBeClimbedFromTheWater() {
+        Landscape land = new Landscape(7);
+        int edges = 0, easy = 0;
+        int[][] d = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int z = -1000; z < 400; z += 6)
+            for (int x = -1200; x < 200; x += 6) {
+                Landscape.Column c = land.column(x, z);
+                if (c.river() <= 0) continue;
+                for (int[] o : d) {
+                    Landscape.Column n = land.column(x + o[0], z + o[1]);
+                    if (Math.max(Landscape.SEA, n.water()) > n.height()) continue;
+                    edges++;
+                    if (n.height() - c.water() <= 1) easy++; // one step up from the surface
+                }
+            }
+        assertTrue(easy > edges * 0.8, easy + " of " + edges + " river edges are one block or less above the water");
+    }
 }

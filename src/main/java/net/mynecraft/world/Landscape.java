@@ -225,8 +225,9 @@ public final class Landscape {
                 water = Math.round(w[0]);
                 h = Math.min(h, water - w[1]);
                 riverMask = 1;
-            } else if (h < SEA + 1) {
-                h = SEA + 1; // carved below the sea without a river: keep it dry land
+            } else {
+                h = Math.min(h, hydrology.bank(wx, wz)); // valley sides you can climb out of
+                if (h < SEA + 1) h = SEA + 1; // carved below the sea without a river: keep it dry land
             }
         }
 

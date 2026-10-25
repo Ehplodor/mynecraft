@@ -43,6 +43,7 @@ public final class Hydrology {
         final float[] flow;          // accumulated flow
         final float[] level;         // water surface where there is a river, NaN elsewhere
         final float[] depth;         // bed depth below the surface
+        final float[] bank;          // highest the ground may be here: gentle banks up from the nearest water
 
         Tile(int x0, int z0, int n) {
             this.x0 = x0;
@@ -52,6 +53,7 @@ public final class Hydrology {
             flow = new float[n * n];
             level = new float[n * n];
             depth = new float[n * n];
+            bank = new float[n * n];
         }
 
         /** The tile's core plus one cell all round: what columns of the tile read (1 MB, not 4). */
@@ -64,6 +66,7 @@ public final class Hydrology {
                 System.arraycopy(flow, from, c.flow, j * m, m);
                 System.arraycopy(level, from, c.level, j * m, m);
                 System.arraycopy(depth, from, c.depth, j * m, m);
+                System.arraycopy(bank, from, c.bank, j * m, m);
             }
             return c;
         }
@@ -95,6 +98,16 @@ public final class Hydrology {
     public float carve(int wx, int wz) {
         Tile t = tile(wx, wz);
         return bilinear(t, t.carve, wx, wz);
+    }
+
+    /**
+     * Highest the ground may rise at a column near water: one block above the nearest river or
+     * lake, then a gentle slope away from it (a valley floor you can climb out of), wider along big
+     * rivers. Very high far from any water.
+     */
+    public float bank(int wx, int wz) {
+        Tile t = tile(wx, wz);
+        return bilinear(t, t.bank, wx, wz);
     }
 
     /** Flow at a column (0 on dry hillsides). */
@@ -357,7 +370,8 @@ public final class Hydrology {
         }
         // The water spreads over any lower ground next to it (a few cells at most): no dry holes
         // below the surface beside a river, which would otherwise need walls of earth.
-        int[] queue = new int[n], hops = new int[n];
+        int[] queue = new int[n * 4], hops = new int[n];
+        float[] slope = new float[n];
         int head = 0, tail = 0;
         for (int k = 0; k < n; k++) if (!Float.isNaN(t.level[k])) queue[tail++] = k;
         while (head < tail) {
@@ -372,6 +386,35 @@ public final class Hydrology {
                 t.level[q] = t.level[k];
                 t.depth[q] = Math.max(1, t.level[k] - h[q]);
                 hops[q] = hops[k] + 1;
+                queue[tail++] = q;
+            }
+        }
+        // Banks: from every water cell (and the sea) outwards, the ground may rise one block above
+        // the water, then BANK_SLOPE blocks per block; big rivers get a flatter, wider floor.
+        java.util.Arrays.fill(t.bank, 400);
+        head = 0;
+        tail = 0;
+        for (int k = 0; k < n; k++) {
+            boolean water = !Float.isNaN(t.level[k]);
+            if (!water && h[k] > sea) continue;
+            float lvl = water ? t.level[k] : sea;
+            t.bank[k] = lvl + 1;
+            float f = water ? Math.max(t.flow[k], STREAM_FLOW) : STREAM_FLOW * 50;
+            slope[k] = CELL * Math.max(0.35f, Math.min(1.2f, 1.6f / (float) Math.log10(f / STREAM_FLOW * 10 + 1)));
+            queue[tail++] = k;
+        }
+        while (head < tail) {
+            int k = queue[head++];
+            int i = k % N, j = k / N;
+            for (int d = 0; d < 4; d++) {
+                int ii = i + di[d], jj = j + dj[d];
+                if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
+                int q = jj * N + ii;
+                boolean edge = !Float.isNaN(t.level[k]) || h[k] <= sea;
+                float cap = t.bank[k] + (edge ? 0 : slope[k]); // the first ring stays at the water's edge
+                if (cap >= t.bank[q] || cap > h[q] + 40) continue; // already lower, or far up a mountain side
+                t.bank[q] = cap;
+                slope[q] = slope[k];
                 queue[tail++] = q;
             }
         }
