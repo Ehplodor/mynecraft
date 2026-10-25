@@ -179,6 +179,25 @@ class ChunkMesherTest {
     }
 
     @Test
+    void generationHasDeepslateOresAndSeveralTreeSpecies() {
+        World w = new World(7);
+        int[] counts = new int[Blocks.COUNT];
+        for (int cx = -12; cx < 12; cx++)
+            for (int cz = -12; cz < 12; cz++) {
+                Chunk c = w.generator.generate(cx, cz);
+                for (int y = Chunk.MIN_Y; y < Chunk.MAX_Y; y++)
+                    for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) counts[c.get(x, y, z)]++;
+                byte deep = c.get(3, -20, 3);
+                assertTrue(deep == Blocks.DEEPSLATE || Blocks.NAMES[deep].endsWith("_ore"), "below y=0: deepslate or ore");
+            }
+        for (byte b : new byte[] {Blocks.COAL_ORE, Blocks.IRON_ORE, Blocks.GOLD_ORE, Blocks.DIAMOND_ORE, Blocks.GRANITE,
+            Blocks.DIORITE, Blocks.ANDESITE, Blocks.OAK_LOG, Blocks.BIRCH_LOG, Blocks.SPRUCE_LOG}) {
+            assertTrue(counts[b] > 0, "no " + Blocks.NAMES[b] + " generated");
+        }
+        assertTrue(counts[Blocks.COAL_ORE] > counts[Blocks.DIAMOND_ORE]);
+    }
+
+    @Test
     void benchmarkGenerateJoinAndMesh() {
         int r = 8, n = (2 * r + 3) * (2 * r + 3);
         World w = new World(1337);

@@ -34,8 +34,9 @@ public final class Placement {
                 state = Blocks.OAK_SLAB_DOUBLE;
                 there = Blocks.AIR;
             }
-        } else if (Blocks.NAMES[selected].equals("oak_log")) {
-            state = hit.nx() != 0 ? Blocks.OAK_LOG_X : hit.nz() != 0 ? Blocks.OAK_LOG_Z : Blocks.OAK_LOG;
+        } else if (Blocks.logStates(selected) != null) {
+            byte[] axes = Blocks.logStates(selected); // y, x, z
+            state = hit.nx() != 0 ? axes[1] : hit.nz() != 0 ? axes[2] : axes[0];
         }
         if (!replaceable(there)) return null;
         if (Blocks.isSolid(state) && player.intersects(px, py, pz)) return null;

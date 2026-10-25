@@ -89,8 +89,22 @@
 - Bûches orientées (`axis`), dalles bas/haut/double (`type`), lues et écrites dans les sauvegardes ;
   les familles vanilla gardent leurs propriétés (`birch_log[axis=x]` → bûche horizontale)
 - Collisions AABB sur les boîtes réelles + montée automatique de 0,6 bloc ; règles de pose vanilla
-- Reste à faire : visée précise des demi-blocs (le raycast vise le cube entier), escaliers, `uvlock`,
-  plus de familles de blocs
+- Reste à faire : escaliers, `uvlock`
+
+## ✅ M8 — Mesure, visée précise, nouveaux blocs
+- Mode `--benchmark N` : vol scripté à 20 blocs/s, FPS, percentiles de temps d'image, temps GPU
+  (requêtes `GL_TIME_ELAPSED` en anneau, sans attente), coût CPU de la sélection des sections, mémoire
+- Parcours d'occlusion sans hachage ni boxing (grille indexée x, z mod 64) : 1,28 → 0,15 ms/image
+- Visée précise des demi-blocs (rayon contre la vraie boîte), contour ajusté à la forme
+- 18 états de plus : granite, diorite, andésite, deepslate, minerais (charbon, fer, or, diamant),
+  bouleau et épicéa (bûches 3 axes, planches, feuilles) ; molette = tous les blocs
+- Génération : deepslate sous y = 0, filons aux hauteurs vanilla, essences d'arbres selon le climat
+- Familles vanilla : autres essences → chêne, minerais deepslate → minerai, `tuff` → deepslate…
+- Mesures (rendu logiciel llvmpipe, non représentatif d'un GPU) : ~38 FPS, p99 34 ms ; blocs + lumière
+  34 Mio pour 780 chunks, tampon GPU 10 Mio
+- Décision : pas de compression par palette des blocs pour l'instant (≈ 20 Mio gagnés au prix des
+  chemins les plus chauds : maillage, lumière)
+- Reste à faire : grottes (pour voir les minerais), couleurs fixes des feuilles de bouleau et d'épicéa
 
 ## Pistes d'optimisation continues
 - Multi-draw indirect (`glMultiDrawElementsIndirect`) + un seul gros VBO → 1 draw call

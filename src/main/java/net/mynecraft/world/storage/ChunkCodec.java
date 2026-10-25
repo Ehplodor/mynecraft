@@ -45,9 +45,18 @@ public final class ChunkCodec {
         if (PLANTS.contains(n)) return Blocks.SHORT_GRASS;
         if (n.endsWith("_flower") || n.endsWith("tulip") || n.endsWith("sapling") || n.equals("dandelion")
             || n.equals("cornflower") || n.equals("azure_bluet") || n.equals("oxeye_daisy")) return Blocks.POPPY;
-        if (n.endsWith("_leaves")) return Blocks.OAK_LEAVES;
-        if (n.endsWith("_log") || n.endsWith("_wood") || n.endsWith("_stem")) return Blocks.fromState("oak_log", properties);
-        if (n.endsWith("_planks")) return Blocks.OAK_PLANKS;
+        // Wood families: birch and spruce exist, other species fall back to oak.
+        String wood = n.startsWith("birch_") || n.startsWith("stripped_birch_") ? "birch"
+            : n.startsWith("spruce_") || n.startsWith("stripped_spruce_") ? "spruce" : "oak";
+        if (n.endsWith("_leaves")) return Blocks.fromState(wood + "_leaves", properties);
+        if (n.endsWith("_log") || n.endsWith("_wood") || n.endsWith("_stem")) return Blocks.fromState(wood + "_log", properties);
+        if (n.endsWith("_planks")) return Blocks.fromState(wood + "_planks", properties);
+        if (n.endsWith("_ore")) {
+            for (String m : new String[] {"coal", "iron", "gold", "diamond"}) if (n.contains(m)) return Blocks.fromState(m + "_ore", properties);
+            return Blocks.STONE;
+        }
+        if (n.contains("deepslate") || n.equals("tuff")) return Blocks.DEEPSLATE;
+        for (String v : new String[] {"granite", "diorite", "andesite"}) if (n.contains(v)) return Blocks.fromState(v, properties);
         if (n.contains("glass")) return Blocks.GLASS;
         if (n.contains("cobble")) return Blocks.COBBLESTONE;
         if (n.contains("sand") && !n.contains("stone")) return Blocks.SAND;

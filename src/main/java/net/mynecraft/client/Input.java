@@ -7,7 +7,8 @@ import static org.lwjgl.glfw.GLFW.*;
 
 /**
  * Keyboard/mouse controls. Movement keys use physical positions (WASD on QWERTY = ZQSD on AZERTY).
- * Space jump (fly: up), Shift fly down, Ctrl sprint, F toggle flying, 1-9 pick block,
+ * Space jump (fly: up), Shift fly down, Ctrl sprint, F toggle flying, 1-9 pick block, mouse wheel
+ * cycles through every placeable block,
  * left click break, right click place, Esc quit.
  */
 final class Input {
@@ -22,11 +23,29 @@ final class Input {
     private boolean first = true, flyKeyWasDown;
     private double breakCooldown, placeCooldown;
 
+    /** Default state of every block name except air and fluids, in registry order. */
+    private static final byte[] PLACEABLE = placeable();
+    private double scroll;
+    private int wheelIndex;
+
     byte selected = HOTBAR[0];
     boolean breakRequested, placeRequested;
 
     Input(long window) {
         this.window = window;
+        glfwSetScrollCallback(window, (w, dx, dy) -> scroll += dy);
+    }
+
+    private static byte[] placeable() {
+        java.util.List<Byte> ids = new java.util.ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (int i = 1; i < Blocks.COUNT; i++) {
+            if (i == Blocks.WATER || !seen.add(Blocks.NAMES[i])) continue;
+            ids.add((byte) i);
+        }
+        byte[] out = new byte[ids.size()];
+        for (int i = 0; i < out.length; i++) out[i] = ids.get(i);
+        return out;
     }
 
     private boolean down(int key) {
@@ -59,6 +78,11 @@ final class Input {
         flyKeyWasDown = fly;
 
         for (int i = 0; i < HOTBAR.length; i++) if (down(GLFW_KEY_1 + i)) selected = HOTBAR[i];
+        if (scroll != 0) {
+            wheelIndex = Math.floorMod(wheelIndex - (int) Math.signum(scroll), PLACEABLE.length);
+            selected = PLACEABLE[wheelIndex];
+            scroll = 0;
+        }
 
         breakCooldown = mouse(GLFW_MOUSE_BUTTON_LEFT) ? breakCooldown - dt : 0;
         placeCooldown = mouse(GLFW_MOUSE_BUTTON_RIGHT) ? placeCooldown - dt : 0;

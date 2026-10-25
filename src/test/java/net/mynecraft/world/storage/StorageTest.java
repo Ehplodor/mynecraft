@@ -88,8 +88,8 @@ class StorageTest {
 
         Chunk c = ChunkCodec.decode(root, 0, 0);
         byte[] expected = {Blocks.AIR, Blocks.STONE, Blocks.DIRT, Blocks.GRASS, Blocks.SAND, Blocks.BEDROCK,
-            Blocks.WATER, Blocks.SAND, Blocks.STONE, Blocks.OAK_LOG, Blocks.POPPY, Blocks.DIRT, Blocks.STONE,
-            Blocks.AIR, Blocks.STONE, Blocks.STONE, Blocks.AIR};
+            Blocks.WATER, Blocks.SAND, Blocks.DEEPSLATE, Blocks.OAK_LOG, Blocks.POPPY, Blocks.DIRT, Blocks.ANDESITE,
+            Blocks.AIR, Blocks.STONE, Blocks.GRANITE, Blocks.AIR};
         for (int i = 0; i < 4096; i++) {
             assertEquals(expected[i % names.length], c.get(i & 15, 64 + (i >> 8), (i >> 4) & 15));
         }
@@ -104,7 +104,11 @@ class StorageTest {
         Chunk back = ChunkCodec.decode(Nbt.read(Nbt.toBytes(ChunkCodec.encode(c))), 0, 0);
         for (int i = 0; i < states.length; i++) assertEquals(states[i], back.get(i, 70, 0));
 
-        assertEquals(Blocks.OAK_LOG_X, ChunkCodec.blockFromState("minecraft:birch_log", Map.of("axis", "x")));
+        assertEquals(Blocks.BIRCH_LOG_X, ChunkCodec.blockFromState("minecraft:birch_log", Map.of("axis", "x")));
+        assertEquals(Blocks.OAK_LOG_Z, ChunkCodec.blockFromState("minecraft:dark_oak_log", Map.of("axis", "z")));
+        assertEquals(Blocks.SPRUCE_LEAVES, ChunkCodec.blockFromState("minecraft:spruce_leaves", Map.of("distance", "7")));
+        assertEquals(Blocks.IRON_ORE, ChunkCodec.blockFromState("minecraft:deepslate_iron_ore", Map.of()));
+        assertEquals(Blocks.DEEPSLATE, ChunkCodec.blockFromState("minecraft:deepslate", Map.of("axis", "x")));
         assertEquals(Blocks.OAK_SLAB_TOP, ChunkCodec.blockFromState("minecraft:stone_slab", Map.of("type", "top", "waterlogged", "false")));
         assertEquals(Blocks.OAK_LOG, ChunkCodec.blockFromState("minecraft:oak_log", Map.of()));
     }

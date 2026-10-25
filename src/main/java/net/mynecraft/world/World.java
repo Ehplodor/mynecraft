@@ -22,6 +22,18 @@ public final class World {
         return chunks.remove(key(cx, cz));
     }
 
+    /** Bytes held by block and light arrays of loaded chunks (shared arrays counted once). */
+    public long storageBytes() {
+        long bytes = 0;
+        for (Chunk c : chunks.values()) {
+            for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
+                if (c.sections[sy] != null) bytes += Section.VOLUME;
+                if (c.light[sy] != null && c.light[sy] != Chunk.DARK) bytes += Section.VOLUME;
+            }
+        }
+        return bytes;
+    }
+
     public java.util.Collection<Chunk> loadedChunks() {
         return chunks.values();
     }

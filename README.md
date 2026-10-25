@@ -22,7 +22,7 @@ gradle test                                  # tests + micro-benchmark générat
 
 Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
-`1`–`9` choisir le bloc (les dalles et bûches s'orientent selon la face visée), `Échap` quitter.
+`1`–`9` ou molette choisir le bloc (les dalles et bûches s'orientent selon la face visée), `Échap` quitter.
 
 ## Architecture
 | Fichier | Rôle |

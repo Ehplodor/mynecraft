@@ -249,9 +249,12 @@ public final class Main {
                 if (frames > 0 || now - fpsTimer > 0) stats.cpuFrame(frameNanos);
                 double elapsed = (System.nanoTime() - benchStart) / 1e9;
                 if (elapsed >= benchSeconds) {
-                    System.out.println(stats.report(elapsed) + String.format(" | cull+sort %.3f ms | sections drawn %d/%d meshed | %d quads",
+                    long[] buf = renderer.bufferUsage();
+                    System.out.println(stats.report(elapsed) + String.format(
+                        " | cull+sort %.3f ms | sections drawn %d/%d meshed | %d quads | blocks+light %.1f MiB (%d chunks) | GPU buffer %.1f MiB",
                         renderer.cullNanos / 1e6 / Math.max(1, renderer.cullFrames),
-                        renderer.drawnSections, renderer.meshCount(), renderer.totalQuads));
+                        renderer.drawnSections, renderer.meshCount(), renderer.totalQuads,
+                        world.storageBytes() / 1048576.0, world.loadedChunks().size(), buf[0] * 32 / 1048576.0));
                     glfwSetWindowShouldClose(window, true);
                 }
             }

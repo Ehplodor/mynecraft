@@ -8,8 +8,11 @@ public final class Blocks {
     public static final byte AIR = 0, STONE = 1, DIRT = 2, GRASS = 3, SAND = 4, BEDROCK = 5, WATER = 6,
         OAK_LOG = 7, OAK_LEAVES = 8, OAK_PLANKS = 9, COBBLESTONE = 10, GLASS = 11, SHORT_GRASS = 12,
         POPPY = 13, GLOWSTONE = 14, GRAVEL = 15, OAK_LOG_X = 16, OAK_LOG_Z = 17, OAK_SLAB = 18,
-        OAK_SLAB_TOP = 19, OAK_SLAB_DOUBLE = 20;
-    public static final int COUNT = 21; // must stay below 128: the mesher uses bit 7 of the id as a flag
+        OAK_SLAB_TOP = 19, OAK_SLAB_DOUBLE = 20, GRANITE = 21, DIORITE = 22, ANDESITE = 23, DEEPSLATE = 24,
+        COAL_ORE = 25, IRON_ORE = 26, GOLD_ORE = 27, DIAMOND_ORE = 28, BIRCH_LOG = 29, BIRCH_LOG_X = 30,
+        BIRCH_LOG_Z = 31, BIRCH_PLANKS = 32, BIRCH_LEAVES = 33, SPRUCE_LOG = 34, SPRUCE_LOG_X = 35,
+        SPRUCE_LOG_Z = 36, SPRUCE_PLANKS = 37, SPRUCE_LEAVES = 38;
+    public static final int COUNT = 39; // must stay below 128: the mesher uses bit 7 of the id as a flag
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -17,9 +20,13 @@ public final class Blocks {
      */
     public static final String[] NAMES = {"air", "stone", "dirt", "grass_block", "sand", "bedrock", "water",
         "oak_log", "oak_leaves", "oak_planks", "cobblestone", "glass", "short_grass", "poppy", "glowstone", "gravel",
-        "oak_log", "oak_log", "oak_slab", "oak_slab", "oak_slab"};
+        "oak_log", "oak_log", "oak_slab", "oak_slab", "oak_slab", "granite", "diorite", "andesite", "deepslate",
+        "coal_ore", "iron_ore", "gold_ore", "diamond_ore", "birch_log", "birch_log", "birch_log", "birch_planks",
+        "birch_leaves", "spruce_log", "spruce_log", "spruce_log", "spruce_planks", "spruce_leaves"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
-        "axis=x", "axis=z", "type=bottom", "type=top", "type=double"};
+        "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
+        "", "", "", "", "axis=y", "axis=x", "axis=z", "",
+        "", "axis=y", "axis=x", "axis=z", "", ""};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4;
@@ -46,8 +53,10 @@ public final class Blocks {
             SOLID[i] = true;
         }
         TINT[GRASS] = TINT_GRASS;
-        cutout(OAK_LEAVES, 1, true);
-        TINT[OAK_LEAVES] = TINT_FOLIAGE;
+        for (byte leaves : new byte[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES}) {
+            cutout(leaves, 1, true);
+            TINT[leaves] = TINT_FOLIAGE; // vanilla gives birch and spruce fixed colours; biome foliage here
+        }
         cutout(GLASS, 0, true);
         plant(SHORT_GRASS);
         TINT[SHORT_GRASS] = TINT_GRASS;
@@ -104,6 +113,14 @@ public final class Blocks {
             if (!kv.substring(eq + 1).equals(properties.get(kv.substring(0, eq)))) return false;
         }
         return true;
+    }
+
+    /** The three axis states of a log family, in y, x, z order, or null. */
+    public static byte[] logStates(byte id) {
+        String n = NAMES[id & 0xFF];
+        if (!n.endsWith("_log")) return null;
+        byte y = fromState(n, java.util.Map.of("axis", "y")), x = fromState(n, java.util.Map.of("axis", "x"));
+        return new byte[] {y, x, fromState(n, java.util.Map.of("axis", "z"))};
     }
 
     public static boolean isSlab(byte id) {

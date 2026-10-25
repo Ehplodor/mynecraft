@@ -100,6 +100,33 @@ def main():
         170 + r.randint(-50, 50)), 17))
     save("water_still", rgba(lambda x, y, r: (lambda v: (v, v, v, 180))(clamp(190 + r.randint(-20, 20))), 18))
 
+    # Stone variants and ores (ores: stone with coloured specks).
+    save("granite", noisy((150, 104, 86), 18, 20))
+    save("diorite", rgba(lambda x, y, r: (lambda v: (v, v, v + 3, 255))(clamp(205 - (70 if r.random() < 0.15 else 0) + r.randint(-10, 10))), 21))
+    save("andesite", noisy((132, 132, 134), 12, 22))
+    save("deepslate", rgba(lambda x, y, r: (lambda v: (v, v, v + 6, 255))(clamp(78 + r.randint(-8, 8) - (14 if y % 4 == 0 else 0))), 23))
+    for name, color, seed in (("coal_ore", (30, 30, 30), 24), ("iron_ore", (216, 175, 147), 25),
+                              ("gold_ore", (250, 220, 60), 26), ("diamond_ore", (90, 230, 220), 27)):
+        rr = random.Random(seed)
+        specks = {(rr.randint(1, 13) + dx, rr.randint(1, 13) + dy) for _ in range(5) for dx in (0, 1) for dy in (0, 1)}
+        save(name, rgba(lambda x, y, r, c=color, sp=specks: (c[0], c[1], c[2], 255) if (x, y) in sp
+             else (lambda v: (v, v, v + 4, 255))(clamp(118 + r.randint(-14, 14))), seed))
+    # Birch and spruce.
+    save("birch_log", rgba(lambda x, y, r: (40, 40, 38, 255) if (r.random() < 0.06 or (y % 5 == 0 and r.random() < 0.4))
+         else (lambda v: (v, v, v - 8, 255))(clamp(220 + r.randint(-12, 8))), 28))
+    save("birch_log_top", rgba(lambda x, y, r: (lambda d: (215, 200, 150, 255) if d < 6 else (225, 225, 215, 255))(
+        ((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5), 29))
+    save("birch_planks", rgba(lambda x, y, r: (lambda g: (clamp(196 + g), clamp(178 + g), clamp(122 + g), 255))(
+        r.randint(-8, 8) - (30 if y % 4 == 3 else 0)), 30))
+    save("birch_leaves", rgba(lambda x, y, r: (lambda v: (v, v, v, 0 if r.random() < 0.15 else 255))(clamp(140 + r.randint(-30, 30))), 31))
+    save("spruce_log", rgba(lambda x, y, r: (lambda g: (clamp(64 + g), clamp(44 + g), clamp(24 + g), 255))(
+        r.randint(-8, 8) - (15 if x % 4 == 0 else 0)), 32))
+    save("spruce_log_top", rgba(lambda x, y, r: (lambda d: (lambda g: (clamp(120 + g), clamp(88 + g), clamp(52 + g), 255))(
+        -20 if int(d) % 2 == 0 else 0) if d < 7 else (60, 42, 24, 255))(((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5), 33))
+    save("spruce_planks", rgba(lambda x, y, r: (lambda g: (clamp(110 + g), clamp(80 + g), clamp(48 + g), 255))(
+        r.randint(-6, 6) - (25 if y % 4 == 3 else 0)), 34))
+    save("spruce_leaves", rgba(lambda x, y, r: (lambda v: (v, v, v, 0 if r.random() < 0.12 else 255))(clamp(95 + r.randint(-25, 25))), 35))
+
     # Biome colormaps (vanilla layout: x = 1 - temperature, y = 1 - downfall * temperature).
     def colormap(name, hot_dry, cold, wet):
         img = Image.new("RGB", (256, 256))
@@ -212,6 +239,19 @@ def main():
                  "rotation": {"origin": [8, 8, 8], "axis": "y", "angle": 45, "rescale": True},
                  "faces": {"west": face, "east": face}}]})
     write_json("models/block/water.json", {"textures": {"particle": "block/water_still"}})
+    for name in ("granite", "diorite", "andesite", "deepslate", "coal_ore", "iron_ore", "gold_ore", "diamond_ore",
+                 "birch_planks", "spruce_planks"):
+        write_json(f"models/block/{name}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{name}"}})
+        write_json(f"blockstates/{name}.json", {"variants": {"": {"model": f"minecraft:block/{name}"}}})
+    for wood in ("birch", "spruce"):
+        write_json(f"models/block/{wood}_log.json", {"parent": "block/cube_column",
+                   "textures": {"end": f"block/{wood}_log_top", "side": f"block/{wood}_log"}})
+        write_json(f"blockstates/{wood}_log.json", {"variants": {
+            "axis=x": {"model": f"minecraft:block/{wood}_log", "x": 90, "y": 90},
+            "axis=y": {"model": f"minecraft:block/{wood}_log"},
+            "axis=z": {"model": f"minecraft:block/{wood}_log", "x": 90}}})
+        write_json(f"models/block/{wood}_leaves.json", {"parent": "block/leaves", "textures": {"all": f"block/{wood}_leaves"}})
+        write_json(f"blockstates/{wood}_leaves.json", {"variants": {"": {"model": f"minecraft:block/{wood}_leaves"}}})
     for name in ("stone", "dirt", "sand", "bedrock", "gravel", "cobblestone", "oak_planks", "glass", "glowstone"):
         write_json(f"models/block/{name}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{name}"}})
     write_json("models/block/oak_log.json", {"parent": "block/cube_column",
