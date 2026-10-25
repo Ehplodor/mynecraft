@@ -1,6 +1,7 @@
 package net.mynecraft.client;
 
 import net.mynecraft.resource.BlockAppearance;
+import net.mynecraft.resource.Colormap;
 import net.mynecraft.resource.PackSource;
 import net.mynecraft.resource.ResourceManager;
 import net.mynecraft.world.Blocks;
@@ -23,7 +24,6 @@ public final class Main {
     private static final int RENDER_RADIUS = 12; // chunks
     private static final double PHYSICS_STEP = 1 / 120.0;
     private static final double REACH = 5;
-    private static final float[] SKY = {0.55f, 0.75f, 0.95f};
 
     private static final long AUTOSAVE_NANOS = 30_000_000_000L;
 
@@ -58,7 +58,6 @@ public final class Main {
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
-        glClearColor(SKY[0], SKY[1], SKY[2], 1);
 
         ResourceManager resources = new ResourceManager().add(PackSource.classpath("defaultpack"));
         for (int i = 0; i < args.length - 1; i++) {
@@ -89,7 +88,9 @@ public final class Main {
                 + " block properties would be lost).");
         }
         World world = new World(storage.seed);
-        WorldRenderer renderer = new WorldRenderer(world, appearance.faceInfo, textures, RENDER_RADIUS + 1);
+        BiomeMap biomes = new BiomeMap(world.generator,
+            Colormap.load(resources, "grass", 0x91BD59), Colormap.load(resources, "foliage", 0x77AB2F));
+        WorldRenderer renderer = new WorldRenderer(world, appearance.faceInfo, textures, biomes, RENDER_RADIUS + 1);
         renderer.occlusion = !argv.contains("--no-occlusion");
         renderer.measureFrustum = screenshot != null;
         ChunkStreamer streamer = new ChunkStreamer(world, storage, RENDER_RADIUS,
@@ -119,6 +120,9 @@ public final class Main {
             player.z = Double.parseDouble(xyz[2]);
             player.flying = true;
         }
+        double ticks = Double.parseDouble(option(args, "--time", Long.toString(storage.dayTime)));
+        boolean timeFrozen = screenshot != null; // scripted shots must be reproducible
+        float[] sky = new float[3];
         long lastAutosave = System.nanoTime();
         if (screenshot != null) cam.pitch = -0.35f;
         String view = option(args, "--view", null); // "yawDegrees,pitchDegrees", for scripted screenshots
@@ -186,10 +190,15 @@ public final class Main {
 
             world.light.drainTouched(k -> renderer.sectionChanged(k, true));
 
+            if (!timeFrozen) ticks += dt * 20;
+            DayCycle.skyColor(ticks, sky);
+            renderer.daylight = DayCycle.daylight(ticks);
+            glClearColor(sky[0], sky[1], sky[2], 1);
+
             glfwGetFramebufferSize(window, fbW, fbH);
             glViewport(0, 0, fbW[0], fbH[0]);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            renderer.render(cam, fbW[0] / (float) Math.max(1, fbH[0]), far, SKY);
+            renderer.render(cam, fbW[0] / (float) Math.max(1, fbH[0]), far, sky);
             if (hit != null) {
                 overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y), (float) (hit.z() - cam.pos.z));
             }
@@ -216,7 +225,7 @@ public final class Main {
 
         try {
             streamer.saveAll();
-            storage.saveLevel(new double[] {player.x, player.y, player.z});
+            storage.saveLevel(new double[] {player.x, player.y, player.z}, (long) ticks % DayCycle.DAY_TICKS);
             storage.close();
         } catch (IOException | InterruptedException e) {
             System.err.println("[storage] save failed: " + e.getMessage());

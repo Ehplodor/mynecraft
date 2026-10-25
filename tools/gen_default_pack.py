@@ -90,6 +90,21 @@ def main():
         170 + r.randint(-50, 50)), 17))
     save("water_still", rgba(lambda x, y, r: (lambda v: (v, v, v, 180))(clamp(190 + r.randint(-20, 20))), 18))
 
+    # Biome colormaps (vanilla layout: x = 1 - temperature, y = 1 - downfall * temperature).
+    def colormap(name, hot_dry, cold, wet):
+        img = Image.new("RGB", (256, 256))
+        for y in range(256):
+            for x in range(256):
+                t = 1 - x / 255
+                d = 1 - y / 255
+                c = [cold[i] * (1 - t) + hot_dry[i] * t * (1 - d) + wet[i] * t * d for i in range(3)]
+                img.putpixel((x, y), tuple(clamp(int(v)) for v in c))
+        path = os.path.join(NS, "textures", "colormap", name + ".png")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        img.save(path)
+    colormap("grass", (190, 182, 72), (112, 172, 84), (62, 196, 40))
+    colormap("foliage", (170, 160, 40), (90, 150, 70), (30, 170, 10))
+
     with open(os.path.join(ROOT, "pack.mcmeta"), "w") as f:
         json.dump({"pack": {"pack_format": 34, "description": "Mynecraft default (original art)"}}, f, indent=2)
         f.write("\n")

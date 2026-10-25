@@ -91,8 +91,45 @@ class ChunkMesherTest {
         assertTrue(r.quads() > 6 + 5);
         int darkest = 3;
         int[] d = r.data();
-        for (int i = 1; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) darkest = Math.min(darkest, (d[i] >> 8) & 3);
+        for (int i = 1; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) darkest = Math.min(darkest, (d[i] >> 12) & 3);
         assertEquals(1, darkest, "floor corner touching the bump on one side + its diagonal");
+    }
+
+    @Test
+    void smoothLightAveragesAroundVertices() {
+        World w = emptyWorld();
+        Chunk c = put(w, 0, 0);
+        c.set(4, 4, 4, Blocks.STONE);
+        c.setLight(5, 4, 4, 0xFF); // sky 15 + block light 15 east of the stone; elsewhere sky only
+        int[] d = mesh(w, c).data();
+        int lit = 0;
+        for (int i = 1; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) {
+            int block = (d[i] >> 6) & 63;
+            if (block != 0) {
+                lit++;
+                // East face corners: the lit front cell + 3 dark samples = sum 15 (average 3.75).
+                assertEquals(15, block);
+            }
+            assertEquals(60, d[i] & 63, "full sky everywhere: 4 x 15");
+        }
+        assertEquals(4, lit);
+    }
+
+    @Test
+    void waterSurfaceIsLowered() {
+        World w = emptyWorld();
+        Chunk c = put(w, 0, 0);
+        c.set(3, 3, 3, Blocks.WATER);
+        c.set(3, 2, 3, Blocks.WATER);
+        int[] d = mesh(w, c).data();
+        int lowered = 0;
+        for (int i = 0; i < d.length; i += ChunkMesher.INTS_PER_VERTEX) {
+            if ((d[i] & (1 << 30)) != 0) {
+                lowered++;
+                assertEquals(4, (d[i] >> 5) & 31, "only vertices at the top of the column (y = 3 + 1)");
+            }
+        }
+        assertEquals(4 + 4 * 2, lowered, "top face + the top edge of 4 side faces");
     }
 
     @Test
@@ -108,12 +145,13 @@ class ChunkMesherTest {
                 assertTrue(((p >> 15) & 7) < 7);
                 int layer = (p >> 18) & 1023;
                 assertTrue(layer > 0 && layer < Blocks.COUNT);
-                assertEquals(0, p >>> 30);
+                assertEquals(0, p >>> 31);
                 int l = d[i + 1];
-                assertEquals(0, (l >> 10) & 63, "section x mod 64");
-                assertEquals(0, (l >> 16) & 63, "section z mod 64");
-                assertEquals(sy, (l >> 22) & 31, "section y");
-                assertEquals(0, l >>> 27);
+                assertTrue((l & 63) <= 60 && ((l >> 6) & 63) <= 60, "smooth light sums");
+                assertEquals(0, (l >> 14) & 63, "section x mod 64");
+                assertEquals(0, (l >> 20) & 63, "section z mod 64");
+                assertEquals(sy, (l >> 26) & 31, "section y");
+                assertEquals(0, l >>> 31);
             }
         }
     }

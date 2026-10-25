@@ -8,7 +8,7 @@ public final class Blocks {
     public static final byte AIR = 0, STONE = 1, DIRT = 2, GRASS = 3, SAND = 4, BEDROCK = 5, WATER = 6,
         OAK_LOG = 7, OAK_LEAVES = 8, OAK_PLANKS = 9, COBBLESTONE = 10, GLASS = 11, SHORT_GRASS = 12,
         POPPY = 13, GLOWSTONE = 14, GRAVEL = 15;
-    public static final int COUNT = 16;
+    public static final int COUNT = 16; // must stay below 128: the mesher uses bit 7 of the id as a flag
 
     /** Resource names (namespace minecraft), used for resource packs and saves. */
     public static final String[] NAMES = {"air", "stone", "dirt", "grass_block", "sand", "bedrock", "water",

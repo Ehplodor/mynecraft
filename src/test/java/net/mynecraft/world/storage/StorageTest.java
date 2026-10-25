@@ -129,12 +129,13 @@ class StorageTest {
         assertTrue(s.enqueueSave(edited));
         assertFalse(s.enqueueSave(untouched));
         s.flush(edited);
-        s.saveLevel(new double[] {1.5, 70, -2.5});
+        s.saveLevel(new double[] {1.5, 70, -2.5}, 18000);
         s.close();
 
         WorldStorage s2 = WorldStorage.open(dir.resolve("w"), 0, false);
         assertEquals(42, s2.seed);
         assertArrayEquals(new double[] {1.5, 70, -2.5}, s2.playerPos);
+        assertEquals(18000, s2.dayTime);
         Chunk back = s2.load(40, -3);
         assertNotNull(back);
         assertSameBlocks(edited, back);
@@ -161,7 +162,7 @@ class StorageTest {
         Chunk c = w.getOrGenerate(0, 0);
         c.markDirty();
         assertFalse(s.enqueueSave(c));
-        s.saveLevel(new double[] {0, 0, 0});
+        s.saveLevel(new double[] {0, 0, 0}, 0);
         assertArrayEquals(before, Files.readAllBytes(dir.resolve("level.dat")));
         assertFalse(Files.exists(dir.resolve("region")));
     }

@@ -2,12 +2,27 @@ package net.mynecraft.world;
 
 public final class TerrainGenerator {
     public static final int SEA_LEVEL = 63;
-    private final Noise noise;
+    private final Noise noise, temperatureNoise, downfallNoise;
     private final long seed;
 
     public TerrainGenerator(long seed) {
         this.noise = new Noise(seed);
+        this.temperatureNoise = new Noise(seed ^ 0x5DEECE66DL);
+        this.downfallNoise = new Noise(seed * 31 + 17);
         this.seed = seed;
+    }
+
+    /** Climate in [0, 1], smooth over hundreds of blocks; drives grass and foliage colours. */
+    public float temperature(int wx, int wz) {
+        return clamp01(0.5f + temperatureNoise.fbm(wx / 600f, wz / 600f, 3) * 1.1f);
+    }
+
+    public float downfall(int wx, int wz) {
+        return clamp01(0.5f + downfallNoise.fbm(wx / 500f, wz / 500f, 3) * 1.1f);
+    }
+
+    private static float clamp01(float v) {
+        return Math.max(0, Math.min(1, v));
     }
 
     public int height(int wx, int wz) {

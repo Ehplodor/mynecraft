@@ -9,11 +9,12 @@ import java.util.Arrays;
  * <p>Each vertex is two ints (8 bytes):
  * <ol>
  *   <li>x,y,z (5 bits each, 0..16) | face (3 bits: 0-5 cube faces, 6 cross plane) | texture layer
- *       (10 bits) | tint type (2 bits). UVs are derived from position in the shader, so merged quads
- *       tile their texture.</li>
- *   <li>light (sky &lt;&lt; 4 | block) | ambient occlusion level 0..3 &lt;&lt; 8 | section x mod 64 &lt;&lt; 10
- *       | section z mod 64 &lt;&lt; 16 | section y &lt;&lt; 22. The section position lets every section share one
- *       buffer and one draw call: the shader rebuilds camera-relative positions from it.</li>
+ *       (10 bits) | tint type (2 bits) | lowered (1 bit: water surface, 2/16 below the block top).
+ *       UVs are derived from position in the shader, so merged quads tile their texture.</li>
+ *   <li>smooth sky light (6 bits) | smooth block light (6 bits) | ambient occlusion 0..3 &lt;&lt; 12
+ *       | section x mod 64 &lt;&lt; 14 | section z mod 64 &lt;&lt; 20 | section index &lt;&lt; 26. Smooth light is
+ *       the exact sum of the 4 cells around the vertex (0..60). The section position lets every section
+ *       share one buffer and one draw call: the shader rebuilds camera-relative positions from it.</li>
  * </ol>
  * Quads are 4 consecutive vertices drawn with a shared index buffer (0,1,2, 2,3,0), grouped by
  * render layer: opaque, then cutout, then translucent.
@@ -44,7 +45,9 @@ public final class ChunkMesher {
     private final int[] faceInfo;
     private final byte[] padded = new byte[P * P * P];
     private final byte[] paddedLight = new byte[P * P * P];
-    private final int[] mask = new int[Section.SIZE * Section.SIZE];
+    private final long[] mask = new long[Section.SIZE * Section.SIZE];
+    private static final int LOWERED_FLAG = 1 << 30;
+    private static final int WATER_SURFACE = 0x80; // key bit on the block field (ids stay below 128)
     private final int[][] out = {new int[4096], new int[1024], new int[1024]};
     private final int[] count = new int[3];
     private final SectionVisibility visibility = new SectionVisibility();
@@ -86,7 +89,7 @@ public final class ChunkMesher {
         System.arraycopy(out[0], 0, data, 0, count[0]);
         System.arraycopy(out[1], 0, data, count[0], count[1]);
         System.arraycopy(out[2], 0, data, count[0] + count[1], count[2]);
-        int sectionBits = (chunk.cx & 63) << 10 | (chunk.cz & 63) << 16 | sy << 22;
+        int sectionBits = (chunk.cx & 63) << 14 | (chunk.cz & 63) << 20 | sy << 26;
         for (int i = 1; i < total; i += INTS_PER_VERTEX) data[i] |= sectionBits;
         return new Result(data, count[0] / INTS_PER_QUAD, count[1] / INTS_PER_QUAD, count[2] / INTS_PER_QUAD, vis);
     }
@@ -151,11 +154,27 @@ public final class ChunkMesher {
         return 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (occludes(front + du + dv) ? 1 : 0));
     }
 
+    /**
+     * Smooth light at one corner: sum of the 4 cells around the vertex in front of the face, with
+     * occluding cells (and a corner hidden by both sides) replaced by the front cell. Returns
+     * skySum | blockSum &lt;&lt; 6, each 0..60.
+     */
+    private int smoothLight(int front, int du, int dv) {
+        int lf = paddedLight[front] & 0xFF;
+        boolean s1 = occludes(front + du), s2 = occludes(front + dv);
+        int l1 = s1 ? lf : paddedLight[front + du] & 0xFF;
+        int l2 = s2 ? lf : paddedLight[front + dv] & 0xFF;
+        int lc = (s1 && s2) || occludes(front + du + dv) ? lf : paddedLight[front + du + dv] & 0xFF;
+        int sky = (lf >> 4) + (l1 >> 4) + (l2 >> 4) + (lc >> 4);
+        int block = (lf & 15) + (l1 & 15) + (l2 & 15) + (lc & 15);
+        return sky | block << 6;
+    }
+
     private void meshAxis(int d, boolean positive) {
         int u = (d + 1) % 3, v = (d + 2) % 3;
         int face = d * 2 + (positive ? 1 : 0);
         int step = positive ? STRIDE[d] : -STRIDE[d];
-        int su = STRIDE[u], sv = STRIDE[v];
+        int su = STRIDE[u], sv = STRIDE[v], up = STRIDE[1];
         int[] pos = new int[3];
 
         for (int slice = 0; slice < Section.SIZE; slice++) {
@@ -166,12 +185,16 @@ public final class ChunkMesher {
                     pos[u] = i;
                     int idx = pIndex(pos[0], pos[1], pos[2]);
                     byte b = padded[idx];
-                    int key = 0;
+                    long key = 0;
                     if (Blocks.SHAPE[b & 0xFF] == Blocks.SHAPE_CUBE && Blocks.faceVisible(b, padded[idx + step])) {
                         int f = idx + step;
-                        // AO corners in quad order (u0,v0), (u1,v0), (u1,v1), (u0,v1).
-                        int ao = ao(f, -su, -sv) | ao(f, su, -sv) << 2 | ao(f, su, sv) << 4 | ao(f, -su, sv) << 6;
-                        key = (b & 0xFF) | (paddedLight[f] & 0xFF) << 8 | ao << 16 | 1 << 24;
+                        // Corners in quad order (u0,v0), (u1,v0), (u1,v1), (u0,v1).
+                        long ao = ao(f, -su, -sv) | ao(f, su, -sv) << 2 | ao(f, su, sv) << 4 | ao(f, -su, sv) << 6;
+                        long light = (long) smoothLight(f, -su, -sv) | (long) smoothLight(f, su, -sv) << 12
+                            | (long) smoothLight(f, su, sv) << 24 | (long) smoothLight(f, -su, sv) << 36;
+                        int blockField = b & 0xFF;
+                        if (b == Blocks.WATER && padded[idx + up] != Blocks.WATER) blockField |= WATER_SURFACE;
+                        key = blockField | ao << 8 | light << 16;
                     }
                     mask[j * Section.SIZE + i] = key;
                 }
@@ -179,7 +202,7 @@ public final class ChunkMesher {
             int plane = slice + (positive ? 1 : 0);
             for (int j = 0; j < Section.SIZE; j++) {
                 for (int i = 0; i < Section.SIZE; ) {
-                    int key = mask[j * Section.SIZE + i];
+                    long key = mask[j * Section.SIZE + i];
                     if (key == 0) { i++; continue; }
                     int w = 1;
                     while (i + w < Section.SIZE && mask[j * Section.SIZE + i + w] == key) w++;
@@ -191,7 +214,7 @@ public final class ChunkMesher {
                         h++;
                     }
                     for (int jj = 0; jj < h; jj++) {
-                        Arrays.fill(mask, (j + jj) * Section.SIZE + i, (j + jj) * Section.SIZE + i + w, 0);
+                        Arrays.fill(mask, (j + jj) * Section.SIZE + i, (j + jj) * Section.SIZE + i + w, 0L);
                     }
                     emitQuad(d, u, v, plane, i, j, w, h, face, key, positive);
                     i += w;
@@ -206,28 +229,51 @@ public final class ChunkMesher {
     }
 
     private void emitQuad(int d, int u, int v, int plane, int i, int j, int w, int h,
-                          int face, int key, boolean positive) {
-        int block = key & 0xFF, light = (key >> 8) & 0xFF;
-        int a0 = (key >> 16) & 3, a1 = (key >> 18) & 3, a2 = (key >> 20) & 3, a3 = (key >> 22) & 3;
+                          int face, long key, boolean positive) {
+        int blockField = (int) (key & 0xFF), block = blockField & 0x7F;
+        int a0 = (int) (key >> 8) & 3, a1 = (int) (key >> 10) & 3, a2 = (int) (key >> 12) & 3, a3 = (int) (key >> 14) & 3;
+        int l0 = (int) (key >> 16) & 0xFFF, l1 = (int) (key >> 28) & 0xFFF, l2 = (int) (key >> 40) & 0xFFF, l3 = (int) (key >>> 52);
         int layer = Blocks.LAYER[block];
         int[] o = reserve(layer);
         int tail = (face << 15) | (faceInfo[block * 6 + face] << 18);
         int sd = d * 5, su = u * 5, sv = v * 5;
         int base = (plane << sd) | tail;
+        // Water surface: lower the top face entirely, and the top edge of side faces (y is u or v).
+        int low0 = 0, low1 = 0, low2 = 0, low3 = 0;
+        if ((blockField & WATER_SURFACE) != 0) {
+            if (face == 3) low0 = low1 = low2 = low3 = LOWERED_FLAG;
+            else if (u == 1) low1 = low2 = LOWERED_FLAG;          // corners with u1 are on top
+            else if (v == 1) low2 = low3 = LOWERED_FLAG;          // corners with v1 are on top
+        }
         int u0 = i << su, u1 = (i + w) << su, v0 = j << sv, v1 = (j + h) << sv;
-        // Corners CCW seen from the +d side (reversed for -d), each with its AO value.
-        int[] p = positive
-            ? new int[] {base | u0 | v0, a0, base | u1 | v0, a1, base | u1 | v1, a2, base | u0 | v1, a3}
-            : new int[] {base | u0 | v0, a0, base | u0 | v1, a3, base | u1 | v1, a2, base | u1 | v0, a1};
-        // Split along the diagonal through the darker corners, otherwise AO looks anisotropic.
-        int start = p[1] + p[5] > p[3] + p[7] ? 1 : 0;
+        int p0 = base | u0 | v0 | low0, p1 = base | u1 | v0 | low1, p2 = base | u1 | v1 | low2, p3 = base | u0 | v1 | low3;
+        int x0 = l0 | a0 << 12, x1 = l1 | a1 << 12, x2 = l2 | a2 << 12, x3 = l3 | a3 << 12;
+        // Brightness per corner decides the split diagonal, otherwise light and AO look anisotropic.
+        int b0 = score(a0, l0), b1 = score(a1, l1), b2 = score(a2, l2), b3 = score(a3, l3);
         int c = count[layer];
-        for (int k = 0; k < 4; k++) {
-            int s = ((start + k) & 3) * 2;
-            o[c++] = p[s];
-            o[c++] = light | p[s + 1] << 8;
+        if (positive) {
+            c = quad(o, c, b0 + b2 > b1 + b3, p0, x0, p1, x1, p2, x2, p3, x3);
+        } else {
+            c = quad(o, c, b0 + b2 > b1 + b3, p0, x0, p3, x3, p2, x2, p1, x1);
         }
         count[layer] = c;
+    }
+
+    private static int score(int ao, int light) {
+        return ao * 64 + Math.max(light & 63, light >> 6);
+    }
+
+    /**
+     * Writes 4 vertices in winding order; when {@code rotate} the list starts at the second vertex,
+     * which moves the shared-index diagonal from 0-2 to 1-3 without changing the winding.
+     */
+    private static int quad(int[] o, int c, boolean rotate, int pa, int la, int pb, int lb, int pc, int lc, int pd, int ld) {
+        if (rotate) {
+            o[c++] = pb; o[c++] = lb; o[c++] = pc; o[c++] = lc; o[c++] = pd; o[c++] = ld; o[c++] = pa; o[c++] = la;
+        } else {
+            o[c++] = pa; o[c++] = la; o[c++] = pb; o[c++] = lb; o[c++] = pc; o[c++] = lc; o[c++] = pd; o[c++] = ld;
+        }
+        return c;
     }
 
     /** Plants: two diagonal planes, each drawn from both sides, lit by their own cell, no AO. */
@@ -238,7 +284,8 @@ public final class ChunkMesher {
                     int idx = pIndex(x, y, z);
                     byte b = padded[idx];
                     if (Blocks.SHAPE[b & 0xFF] != Blocks.SHAPE_CROSS) continue;
-                    int light = (paddedLight[idx] & 0xFF) | 3 << 8;
+                    int l = paddedLight[idx] & 0xFF;
+                    int light = (l >> 4) * 4 | (l & 15) * 4 << 6 | 3 << 12;
                     int tail = (CROSS_FACE << 15) | (faceInfo[(b & 0xFF) * 6 + 4] << 18);
                     int x1 = x + 1, y1 = y + 1, z1 = z + 1;
                     crossQuad(Blocks.LAYER[b], tail, light, x, y, z, x1, z1, y1);

@@ -60,7 +60,7 @@ final class WorldRenderer {
     /** One chunk shader variant and its uniform locations. */
     private static final class Program {
         final Shader shader;
-        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd;
+        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd, uDaylight;
         Program(String defines) {
             shader = new Shader("/shaders/chunk.vert", "/shaders/chunk.frag", defines);
             uViewProj = shader.uniform("uViewProj");
@@ -68,9 +68,11 @@ final class WorldRenderer {
             uCamOffset = shader.uniform("uCamOffset");
             uFogColor = shader.uniform("uFogColor");
             uFogEnd = shader.uniform("uFogEnd");
+            uDaylight = shader.uniform("uDaylight");
             glUseProgram(shader.program);
             glUniform1i(shader.uniform("uTextures"), 0);
-            // Tint colours by type: none, grass, foliage, water (fixed until biomes exist).
+            glUniform1i(shader.uniform("uBiome"), 1);
+            // Tint colours by type: none, grass, foliage, water. Grass and foliage come from the biome map.
             glUniform3fv(shader.uniform("uTints"), new float[] {
                 1, 1, 1, 0.57f, 0.74f, 0.35f, 0.47f, 0.70f, 0.27f, 0.25f, 0.46f, 0.89f});
         }
@@ -110,8 +112,11 @@ final class WorldRenderer {
     private final AtomicInteger pendingJobs = new AtomicInteger();
     int drawnSections, totalQuads;
 
-    WorldRenderer(World world, int[] faceInfo, TextureArray textures, int cullRadius) {
+    private final BiomeMap biomes;
+
+    WorldRenderer(World world, int[] faceInfo, TextureArray textures, BiomeMap biomes, int cullRadius) {
         this.world = world;
+        this.biomes = biomes;
         this.culler = new OcclusionCuller(cullRadius);
         this.textures = textures;
         this.meshers = ThreadLocal.withInitial(() -> new ChunkMesher(faceInfo));
@@ -175,6 +180,7 @@ final class WorldRenderer {
     /** Schedules all sections of a chunk that just became visible (bulk priority). */
     void chunkVisible(int cx, int cz) {
         visibleChunks.add(World.key(cx, cz));
+        biomes.chunkVisible(cx, cz);
         long[] seqs = new long[Chunk.SECTIONS];
         for (int sy = 0; sy < Chunk.SECTIONS; sy++) seqs[sy] = request(World.sectionKey(cx, sy, cz));
         pendingJobs.incrementAndGet();
@@ -287,6 +293,9 @@ final class WorldRenderer {
         return viewProj;
     }
 
+    /** Sky light multiplier, see {@link DayCycle}. */
+    float daylight = 1;
+
     void render(Camera cam, float aspect, float far, float[] fog) {
         drainUploads(4_000_000L);
         cam.viewProj(viewProj, aspect, far);
@@ -294,6 +303,9 @@ final class WorldRenderer {
         viewProj.get(matrixBuf);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, textures.id);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, biomes.id);
+        glActiveTexture(GL_TEXTURE0);
 
         double px = cam.pos.x, py = cam.pos.y, pz = cam.pos.z;
         int camCx = (int) Math.floor(px) >> 4, camCz = (int) Math.floor(pz) >> 4;
@@ -377,6 +389,7 @@ final class WorldRenderer {
         glUniform3f(p.uCamOffset, offX, offY, offZ);
         glUniform3f(p.uFogColor, fog[0], fog[1], fog[2]);
         glUniform1f(p.uFogEnd, far);
+        glUniform1f(p.uDaylight, daylight);
         glMultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts, GL_UNSIGNED_INT, drawOffsets, drawBase);
     }
 
@@ -401,6 +414,7 @@ final class WorldRenderer {
         glDeleteVertexArrays(vao);
         glDeleteBuffers(ebo);
         glDeleteTextures(textures.id);
+        biomes.dispose();
         for (Program p : new Program[] {opaqueProgram, cutoutProgram, translucentProgram}) glDeleteProgram(p.shader.program);
     }
 }

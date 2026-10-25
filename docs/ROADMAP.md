@@ -64,9 +64,20 @@
 - Reste à faire : mesurer le temps GPU/CPU par image sur une vraie carte (requêtes timer GL),
   lumière de jointure sur un thread dédié
 
-## M6 — Proposé
-- Cycle jour/nuit, lumière lisse, couleurs de biome, surface de l'eau abaissée
-- Hauteur de monde -64..319 (compatibilité totale des mondes 1.18+)
+## ✅ M6 — Monde complet et rendu vivant
+- Hauteur -64..319 (24 sections), sections Anvil Y -4..19 lues et écrites directement
+- Sections enfouies (opaques et entourées d'opaques) sautées sans maillage ; bordure du maillage lue via
+  les 3×3 chunks voisins (plus de recherche par case) : 0,25 → 0,09 ms/section en moyenne
+- Lumière lisse : somme exacte des 4 cellules autour du sommet (6+6 bits), cellules opaques remplacées
+  comme en vanilla ; clé de fusion 64 bits (bloc, AO, 4 lumières de coin) ; diagonale choisie sur lumière + AO
+- Cycle jour/nuit (24 000 ticks, `DayTime` dans `level.dat`), ciel et brouillard suivent, lumière du ciel
+  modulée dans le shader (aucun remaillage)
+- Couleurs de biome : température/humidité par bruit, colormaps du pack (`colormap/grass.png`,
+  `foliage.png`), carte GPU 512×512 circulaire échantillonnée en linéaire (mélange gratuit entre colonnes)
+- Surface de l'eau abaissée de 2/16 (1 bit du sommet)
+- Coût mesuré : +11 % de quads par section (la lumière lisse limite un peu la fusion)
+- Reste à faire : overlay teinté du côté des blocs d'herbe, biomes lus depuis les sauvegardes vanilla,
+  soleil/lune/nuages
 
 ## Pistes d'optimisation continues
 - Multi-draw indirect (`glMultiDrawElementsIndirect`) + un seul gros VBO → 1 draw call
