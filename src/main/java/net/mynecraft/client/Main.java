@@ -113,6 +113,7 @@ public final class Main {
 
         boolean editDemo = argv.contains("--edit-demo");
         Overlay overlay = new Overlay();
+        Hud hud = new Hud(appearance.faceInfo);
         SkyRenderer skyRenderer = new SkyRenderer(resources);
         org.joml.Matrix4f skyViewProj = new org.joml.Matrix4f();
         Camera cam = new Camera();
@@ -245,6 +246,7 @@ public final class Main {
                     (float) (hit.z() - cam.pos.z), lo, hi);
             }
             overlay.crosshair(fbW[0], fbH[0]);
+            hud.draw(fbW[0], fbH[0], input.hotbar, input.slot, textures.id);
             if (stats != null) {
                 stats.endGpu();
                 if (frames > 0 || now - fpsTimer > 0) stats.cpuFrame(frameNanos);
@@ -288,6 +290,7 @@ public final class Main {
         }
         streamer.close();
         overlay.dispose();
+        hud.dispose();
         skyRenderer.dispose();
         renderer.dispose();
         glfwDestroyWindow(window);

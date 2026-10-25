@@ -13,7 +13,8 @@ Voir l'[étude de faisabilité](docs/ETUDE_FAISABILITE.md) et la [feuille de rou
 gradle run                                   # jeu
 gradle run --args="--no-vsync"               # FPS non plafonnés (affichés dans le titre)
 gradle run --args="--screenshot shot.png"    # rend une image, affiche des stats, quitte
-                                             #   (--view lacet,tangage en degrés, --pos x,y,z, --time ticks, --no-occlusion)
+                                             #   (--view lacet,tangage en degrés, --pos x,y,z, --time ticks,
+                                             #    --no-occlusion, --fullbright)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
 gradle run --args="--benchmark 20"           # vol scripté 20 s : FPS, percentiles, temps GPU, mémoire
@@ -22,13 +23,13 @@ gradle test                                  # tests + micro-benchmark générat
 
 Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
-`1`–`9` ou molette choisir le bloc (les dalles et bûches s'orientent selon la face visée), `Échap` quitter.
+`1`–`9` choisir l'emplacement de la barre, molette changer son bloc (dalles et bûches s'orientent selon la face visée), `Échap` quitter.
 
 ## Architecture
 | Fichier | Rôle |
 |---|---|
 | `world/Section`, `Chunk`, `World` | Stockage : 1 octet/bloc, sections 16³ vides = `null` |
-| `world/TerrainGenerator`, `Noise` | Génération par bruit fBm, déterministe par seed |
+| `world/TerrainGenerator`, `Noise` | Relief fBm + chaînes de montagnes, grottes (bruit 3D interpolé), filons, arbres ; déterministe par seed |
 | `world/Player`, `Raycast` | Physique AABB par balayage d'axe sur les vraies boîtes (dalles), montée de marche 0,6, raycast DDA |
 | `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |
 | `world/storage/*` | NBT, fichiers région Anvil `.mca`, codec de chunk 1.16+/1.18+, `level.dat` |
@@ -44,6 +45,7 @@ Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches)
 | `client/WorldRenderer` | Un seul VBO pour tout le monde, **1 appel de dessin par passe** (`glMultiDrawElementsBaseVertex`), 3 passes triées, remaillage incrémental versionné |
 | `client/SkyRenderer` | Soleil, phases de lune, nuages (textures `environment/` du pack) |
 | `client/DayCycle`, `BiomeMap` | Cycle jour/nuit (`DayTime` vanilla), couleurs de biome depuis les colormaps du pack |
+| `client/Hud` | Barre d'objets : 9 emplacements, icônes isométriques tirées du texture array |
 | `client/Overlay` | Réticule et contour du bloc visé |
 
 ## Resource packs

@@ -7,14 +7,14 @@ import static org.lwjgl.glfw.GLFW.*;
 
 /**
  * Keyboard/mouse controls. Movement keys use physical positions (WASD on QWERTY = ZQSD on AZERTY).
- * Space jump (fly: up), Shift fly down, Ctrl sprint, F toggle flying, 1-9 pick block, mouse wheel
- * cycles through every placeable block,
+ * Space jump (fly: up), Shift fly down, Ctrl sprint, F toggle flying, 1-9 pick a hotbar slot, mouse
+ * wheel changes the block in the current slot (cycling through every placeable block),
  * left click break, right click place, Esc quit.
  */
 final class Input {
     private static final float SENSITIVITY = 0.0025f;
     private static final double CLICK_REPEAT = 0.25;
-    private static final byte[] HOTBAR = {Blocks.STONE, Blocks.OAK_SLAB, Blocks.GRASS, Blocks.OAK_PLANKS,
+    private static final byte[] DEFAULT_HOTBAR = {Blocks.STONE, Blocks.OAK_SLAB, Blocks.GRASS, Blocks.OAK_PLANKS,
         Blocks.COBBLESTONE, Blocks.GLASS, Blocks.OAK_LOG, Blocks.OAK_LEAVES, Blocks.GLOWSTONE};
 
     private final long window;
@@ -26,9 +26,11 @@ final class Input {
     /** Default state of every block name except air and fluids, in registry order. */
     private static final byte[] PLACEABLE = placeable();
     private double scroll;
-    private int wheelIndex;
 
-    byte selected = HOTBAR[0];
+    /** Hotbar contents (editable with the wheel) and the selected slot. */
+    final byte[] hotbar = DEFAULT_HOTBAR.clone();
+    int slot;
+    byte selected = hotbar[0];
     boolean breakRequested, placeRequested;
 
     Input(long window) {
@@ -77,12 +79,14 @@ final class Input {
         }
         flyKeyWasDown = fly;
 
-        for (int i = 0; i < HOTBAR.length; i++) if (down(GLFW_KEY_1 + i)) selected = HOTBAR[i];
+        for (int i = 0; i < hotbar.length; i++) if (down(GLFW_KEY_1 + i)) slot = i;
         if (scroll != 0) {
-            wheelIndex = Math.floorMod(wheelIndex - (int) Math.signum(scroll), PLACEABLE.length);
-            selected = PLACEABLE[wheelIndex];
+            int current = 0;
+            for (int i = 0; i < PLACEABLE.length; i++) if (PLACEABLE[i] == hotbar[slot]) current = i;
+            hotbar[slot] = PLACEABLE[Math.floorMod(current - (int) Math.signum(scroll), PLACEABLE.length)];
             scroll = 0;
         }
+        selected = hotbar[slot];
 
         breakCooldown = mouse(GLFW_MOUSE_BUTTON_LEFT) ? breakCooldown - dt : 0;
         placeCooldown = mouse(GLFW_MOUSE_BUTTON_RIGHT) ? placeCooldown - dt : 0;

@@ -104,7 +104,21 @@
   34 Mio pour 780 chunks, tampon GPU 10 Mio
 - Décision : pas de compression par palette des blocs pour l'instant (≈ 20 Mio gagnés au prix des
   chemins les plus chauds : maillage, lumière)
-- Reste à faire : grottes (pour voir les minerais), couleurs fixes des feuilles de bouleau et d'épicéa
+- Reste à faire : couleurs fixes des feuilles de bouleau et d'épicéa
+
+## ✅ M9 — Grottes, montagnes, barre d'objets
+- Grottes : tunnels « spaghetti » (deux champs de bruit 3D proches de zéro) et cavernes profondes
+  « cheese » ; bruit échantillonné sur une grille 4×8×4 puis interpolé (x/z une fois par colonne,
+  y par bloc, 2ᵉ champ évalué seulement près du 1er) ; ~3,5 % du sous-sol creusé ; pas de creusement
+  sous l'eau (pas encore d'écoulement des fluides)
+- Passe verticale de lumière qui saute les sections vides en plein soleil ; profilage JFR :
+  génération + lumière 0,71 → 0,49 ms/chunk à monde égal
+- Montagnes : masque très basse fréquence + bruit « ridged », sommets ~200, roche nue au-dessus de 135
+- Barre d'objets à l'écran (icônes isométriques, dalles en demi-hauteur), molette = bloc de l'emplacement
+- Option de débogage `--fullbright`
+- Coût mesuré des grottes : ~160 quads/section (vs ~52), ~0,9 à 1,1 M quads chargés, tampon GPU
+  ~30 Mio ; sous terre, l'occlusion ne dessine que ~1 % des sections du champ de vision
+- Reste à faire : eau et lave dans les grottes (écoulement), texte à l'écran (nom du bloc, F3)
 
 ## Pistes d'optimisation continues
 - Multi-draw indirect (`glMultiDrawElementsIndirect`) + un seul gros VBO → 1 draw call
