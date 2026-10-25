@@ -16,7 +16,8 @@ gradle run --args="--screenshot shot.png"    # rend une image, affiche des stats
                                              #   (--view lacet,tangage en degrés, --pos x,y,z, --time ticks, --no-occlusion)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
-gradle test                                  # tests + micro-benchmark génération/maillage
+gradle run --args="--benchmark 20"           # vol scripté 20 s : FPS, percentiles, temps GPU, mémoire
+gradle test                                  # tests + micro-benchmark génération/lumière/maillage
 ```
 
 Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,

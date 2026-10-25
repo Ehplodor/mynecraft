@@ -27,6 +27,7 @@ public final class Main {
     private static final double REACH = 5;
 
     private static final long AUTOSAVE_NANOS = 30_000_000_000L;
+    private static final double BENCH_SPEED = 20; // blocks per second, about elytra cruising
 
     private static String option(String[] args, String name, String def) {
         for (int i = 0; i < args.length - 1; i++) if (args[i].equals(name)) return args[i + 1];
@@ -48,7 +49,7 @@ public final class Main {
 
     public static void main(String[] args) {
         java.util.List<String> argv = java.util.Arrays.asList(args);
-        boolean vsync = !argv.contains("--no-vsync");
+        boolean vsync = !argv.contains("--no-vsync") && !argv.contains("--benchmark");
         int shotIdx = argv.indexOf("--screenshot");
         String screenshot = shotIdx >= 0 && shotIdx + 1 < args.length ? args[shotIdx + 1] : null;
         GLFWErrorCallback.createPrint(System.err).set();
@@ -135,6 +136,17 @@ public final class Main {
         double ticks = Double.parseDouble(option(args, "--time", Long.toString(storage.dayTime)));
         boolean timeFrozen = screenshot != null; // scripted shots must be reproducible
         float[] sky = new float[3];
+        // Benchmark: fly east at a fixed speed and height through fresh terrain, then report timings.
+        double benchSeconds = Double.parseDouble(option(args, "--benchmark", "0"));
+        FrameStats stats = benchSeconds > 0 ? new FrameStats() : null;
+        if (stats != null) {
+            player.flying = true;
+            player.y = world.generator.height((int) player.x, (int) player.z) + 30;
+            cam.yaw = (float) Math.toRadians(-90);
+            cam.pitch = (float) Math.toRadians(-15);
+            timeFrozen = true;
+        }
+        long benchStart = System.nanoTime();
         long lastAutosave = System.nanoTime();
         if (screenshot != null) cam.pitch = -0.35f;
         String view = option(args, "--view", null); // "yawDegrees,pitchDegrees", for scripted screenshots
@@ -153,7 +165,8 @@ public final class Main {
 
         while (!glfwWindowShouldClose(window)) {
             long now = System.nanoTime();
-            double dt = Math.min(0.25, (now - last) / 1e9);
+            long frameNanos = now - last;
+            double dt = Math.min(0.25, frameNanos / 1e9);
             last = now;
 
             glfwPollEvents();
@@ -163,11 +176,12 @@ public final class Main {
                 streamer.autosave();
                 lastAutosave = now;
             }
-            input.frame(cam, player, dt);
+            if (stats == null) input.frame(cam, player, dt);
             // Fixed physics step: frame-rate independent and stable collisions.
             accumulator += dt;
             while (accumulator >= PHYSICS_STEP) {
-                input.move(cam, player);
+                if (stats == null) input.move(cam, player);
+                else { player.vx = BENCH_SPEED; player.vz = 0; player.vy = 0; }
                 player.step(world, PHYSICS_STEP);
                 accumulator -= PHYSICS_STEP;
             }
@@ -214,6 +228,7 @@ public final class Main {
             glClearColor(sky[0], sky[1], sky[2], 1);
 
             glfwGetFramebufferSize(window, fbW, fbH);
+            if (stats != null) stats.beginGpu();
             glViewport(0, 0, fbW[0], fbH[0]);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             float aspect = fbW[0] / (float) Math.max(1, fbH[0]);
@@ -225,6 +240,17 @@ public final class Main {
                 overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y), (float) (hit.z() - cam.pos.z));
             }
             overlay.crosshair(fbW[0], fbH[0]);
+            if (stats != null) {
+                stats.endGpu();
+                if (frames > 0 || now - fpsTimer > 0) stats.cpuFrame(frameNanos);
+                double elapsed = (System.nanoTime() - benchStart) / 1e9;
+                if (elapsed >= benchSeconds) {
+                    System.out.println(stats.report(elapsed) + String.format(" | cull+sort %.3f ms | sections drawn %d/%d meshed | %d quads",
+                        renderer.cullNanos / 1e6 / Math.max(1, renderer.cullFrames),
+                        renderer.drawnSections, renderer.meshCount(), renderer.totalQuads));
+                    glfwSetWindowShouldClose(window, true);
+                }
+            }
             if (screenshot != null && streamer.settled() && renderer.idle()) {
                 Screenshot.save(screenshot, fbW[0], fbH[0]);
                 long[] buf = renderer.bufferUsage();

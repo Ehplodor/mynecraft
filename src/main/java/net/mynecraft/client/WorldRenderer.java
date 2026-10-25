@@ -82,12 +82,20 @@ final class WorldRenderer {
     private final Program opaqueProgram, cutoutProgram, translucentProgram;
     private final int ebo;
     private final HashMap<Long, Mesh> meshes = new HashMap<>();
-    /** Face connectivity of every meshed section, including ones that produced no quads. */
-    private final HashMap<Long, Integer> visibility = new HashMap<>();
     private final QuadAllocator allocator = new QuadAllocator(INITIAL_QUADS);
     private final int vao;
     private int vbo;
     private final OcclusionCuller culler;
+    /**
+     * Direct-indexed view of visible chunks for the per-frame walk: column slot = (cx mod 64, cz mod 64),
+     * which never collides while the render radius stays below 32. Avoids hashing and boxing on the
+     * ~17k section lookups of a frame.
+     */
+    private static final int GRID = 64;
+    private final long[] gridOwner = new long[GRID * GRID];          // chunk key of the slot, or EMPTY
+    private final int[] gridVisibility = new int[GRID * GRID * Chunk.SECTIONS];
+    private final Mesh[] gridMesh = new Mesh[GRID * GRID * Chunk.SECTIONS];
+    private static final long EMPTY = Long.MIN_VALUE;
     boolean occlusion = true;
     int frustumSections = -1; // sections passing the frustum alone (stats), -1 when not measured
     boolean measureFrustum;
@@ -111,11 +119,13 @@ final class WorldRenderer {
 
     private final AtomicInteger pendingJobs = new AtomicInteger();
     int drawnSections, totalQuads;
+    long cullNanos, cullFrames; // CPU time spent selecting and sorting sections (benchmark stats)
 
     private final BiomeMap biomes;
 
     WorldRenderer(World world, int[] faceInfo, TextureArray textures, BiomeMap biomes, int cullRadius) {
         this.world = world;
+        Arrays.fill(gridOwner, EMPTY);
         this.biomes = biomes;
         this.culler = new OcclusionCuller(cullRadius);
         this.textures = textures;
@@ -178,8 +188,16 @@ final class WorldRenderer {
     }
 
     /** Schedules all sections of a chunk that just became visible (bulk priority). */
+    private static int column(int cx, int cz) {
+        return ((cx & (GRID - 1)) * GRID + (cz & (GRID - 1))) * Chunk.SECTIONS;
+    }
+
     void chunkVisible(int cx, int cz) {
         visibleChunks.add(World.key(cx, cz));
+        int col = column(cx, cz);
+        gridOwner[col / Chunk.SECTIONS] = World.key(cx, cz);
+        Arrays.fill(gridVisibility, col, col + Chunk.SECTIONS, SectionVisibility.ALL); // open until meshed
+        Arrays.fill(gridMesh, col, col + Chunk.SECTIONS, null);
         biomes.chunkVisible(cx, cz);
         long[] seqs = new long[Chunk.SECTIONS];
         for (int sy = 0; sy < Chunk.SECTIONS; sy++) seqs[sy] = request(World.sectionKey(cx, sy, cz));
@@ -193,10 +211,14 @@ final class WorldRenderer {
     /** Frees GPU buffers of a chunk that left render distance; in-flight meshes for it become stale. */
     void chunkHidden(int cx, int cz) {
         visibleChunks.remove(World.key(cx, cz));
+        int col = column(cx, cz);
+        if (gridOwner[col / Chunk.SECTIONS] == World.key(cx, cz)) {
+            gridOwner[col / Chunk.SECTIONS] = EMPTY;
+            Arrays.fill(gridMesh, col, col + Chunk.SECTIONS, null);
+        }
         for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
             long k = World.sectionKey(cx, sy, cz);
             latest.remove(k);
-            visibility.remove(k);
             Mesh m = meshes.remove(k);
             if (m != null) {
                 totalQuads -= m.opaque + m.cutout + m.translucent;
@@ -263,12 +285,15 @@ final class WorldRenderer {
         Long want = latest.get(p.key);
         if (want == null || p.seq < want) return; // stale, or chunk hidden meanwhile
         ChunkMesher.Result r = p.mesh;
-        visibility.put(p.key, r.visibility());
+        int slot = column(p.cx, p.cz) + p.sy;
+        boolean inGrid = gridOwner[slot / Chunk.SECTIONS] == World.key(p.cx, p.cz);
+        if (inGrid) gridVisibility[slot] = r.visibility();
         Mesh m = meshes.get(p.key);
         if (m == null) {
             if (r.quads() == 0) return;
             m = new Mesh(p.cx, p.sy, p.cz);
             meshes.put(p.key, m);
+            if (inGrid) gridMesh[slot] = m;
         } else {
             totalQuads -= m.opaque + m.cutout + m.translucent;
             if (m.offset >= 0) allocator.release(m.offset, m.size);
@@ -311,18 +336,19 @@ final class WorldRenderer {
         int camCx = (int) Math.floor(px) >> 4, camCz = (int) Math.floor(pz) >> 4;
         int camSy = Chunk.sectionIndex((int) Math.floor(py));
         drawCount = 0;
+        long cullStart = System.nanoTime();
         if (occlusion) {
             culler.cull(camCx, camSy, camCz, new OcclusionCuller.Graph() {
                 public int visibility(int cx, int sy, int cz) {
-                    if (!visibleChunks.contains(World.key(cx, cz))) return -1;
-                    Integer v = visibility.get(World.sectionKey(cx, sy, cz));
-                    return v == null ? SectionVisibility.ALL : v; // not meshed yet: assume open
+                    int col = column(cx, cz);
+                    if (gridOwner[col / Chunk.SECTIONS] != World.key(cx, cz)) return -1;
+                    return gridVisibility[col + sy];
                 }
                 public boolean inFrustum(int cx, int sy, int cz) {
                     float ox = (float) ((cx << 4) - px), oy = (float) (Chunk.sectionMinY(sy) - py), oz = (float) ((cz << 4) - pz);
                     return frustum.testAab(ox, oy, oz, ox + 16, oy + 16, oz + 16);
                 }
-            }, (cx, sy, cz) -> addDraw(meshes.get(World.sectionKey(cx, sy, cz)), px, py, pz, false));
+            }, (cx, sy, cz) -> addDraw(gridMesh[column(cx, cz) + sy], px, py, pz, false));
         }
         if (!occlusion || measureFrustum) {
             int before = drawCount;
@@ -332,6 +358,8 @@ final class WorldRenderer {
         }
         Arrays.sort(drawList, 0, drawCount, (a, b) -> Float.compare(a.distance, b.distance));
         drawnSections = drawCount;
+        cullNanos += System.nanoTime() - cullStart;
+        cullFrames++;
 
         glBindVertexArray(vao);
         float offX = (float) (px - (camCx << 4)), offY = (float) (py - Chunk.MIN_Y), offZ = (float) (pz - (camCz << 4));
