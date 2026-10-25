@@ -1,0 +1,40 @@
+package net.mynecraft.world;
+
+/** Vertical column of sections. Empty sections stay null to save memory and meshing time. */
+public final class Chunk {
+    public static final int SECTIONS = 8;
+    public static final int HEIGHT = SECTIONS * Section.SIZE;
+
+    public final int cx, cz;
+    final Section[] sections = new Section[SECTIONS];
+
+    public Chunk(int cx, int cz) {
+        this.cx = cx;
+        this.cz = cz;
+    }
+
+    public Section section(int sy) {
+        return sections[sy];
+    }
+
+    public byte get(int x, int y, int z) {
+        Section s = sections[y >> 4];
+        return s == null ? Blocks.AIR : s.get(x, y & 15, z);
+    }
+
+    public void set(int x, int y, int z, byte id) {
+        Section s = sections[y >> 4];
+        if (s == null) {
+            if (id == Blocks.AIR) return;
+            s = sections[y >> 4] = new Section();
+        }
+        s.set(x, y & 15, z, id);
+    }
+
+    /** Drops sections that ended up all air. */
+    void compact() {
+        for (int i = 0; i < SECTIONS; i++) {
+            if (sections[i] != null && sections[i].isEmpty()) sections[i] = null;
+        }
+    }
+}
