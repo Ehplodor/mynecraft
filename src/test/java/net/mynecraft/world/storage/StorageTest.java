@@ -88,8 +88,8 @@ class StorageTest {
 
         Chunk c = ChunkCodec.decode(root, 0, 0);
         byte[] expected = {Blocks.AIR, Blocks.STONE, Blocks.DIRT, Blocks.GRASS, Blocks.SAND, Blocks.BEDROCK,
-            Blocks.AIR, Blocks.SAND, Blocks.STONE, Blocks.STONE, Blocks.AIR, Blocks.DIRT, Blocks.STONE,
-            Blocks.AIR, Blocks.SAND, Blocks.STONE, Blocks.AIR};
+            Blocks.WATER, Blocks.SAND, Blocks.STONE, Blocks.OAK_LOG, Blocks.POPPY, Blocks.DIRT, Blocks.STONE,
+            Blocks.AIR, Blocks.STONE, Blocks.STONE, Blocks.AIR};
         for (int i = 0; i < 4096; i++) {
             assertEquals(expected[i % names.length], c.get(i & 15, 64 + (i >> 8), (i >> 4) & 15));
         }

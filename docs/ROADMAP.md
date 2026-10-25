@@ -33,9 +33,28 @@
 - Reste à faire : hauteur -64..319, compression LZ4 (1.20.5+ optionnelle) et chunks externes `.mcc`,
   validation d'une sauvegarde Mynecraft ouverte par le jeu officiel
 
-## M4 — Plus de blocs et rendu (proposé)
-- Registre de blocs extensible (états/propriétés), transparence (verre, feuilles, eau), modèles non cubiques
-- Éclairage (ciel + blocs) par propagation, ambient occlusion dans le sommet
+## ✅ M4 — Plus de blocs, transparence, lumière
+- Registre de 16 blocs (tableaux par propriété) : eau, bûche, feuilles, planches, pierre taillée, verre,
+  herbes, coquelicot, glowstone, gravier
+- 3 passes : opaque trié avant→arrière (rejet précoce en profondeur), cutout (programme séparé pour que
+  l'opaque ne paie pas `discard`), translucide trié arrière→avant sans écriture de profondeur ;
+  un seul VBO par section (`glDrawElementsBaseVertex`)
+- Lumière ciel + blocs 4+4 bits : BFS incrémental (file d'ajout / file de retrait), propagation aux bords à
+  l'arrivée d'un chunk, sections touchées remaillées ; tableaux de lumière nuls tant que « plein ciel »
+- AO par sommet façon vanilla avec diagonale choisie contre l'anisotropie ; le greedy ne fusionne qu'à
+  lumière et AO identiques
+- Sommet 8 octets (position/face/texture/teinte + lumière/AO)
+- Génération : eau au niveau de la mer, gravier, arbres, herbes, fleurs (décor confiné au chunk)
+- Teintes herbe / feuillage / eau, modèles `cross` / `tinted_cross` / `leaves` / `cube_column`
+- Mesures (CPU conteneur) : génération + lumière ~0,34 ms/chunk, maillage ~0,33 ms/section,
+  ~110 quads/section (plantes et AO limitent la fusion)
+- Reste à faire : surface de l'eau abaissée, cycle jour/nuit (uniforme déjà séparé ciel/blocs),
+  lumière lisse, couleurs de biome, propriétés de blocs (orientation des bûches…)
+
+## M5 — Proposé
+- Multi-draw indirect + un seul gros VBO (1 appel de dessin par passe)
+- Occlusion culling par graphe de visibilité des sections
+- Lumière de jointure de chunk déplacée hors du thread principal
 
 ## Pistes d'optimisation continues
 - Multi-draw indirect (`glMultiDrawElementsIndirect`) + un seul gros VBO → 1 draw call

@@ -76,6 +76,7 @@ public final class ChunkStreamer implements AutoCloseable {
         for (Chunk c; (c = completed.poll()) != null; ) {
             inFlight.remove(World.key(c.cx, c.cz));
             world.put(c);
+            world.light.chunkJoined(c);
         }
 
         // Visibility: needs all 4 neighbours so border faces are culled correctly.

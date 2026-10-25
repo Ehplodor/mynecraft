@@ -12,7 +12,7 @@ Voir l'[étude de faisabilité](docs/ETUDE_FAISABILITE.md) et la [feuille de rou
 ```bash
 gradle run                                   # jeu
 gradle run --args="--no-vsync"               # FPS non plafonnés (affichés dans le titre)
-gradle run --args="--screenshot shot.png"    # rend une image puis quitte
+gradle run --args="--screenshot shot.png"    # rend une image puis quitte (avec --view lacet,tangage en degrés)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
 gradle test                                  # tests + micro-benchmark génération/maillage
@@ -20,7 +20,7 @@ gradle test                                  # tests + micro-benchmark générat
 
 Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
-`1`–`5` choisir le bloc, `Échap` quitter.
+`1`–`9` choisir le bloc, `Échap` quitter.
 
 ## Architecture
 | Fichier | Rôle |
@@ -30,11 +30,13 @@ Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches)
 | `world/Player`, `Raycast` | Physique AABB axe par axe (pas fixe 120 Hz), raycast DDA |
 | `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |
 | `world/storage/*` | NBT, fichiers région Anvil `.mca`, codec de chunk 1.16+/1.18+, `level.dat` |
-| `world/ChunkMesher` | **Greedy meshing**, sommet compacté sur **un seul `int`** (4 o/sommet) |
+| `world/Blocks` | Registre : couche de rendu, forme, collision, opacité, émission, teinte |
+| `world/LightEngine` | Lumière ciel + blocs (BFS ajout/retrait incrémental, traverse les chunks) |
+| `world/ChunkMesher` | **Greedy meshing** (fusion à lumière et AO égales), AO par sommet, plantes en croix, 8 o/sommet |
 | `resource/PackSource`, `ResourceManager` | Packs dossier/zip/classpath empilés (le dernier gagne) |
 | `resource/BlockAppearance` | `blockstates` → `models` (héritage `parent`, refs `#`) → textures + `tintindex` |
 | `client/TextureArray` | Toutes les textures dans un `GL_TEXTURE_2D_ARRAY` (mipmaps, répétition sur quads fusionnés) |
-| `client/WorldRenderer` | Génération/maillage multi-thread, upload GPU avec budget/frame, frustum culling, rendu relatif caméra, remaillage incrémental versionné |
+| `client/WorldRenderer` | Maillage multi-thread, 3 passes (opaque avant→arrière, cutout, translucide arrière→avant), frustum culling, rendu relatif caméra, remaillage incrémental versionné |
 | `client/Overlay` | Réticule et contour du bloc visé |
 
 ## Resource packs

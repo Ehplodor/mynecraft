@@ -17,14 +17,15 @@ import java.util.Map;
  * Resolves every block's six face textures from the pack stack:
  * blockstates/&lt;block&gt;.json -> model (following "parent") -> element faces -> "#ref" textures.
  *
- * <p>Result is a flat {@link #faceInfo} table (blockId * 6 + face) consumed by the mesher, plus the
+ * <p>Result is a flat {@link #faceInfo} table (blockId * 6 + face: layer | tint type &lt;&lt; 10) consumed by
+ * the mesher, plus the
  * ordered list of texture ids whose index is the texture-array layer. Layer 0 is the missing texture.
  */
 public final class BlockAppearance {
     /** Our face order (matches the mesher): -x, +x, -y, +y, -z, +z. */
     static final String[] FACE_NAMES = {"west", "east", "down", "up", "north", "south"};
-    public static final int TINT_BIT = 1 << 10;
-    public static final int LAYER_MASK = TINT_BIT - 1;
+    public static final int LAYER_MASK = (1 << 10) - 1;
+    public static final int TINT_SHIFT = 10;
     public static final String MISSING = "mynecraft:missing";
 
     public final List<String> textures = new ArrayList<>();
@@ -56,14 +57,29 @@ public final class BlockAppearance {
 
     private void resolveBlock(int id) {
         String name = "minecraft:" + Blocks.NAMES[id];
-        String modelId = modelFromBlockstate(name);
         String[] tex = new String[6];
         boolean[] tint = new boolean[6];
-        if (modelId == null) warnings.add("no blockstate for " + name);
-        else resolveModel(ResourceManager.normalize(modelId), tex, tint);
+        if (id == Blocks.WATER) {
+            // Fluids have no block model in Java packs: the game draws them from *_still textures.
+            java.util.Arrays.fill(tex, "minecraft:block/water_still");
+            java.util.Arrays.fill(tint, true);
+        } else {
+            String modelId = modelFromBlockstate(name);
+            if (modelId == null) warnings.add("no blockstate for " + name);
+            else resolveModel(ResourceManager.normalize(modelId), tex, tint);
+        }
+        if (Blocks.SHAPE[id] == Blocks.SHAPE_CROSS) {
+            // Cross models only texture the faces of their diagonal planes: reuse one for all.
+            for (int f = 0; f < 6; f++) if (tex[f] != null) {
+                String t = tex[f];
+                boolean ti = tint[f];
+                for (int g = 0; g < 6; g++) { tex[g] = t; tint[g] = ti; }
+                break;
+            }
+        }
         for (int f = 0; f < 6; f++) {
             if (tex[f] == null) tex[f] = MISSING;
-            faceInfo[id * 6 + f] = layer(tex[f]) | (tint[f] ? TINT_BIT : 0);
+            faceInfo[id * 6 + f] = layer(tex[f]) | (tint[f] ? Blocks.TINT[id] << TINT_SHIFT : 0);
         }
     }
 

@@ -10,8 +10,13 @@ final class Shader {
     final int program;
 
     Shader(String vertexResource, String fragmentResource) {
-        int vs = compile(GL_VERTEX_SHADER, load(vertexResource));
-        int fs = compile(GL_FRAGMENT_SHADER, load(fragmentResource));
+        this(vertexResource, fragmentResource, "");
+    }
+
+    /** @param defines lines inserted right after #version, e.g. "#define CUTOUT\n". */
+    Shader(String vertexResource, String fragmentResource, String defines) {
+        int vs = compile(GL_VERTEX_SHADER, inject(load(vertexResource), defines));
+        int fs = compile(GL_FRAGMENT_SHADER, inject(load(fragmentResource), defines));
         program = glCreateProgram();
         glAttachShader(program, vs);
         glAttachShader(program, fs);
@@ -25,6 +30,11 @@ final class Shader {
 
     int uniform(String name) {
         return glGetUniformLocation(program, name);
+    }
+
+    private static String inject(String src, String defines) {
+        int eol = src.indexOf('\n');
+        return src.substring(0, eol + 1) + defines + src.substring(eol + 1);
     }
 
     private static int compile(int type, String src) {

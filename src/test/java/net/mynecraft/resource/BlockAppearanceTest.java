@@ -34,7 +34,7 @@ class BlockAppearanceTest {
     }
 
     private static boolean tinted(BlockAppearance a, byte block, int face) {
-        return (a.faceInfo[block * 6 + face] & BlockAppearance.TINT_BIT) != 0;
+        return (a.faceInfo[block * 6 + face] >> BlockAppearance.TINT_SHIFT) != 0;
     }
 
     @Test
@@ -47,6 +47,13 @@ class BlockAppearanceTest {
         assertEquals("minecraft:block/dirt", tex(a, Blocks.GRASS, DOWN));
         assertTrue(tinted(a, Blocks.GRASS, UP));
         assertFalse(tinted(a, Blocks.GRASS, WEST));
+        assertEquals("minecraft:block/oak_log_top", tex(a, Blocks.OAK_LOG, UP));
+        assertEquals("minecraft:block/oak_log", tex(a, Blocks.OAK_LOG, WEST));
+        assertEquals("minecraft:block/short_grass", tex(a, Blocks.SHORT_GRASS, 4));
+        assertTrue(tinted(a, Blocks.SHORT_GRASS, 4));
+        assertFalse(tinted(a, Blocks.POPPY, 4));
+        assertEquals(Blocks.TINT_FOLIAGE, a.faceInfo[Blocks.OAK_LEAVES * 6 + UP] >> BlockAppearance.TINT_SHIFT);
+        assertEquals("minecraft:block/water_still", tex(a, Blocks.WATER, UP));
         for (int i = 0; i < a.faceInfo.length; i++) {
             if (i >= 6) assertNotEquals(0, a.faceInfo[i] & BlockAppearance.LAYER_MASK, "missing texture at " + i);
         }

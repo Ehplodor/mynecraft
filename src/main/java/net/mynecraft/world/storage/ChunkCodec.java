@@ -20,21 +20,31 @@ public final class ChunkCodec {
     public static final int DATA_VERSION = 3953; // 1.21
 
     private static final Set<String> NON_SOLID = Set.of(
-        "air", "cave_air", "void_air", "water", "lava", "short_grass", "grass", "tall_grass", "fern",
-        "large_fern", "dandelion", "poppy", "seagrass", "tall_seagrass", "kelp", "kelp_plant", "snow",
-        "vine", "dead_bush", "bubble_column", "light", "structure_void");
+        "air", "cave_air", "void_air", "lava", "snow", "vine", "bubble_column", "light", "structure_void",
+        "kelp", "kelp_plant", "seagrass", "tall_seagrass");
+    private static final Set<String> PLANTS = Set.of("short_grass", "grass", "tall_grass", "fern", "large_fern",
+        "dead_bush");
 
     private ChunkCodec() {}
 
+    /** Maps a Java block id to ours: exact name first, then the closest family, then stone. */
     public static byte blockFromName(String id) {
         String n = id.startsWith("minecraft:") ? id.substring(10) : id;
         for (int i = 0; i < Blocks.COUNT; i++) if (Blocks.NAMES[i].equals(n)) return (byte) i;
-        if (NON_SOLID.contains(n) || n.endsWith("_flower") || n.endsWith("sapling") || n.endsWith("torch")
-            || n.endsWith("tulip") || n.endsWith("_button") || n.endsWith("_sign") || n.endsWith("_carpet")
-            || n.endsWith("_pressure_plate") || n.endsWith("rail")) return Blocks.AIR;
-        if (n.contains("sand")) return Blocks.SAND;
+        if (NON_SOLID.contains(n) || n.endsWith("torch") || n.endsWith("_button") || n.endsWith("_sign")
+            || n.endsWith("_carpet") || n.endsWith("_pressure_plate") || n.endsWith("rail")) return Blocks.AIR;
+        if (PLANTS.contains(n)) return Blocks.SHORT_GRASS;
+        if (n.endsWith("_flower") || n.endsWith("tulip") || n.endsWith("sapling") || n.equals("dandelion")
+            || n.equals("cornflower") || n.equals("azure_bluet") || n.equals("oxeye_daisy")) return Blocks.POPPY;
+        if (n.endsWith("_leaves")) return Blocks.OAK_LEAVES;
+        if (n.endsWith("_log") || n.endsWith("_wood") || n.endsWith("_stem")) return Blocks.OAK_LOG;
+        if (n.endsWith("_planks")) return Blocks.OAK_PLANKS;
+        if (n.contains("glass")) return Blocks.GLASS;
+        if (n.contains("cobble")) return Blocks.COBBLESTONE;
+        if (n.contains("sand") && !n.contains("stone")) return Blocks.SAND;
         if (n.contains("dirt") || n.equals("podzol") || n.equals("mycelium") || n.equals("farmland")
-            || n.equals("dirt_path") || n.equals("mud")) return Blocks.DIRT;
+            || n.equals("mud") || n.equals("clay")) return Blocks.DIRT;
+        if (n.contains("lantern") || n.equals("sea_lantern") || n.equals("shroomlight")) return Blocks.GLOWSTONE;
         return Blocks.STONE;
     }
 
@@ -69,6 +79,8 @@ public final class ChunkCodec {
             }
             fill(chunk, y, ids, states);
         }
+        chunk.compact();
+        net.mynecraft.world.LightEngine.initChunk(chunk);
         chunk.markClean();
         return chunk;
     }

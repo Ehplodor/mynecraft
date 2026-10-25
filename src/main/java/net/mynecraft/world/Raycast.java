@@ -20,7 +20,7 @@ public final class Raycast {
         int nx = 0, ny = 0, nz = 0;
         double t = 0;
         while (t <= maxDist) {
-            if (Blocks.isOpaque(world.get(x, y, z))) return new Hit(x, y, z, nx, ny, nz);
+            if (Blocks.isTargetable(world.get(x, y, z))) return new Hit(x, y, z, nx, ny, nz);
             if (tmx < tmy && tmx < tmz) {
                 x += sx; t = tmx; tmx += tdx; nx = -sx; ny = 0; nz = 0;
             } else if (tmy < tmz) {

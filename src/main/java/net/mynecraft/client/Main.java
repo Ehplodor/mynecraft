@@ -32,6 +32,10 @@ public final class Main {
         return def;
     }
 
+    private static void demoSet(World world, WorldRenderer renderer, int x, int y, int z, byte b) {
+        if (world.set(x, y, z, b)) renderer.blockChanged(x, y, z);
+    }
+
     public static void main(String[] args) {
         java.util.List<String> argv = java.util.Arrays.asList(args);
         boolean vsync = !argv.contains("--no-vsync");
@@ -107,6 +111,12 @@ public final class Main {
         }
         long lastAutosave = System.nanoTime();
         if (screenshot != null) cam.pitch = -0.35f;
+        String view = option(args, "--view", null); // "yawDegrees,pitchDegrees", for scripted screenshots
+        if (view != null) {
+            String[] yp = view.split(",");
+            cam.yaw = (float) Math.toRadians(Double.parseDouble(yp[0]));
+            cam.pitch = (float) Math.toRadians(Double.parseDouble(yp[1]));
+        }
         Input input = new Input(window);
 
         int[] fbW = new int[1], fbH = new int[1];
@@ -122,6 +132,7 @@ public final class Main {
 
             glfwPollEvents();
             streamer.update((int) Math.floor(player.x) >> 4, (int) Math.floor(player.z) >> 4);
+            world.light.drainTouched(k -> renderer.sectionChanged(k, false));
             if (now - lastAutosave > AUTOSAVE_NANOS) {
                 streamer.autosave();
                 lastAutosave = now;
@@ -151,13 +162,19 @@ public final class Main {
                 }
             }
             if (editDemo && streamer.settled()) {
-                // Self-test for incremental remeshing: dig in front, build a pillar crossing a section border.
-                for (int y = 0; y < 20; y++) {
-                    int bx = (int) Math.floor(player.x) - 3, by = (int) player.y + y, bz = (int) Math.floor(player.z) - 6;
-                    if (world.set(bx, by, bz, Blocks.STONE)) renderer.blockChanged(bx, by, bz);
-                }
+                // Self-test for incremental remeshing and light: a pillar crossing a section border,
+                // and a plank roof casting a shadow with a glowstone lamp and glass underneath.
+                int ox = (int) Math.floor(player.x), oy = (int) player.y, oz = (int) Math.floor(player.z);
+                for (int y = 0; y < 20; y++) demoSet(world, renderer, ox - 3, oy + y, oz - 6, Blocks.STONE);
+                for (int dx = 0; dx < 7; dx++)
+                    for (int dz = 0; dz < 7; dz++) demoSet(world, renderer, ox + 1 + dx, oy + 4, oz - 9 + dz, Blocks.OAK_PLANKS);
+                demoSet(world, renderer, ox + 4, oy + 3, oz - 6, Blocks.GLOWSTONE);
+                demoSet(world, renderer, ox + 2, oy, oz - 4, Blocks.GLASS);
+                demoSet(world, renderer, ox + 2, oy + 1, oz - 4, Blocks.GLASS);
                 editDemo = false;
             }
+
+            world.light.drainTouched(k -> renderer.sectionChanged(k, true));
 
             glfwGetFramebufferSize(window, fbW, fbH);
             glViewport(0, 0, fbW[0], fbH[0]);
