@@ -74,6 +74,10 @@ public final class LightEngine {
                         y = Chunk.sectionMinY(sy); // skip the rest of this section
                         continue;
                     }
+                    if (sky == 15 && c.sections[sy] == null) {
+                        y = Chunk.sectionMinY(sy); // empty and fully sunlit: the default light already
+                        continue;
+                    }
                     byte b = c.get(x, y, z);
                     int op = Blocks.OPACITY[b & 0xFF];
                     if (sky != 15 || op != 0) {

@@ -188,13 +188,21 @@ class ChunkMesherTest {
                 for (int y = Chunk.MIN_Y; y < Chunk.MAX_Y; y++)
                     for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) counts[c.get(x, y, z)]++;
                 byte deep = c.get(3, -20, 3);
-                assertTrue(deep == Blocks.DEEPSLATE || Blocks.NAMES[deep].endsWith("_ore"), "below y=0: deepslate or ore");
+                assertTrue(deep == Blocks.DEEPSLATE || deep == Blocks.AIR || Blocks.NAMES[deep].endsWith("_ore"),
+                    "below y=0: deepslate, ore or cave");
             }
         for (byte b : new byte[] {Blocks.COAL_ORE, Blocks.IRON_ORE, Blocks.GOLD_ORE, Blocks.DIAMOND_ORE, Blocks.GRANITE,
             Blocks.DIORITE, Blocks.ANDESITE, Blocks.OAK_LOG, Blocks.BIRCH_LOG, Blocks.SPRUCE_LOG}) {
             assertTrue(counts[b] > 0, "no " + Blocks.NAMES[b] + " generated");
         }
         assertTrue(counts[Blocks.COAL_ORE] > counts[Blocks.DIAMOND_ORE]);
+        // Caves: a few percent of the deep volume is air.
+        long deepAir = 0;
+        for (int cx = 0; cx < 4; cx++) for (int cz = 0; cz < 4; cz++) {
+            Chunk c = w.generator.generate(cx, cz);
+            for (int y = -50; y < 0; y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) if (c.get(x, y, z) == Blocks.AIR) deepAir++;
+        }
+        assertTrue(deepAir > 0, "no caves");
     }
 
     @Test

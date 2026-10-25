@@ -60,7 +60,7 @@ final class WorldRenderer {
     /** One chunk shader variant and its uniform locations. */
     private static final class Program {
         final Shader shader;
-        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd, uDaylight;
+        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd, uDaylight, uMinLight;
         Program(String defines) {
             shader = new Shader("/shaders/chunk.vert", "/shaders/chunk.frag", defines);
             uViewProj = shader.uniform("uViewProj");
@@ -69,6 +69,7 @@ final class WorldRenderer {
             uFogColor = shader.uniform("uFogColor");
             uFogEnd = shader.uniform("uFogEnd");
             uDaylight = shader.uniform("uDaylight");
+            uMinLight = shader.uniform("uMinLight");
             glUseProgram(shader.program);
             glUniform1i(shader.uniform("uTextures"), 0);
             glUniform1i(shader.uniform("uBiome"), 1);
@@ -320,6 +321,8 @@ final class WorldRenderer {
 
     /** Sky light multiplier, see {@link DayCycle}. */
     float daylight = 1;
+    /** Debug: lowest light level shown (1 = everything fully lit). */
+    float minLight;
 
     void render(Camera cam, float aspect, float far, float[] fog) {
         drainUploads(4_000_000L);
@@ -418,6 +421,7 @@ final class WorldRenderer {
         glUniform3f(p.uFogColor, fog[0], fog[1], fog[2]);
         glUniform1f(p.uFogEnd, far);
         glUniform1f(p.uDaylight, daylight);
+        glUniform1f(p.uMinLight, minLight);
         glMultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts, GL_UNSIGNED_INT, drawOffsets, drawBase);
     }
 

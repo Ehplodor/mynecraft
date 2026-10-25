@@ -104,6 +104,7 @@ public final class Main {
         WorldRenderer renderer = new WorldRenderer(world, appearance.faceInfo, textures, biomes, RENDER_RADIUS + 1);
         renderer.occlusion = !argv.contains("--no-occlusion");
         renderer.measureFrustum = screenshot != null;
+        if (argv.contains("--fullbright")) renderer.minLight = 1;
         ChunkStreamer streamer = new ChunkStreamer(world, storage, RENDER_RADIUS,
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2), new ChunkStreamer.Listener() {
                 public void chunkVisible(int cx, int cz) { renderer.chunkVisible(cx, cz); }

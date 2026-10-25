@@ -2,13 +2,16 @@ package net.mynecraft.world;
 
 public final class TerrainGenerator {
     public static final int SEA_LEVEL = 63;
-    private final Noise noise, temperatureNoise, downfallNoise;
+    private final Noise noise, temperatureNoise, downfallNoise, tunnelA, tunnelB, cavern;
     private final long seed;
 
     public TerrainGenerator(long seed) {
         this.noise = new Noise(seed);
         this.temperatureNoise = new Noise(seed ^ 0x5DEECE66DL);
         this.downfallNoise = new Noise(seed * 31 + 17);
+        this.tunnelA = new Noise(seed + 101);
+        this.tunnelB = new Noise(seed + 202);
+        this.cavern = new Noise(seed + 303);
         this.seed = seed;
     }
 
@@ -70,6 +73,7 @@ public final class TerrainGenerator {
                 for (int y = h + 1; y <= SEA_LEVEL; y++) c.set(x, y, z, Blocks.WATER);
             }
         }
+        carveCaves(c, heights);
         ores(c, heights);
         // Decorations stay inside the chunk so generation never depends on neighbours.
         for (int z = 0; z < 16; z++) {
@@ -91,6 +95,81 @@ public final class TerrainGenerator {
         c.compact();
         LightEngine.initChunk(c);
         return c;
+    }
+
+    // ---- caves ----
+
+    private static final int CAVE_FLOOR = Chunk.MIN_Y + 5;   // keep the bedrock floor intact
+    private static final int GRID_XZ = 4, GRID_Y = 8;        // noise sample spacing, interpolated between
+
+    /**
+     * Carves tunnels ("spaghetti": where two thin noise fields are both near zero) and, deeper down,
+     * caverns ("cheese": where a third field is high). Noise is sampled on a coarse 4x8x4 grid and
+     * trilinearly interpolated, which is ~30 times cheaper than evaluating it per block. Columns
+     * under water or beaches are left alone near their surface: there is no fluid flow to fill
+     * what a cave would expose.
+     */
+    private void carveCaves(Chunk c, int[] heights) {
+        int maxH = Chunk.MIN_Y;
+        for (int h : heights) maxH = Math.max(maxH, h);
+        int ny = (maxH - CAVE_FLOOR) / GRID_Y + 2;
+        int n = 16 / GRID_XZ + 1;
+        float[] a = new float[n * n * ny], b = new float[n * n * ny], k = new float[n * n * ny];
+        int bx = c.cx << 4, bz = c.cz << 4;
+        for (int iy = 0; iy < ny; iy++) {
+            int y = CAVE_FLOOR + iy * GRID_Y;
+            for (int iz = 0; iz < n; iz++)
+                for (int ix = 0; ix < n; ix++) {
+                    float wx = bx + ix * GRID_XZ, wz = bz + iz * GRID_XZ;
+                    int i = (iy * n + iz) * n + ix;
+                    a[i] = tunnelA.noise3(wx / 48f, y / 32f, wz / 48f);
+                    b[i] = tunnelB.noise3(wx / 48f, y / 32f, wz / 48f);
+                    k[i] = cavern.noise3(wx / 80f, y / 40f, wz / 80f);
+                }
+        }
+        // Per column: interpolate the grid in x/z once per level, then only along y per block.
+        float[] colA = new float[ny], colB = new float[ny], colK = new float[ny];
+        for (int z = 0; z < 16; z++) {
+            int iz = z / GRID_XZ;
+            float fz = (z % GRID_XZ) / (float) GRID_XZ;
+            for (int x = 0; x < 16; x++) {
+                int ix = x / GRID_XZ;
+                float fx = (x % GRID_XZ) / (float) GRID_XZ;
+                int h = heights[z * 16 + x];
+                boolean wet = h <= SEA_LEVEL + 2;
+                int top = wet ? Math.min(h - 8, SEA_LEVEL - 10) : h;
+                if (top < CAVE_FLOOR) continue;
+                int levels = Math.min(ny, (top - CAVE_FLOOR) / GRID_Y + 2);
+                for (int iy = 0; iy < levels; iy++) {
+                    int i = (iy * n + iz) * n + ix;
+                    colA[iy] = bilinear(a, i, n, fx, fz);
+                    colB[iy] = bilinear(b, i, n, fx, fz);
+                    colK[iy] = bilinear(k, i, n, fx, fz);
+                }
+                for (int y = CAVE_FLOOR; y <= top; y++) {
+                    int iy = (y - CAVE_FLOOR) / GRID_Y;
+                    float fy = ((y - CAVE_FLOOR) % GRID_Y) / (float) GRID_Y;
+                    float ta = colA[iy] + (colA[iy + 1] - colA[iy]) * fy;
+                    boolean carve = false;
+                    if (ta * ta < TUNNEL) { // cheap reject before the second field
+                        float tb = colB[iy] + (colB[iy + 1] - colB[iy]) * fy;
+                        carve = ta * ta + tb * tb < TUNNEL;
+                    }
+                    if (!carve && y < 20) {
+                        carve = colK[iy] + (colK[iy + 1] - colK[iy]) * fy > 0.5f + Math.max(0, y) * 0.004f;
+                    }
+                    if (carve) c.set(x, y, z, Blocks.AIR);
+                }
+            }
+        }
+    }
+
+    private static final float TUNNEL = 0.0025f; // squared radius of a tunnel in noise units
+
+    private static float bilinear(float[] v, int i, int n, float fx, float fz) {
+        float x0 = v[i] + (v[i + 1] - v[i]) * fx;
+        float x1 = v[i + n] + (v[i + n + 1] - v[i + n]) * fx;
+        return x0 + (x1 - x0) * fz;
     }
 
     /** Deepslate replaces stone below this height, as in 1.18+. */

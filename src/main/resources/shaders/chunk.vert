@@ -7,6 +7,7 @@ uniform ivec2 uCamChunk;  // camera chunk coordinates
 uniform vec3 uCamOffset;  // camera position relative to its chunk origin (y from the world bottom)
 uniform vec3 uTints[4];   // none, grass, foliage, water
 uniform float uDaylight;  // 1 at noon, low at night: scales sky light only
+uniform float uMinLight;  // debug floor (--fullbright), 0 normally
 uniform sampler2DArray uBiome; // grass (layer 0) and foliage (layer 1) colour per column, wraps every 512 blocks
 
 out vec2 vUv;
@@ -43,7 +44,7 @@ void main() {
     // Smooth light: sums of the 4 cells around the vertex (0..60), averaged here.
     float sky = level(float(aLight & 63u) * 0.25) * uDaylight;
     float block = level(float((aLight >> 6) & 63u) * 0.25);
-    float light = max(sky, block) * AO[(aLight >> 12) & 3u] * SHADE[face];
+    float light = max(max(sky, block), uMinLight) * AO[(aLight >> 12) & 3u] * SHADE[face];
     vLayer = float(layer);
     // Section coordinates are stored mod 64: unambiguous while the render radius stays below 32.
     int dx = ((int((aLight >> 14) & 63u) - (uCamChunk.x & 63) + 96) & 63) - 32;
