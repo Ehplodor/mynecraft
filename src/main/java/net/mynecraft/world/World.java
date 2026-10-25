@@ -5,9 +5,24 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class World {
     private final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap<>();
     public final TerrainGenerator generator;
+    public final long seed;
 
     public World(long seed) {
+        this.seed = seed;
         this.generator = new TerrainGenerator(seed);
+    }
+
+    /** Publishes a loaded or generated chunk; it becomes visible to collisions and meshing. */
+    public void put(Chunk c) {
+        chunks.put(key(c.cx, c.cz), c);
+    }
+
+    public Chunk remove(int cx, int cz) {
+        return chunks.remove(key(cx, cz));
+    }
+
+    public java.util.Collection<Chunk> loadedChunks() {
+        return chunks.values();
     }
 
     public static long key(int cx, int cz) {
@@ -41,6 +56,7 @@ public final class World {
         Chunk c = chunk(x >> 4, z >> 4);
         if (c == null || c.get(x & 15, y, z & 15) == id) return false;
         c.set(x & 15, y, z & 15, id);
+        c.markDirty();
         return true;
     }
 

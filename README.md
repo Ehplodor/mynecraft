@@ -14,6 +14,7 @@ gradle run                                   # jeu
 gradle run --args="--no-vsync"               # FPS non plafonnés (affichés dans le titre)
 gradle run --args="--screenshot shot.png"    # rend une image puis quitte
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
+gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
 gradle test                                  # tests + micro-benchmark génération/maillage
 ```
 
@@ -27,6 +28,8 @@ Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches)
 | `world/Section`, `Chunk`, `World` | Stockage : 1 octet/bloc, sections 16³ vides = `null` |
 | `world/TerrainGenerator`, `Noise` | Génération par bruit fBm, déterministe par seed |
 | `world/Player`, `Raycast` | Physique AABB axe par axe (pas fixe 120 Hz), raycast DDA |
+| `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |
+| `world/storage/*` | NBT, fichiers région Anvil `.mca`, codec de chunk 1.16+/1.18+, `level.dat` |
 | `world/ChunkMesher` | **Greedy meshing**, sommet compacté sur **un seul `int`** (4 o/sommet) |
 | `resource/PackSource`, `ResourceManager` | Packs dossier/zip/classpath empilés (le dernier gagne) |
 | `resource/BlockAppearance` | `blockstates` → `models` (héritage `parent`, refs `#`) → textures + `tintindex` |
@@ -40,3 +43,10 @@ Format Java Edition (`pack.mcmeta`, `assets/<ns>/blockstates|models|textures`). 
 Supporté : variantes (première, listes pondérées), `multipart` (première partie), parents, références `#`,
 `tintindex` (couleur fixe en attendant les biomes), textures de taille quelconque (mise à l'échelle commune),
 textures animées (première image). Non supporté pour l'instant : formes non cubiques, rotations, `.mcmeta` d'animation.
+
+## Mondes et sauvegarde
+Format Java Edition : `level.dat` + `region/r.X.Z.mca` (Anvil, zlib). Sauvegarde automatique toutes les 30 s
+et à la fermeture ; seuls les chunks **modifiés** sont écrits (la génération est déterministe).
+Un monde **vanilla** peut être ouvert (`--world chemin/vers/monde`) : il est en **lecture seule** par défaut,
+car Mynecraft ne représente pas encore tout (hauteurs hors 0..127, entités, propriétés de blocs ; les blocs
+inconnus sont approximés). `--allow-foreign-writes` force l'écriture, à vos risques.

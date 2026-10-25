@@ -7,6 +7,8 @@ public final class Chunk {
 
     public final int cx, cz;
     final Section[] sections = new Section[SECTIONS];
+    /** Set when modified since load/generation; only dirty chunks are written (generation is deterministic). */
+    private volatile boolean dirty;
 
     public Chunk(int cx, int cz) {
         this.cx = cx;
@@ -31,8 +33,20 @@ public final class Chunk {
         s.set(x, y & 15, z, id);
     }
 
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    public void markDirty() {
+        dirty = true;
+    }
+
+    public void markClean() {
+        dirty = false;
+    }
+
     /** Drops sections that ended up all air. */
-    void compact() {
+    public void compact() {
         for (int i = 0; i < SECTIONS; i++) {
             if (sections[i] != null && sections[i].isEmpty()) sections[i] = null;
         }

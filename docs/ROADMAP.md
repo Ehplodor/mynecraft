@@ -23,9 +23,19 @@
 - Versionnage par section : un maillage obsolète ne peut pas écraser un plus récent
 - Réticule et contour du bloc visé
 
-## M3 — Monde infini & persistance
-- Chargement/déchargement dynamique autour du joueur, priorité par distance
-- Sauvegarde/lecture format Anvil (NBT, `.mca`)
+## ✅ M3 — Monde infini & persistance
+- Streaming autour du joueur : priorité par distance, tâches en vol bornées, hystérésis rendu (R) / masquage (R+1) / déchargement (R+3)
+- Un chunk n'est maillé que si ses 4 voisins sont chargés (bords corrects du premier coup)
+- NBT complet (12 types, gzip), fichiers région Anvil (lecture gzip/zlib/brut, écriture zlib, réallocation de secteurs)
+- Codec de chunk : lecture 1.18+ et 1.16–1.17, écriture 1.21 (palette + `long[]`)
+- Sauvegarde des seuls chunks modifiés, file IO unique ordonnée, autosave 30 s, `level.dat` atomique
+- Mondes vanilla en lecture seule par défaut ; correspondance approximative des blocs inconnus
+- Reste à faire : hauteur -64..319, compression LZ4 (1.20.5+ optionnelle) et chunks externes `.mcc`,
+  validation d'une sauvegarde Mynecraft ouverte par le jeu officiel
+
+## M4 — Plus de blocs et rendu (proposé)
+- Registre de blocs extensible (états/propriétés), transparence (verre, feuilles, eau), modèles non cubiques
+- Éclairage (ciel + blocs) par propagation, ambient occlusion dans le sommet
 
 ## Pistes d'optimisation continues
 - Multi-draw indirect (`glMultiDrawElementsIndirect`) + un seul gros VBO → 1 draw call

@@ -7,9 +7,8 @@ import net.mynecraft.world.World;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadFactory;
@@ -45,6 +44,7 @@ final class WorldRenderer {
     /** Latest requested version per section: a slower, older job must never overwrite a newer mesh. */
     private final ConcurrentHashMap<Long, Long> latest = new ConcurrentHashMap<>();
     private final AtomicLong sequence = new AtomicLong();
+    private final HashSet<Long> visibleChunks = new HashSet<>();
     private final ConcurrentLinkedQueue<Pending> uploads = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<Pending> urgentUploads = new ConcurrentLinkedQueue<>();
     private final ExecutorService workers;
@@ -106,27 +106,31 @@ final class WorldRenderer {
         return ((long) cx << 32) | ((cz & 0x0FFFFFFFL) << 4) | sy;
     }
 
-    /** Generates a square of chunks around the origin, then meshes each once its neighbours exist. */
-    void loadArea(int radius) {
-        List<Runnable> gen = new ArrayList<>();
-        for (int cx = -radius - 1; cx <= radius + 1; cx++)
-            for (int cz = -radius - 1; cz <= radius + 1; cz++) {
-                int x = cx, z = cz;
-                gen.add(() -> world.getOrGenerate(x, z));
-            }
-        gen.parallelStream().forEach(Runnable::run);
+    /** Schedules all sections of a chunk that just became visible (bulk priority). */
+    void chunkVisible(int cx, int cz) {
+        visibleChunks.add(World.key(cx, cz));
+        long[] seqs = new long[Chunk.SECTIONS];
+        for (int sy = 0; sy < Chunk.SECTIONS; sy++) seqs[sy] = request(sectionKey(cx, sy, cz));
+        pendingJobs.incrementAndGet();
+        workers.execute(() -> {
+            for (int sy = 0; sy < Chunk.SECTIONS; sy++) meshSection(cx, sy, cz, seqs[sy], uploads);
+            pendingJobs.decrementAndGet();
+        });
+    }
 
-        for (int cx = -radius; cx <= radius; cx++)
-            for (int cz = -radius; cz <= radius; cz++) {
-                int x = cx, z = cz;
-                long[] seqs = new long[Chunk.SECTIONS];
-                for (int sy = 0; sy < Chunk.SECTIONS; sy++) seqs[sy] = request(sectionKey(x, sy, z));
-                pendingJobs.incrementAndGet();
-                workers.execute(() -> {
-                    for (int sy = 0; sy < Chunk.SECTIONS; sy++) meshSection(x, sy, z, seqs[sy], uploads);
-                    pendingJobs.decrementAndGet();
-                });
+    /** Frees GPU buffers of a chunk that left render distance; in-flight meshes for it become stale. */
+    void chunkHidden(int cx, int cz) {
+        visibleChunks.remove(World.key(cx, cz));
+        for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
+            long k = sectionKey(cx, sy, cz);
+            latest.remove(k);
+            Mesh m = meshes.remove(k);
+            if (m != null) {
+                totalQuads -= m.indexCount / 6;
+                glDeleteBuffers(m.vbo);
+                glDeleteVertexArrays(m.vao);
             }
+        }
     }
 
     private long request(long key) {
@@ -158,6 +162,7 @@ final class WorldRenderer {
     }
 
     private void remesh(int cx, int sy, int cz) {
+        if (!visibleChunks.contains(World.key(cx, cz))) return;
         long seq = request(sectionKey(cx, sy, cz));
         pendingJobs.incrementAndGet();
         editWorker.execute(() -> {
@@ -176,7 +181,7 @@ final class WorldRenderer {
 
     private void upload(Pending p) {
         Long want = latest.get(p.key);
-        if (want != null && p.seq < want) return; // stale
+        if (want == null || p.seq < want) return; // stale, or chunk hidden meanwhile
         Mesh m = meshes.get(p.key);
         int quads = p.vertices.length / 4;
         if (m == null) {
