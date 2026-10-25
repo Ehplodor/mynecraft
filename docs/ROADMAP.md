@@ -239,3 +239,9 @@
   précipitations, température ; calculée en arrière-plan depuis le générateur (terres inexplorées
   comprises), recoloriée deux fois par seconde avec la météo ; `--minimap <couche>` pour les captures
 - Affichage du creusement des tuiles en cours ; F3 : débit et surface de la rivière sous le joueur
+- Cohérence des masses d'eau : chaque cellule du lit prend le niveau du centre de rivière le plus
+  proche (plus de marches là où les disques se chevauchent) ; l'eau gagne les creux voisins sous sa
+  surface ; trous et îlots minces dans le lit inondés au lieu d'être murés (plus de piliers de berge)
+- Rendu des fluides : hauteur de surface par coin (moyenne des cellules voisines, l'air libre comptant
+  pour 0, comme vanilla) : paliers et bords en pentes continues ; les surfaces calmes restent plates et
+  fusionnées ; la texture glisse dans le sens de la pente (courant) et descend le long des chutes

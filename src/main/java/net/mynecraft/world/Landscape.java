@@ -149,14 +149,21 @@ public final class Landscape {
             for (int x = 0; x < 16; x++) {
                 Column col = out[(z + 1) * 18 + x + 1];
                 if (col.river() > 0 || col.height() < SEA) continue;
-                int need = Integer.MIN_VALUE;
+                int need = Integer.MIN_VALUE, wet = 0;
                 for (int k = 0; k < 4; k++) {
                     int nx = x + (k == 0 ? -1 : k == 1 ? 1 : 0), nz = z + (k == 2 ? -1 : k == 3 ? 1 : 0);
                     Column nb = out[(nz + 1) * 18 + nx + 1];
-                    if (nb.river() > 0) need = Math.max(need, nb.water());
+                    if (nb.river() > 0) {
+                        need = Math.max(need, nb.water());
+                        wet++;
+                    }
                 }
-                if (need > col.height())
-                    banked[(z + 1) * 18 + x + 1] = new Column(need, col.biome(), col.water(), col.river(), col.temperature());
+                if (need <= col.height()) continue;
+                int i = (z + 1) * 18 + x + 1;
+                if (wet >= 3 || col.height() < need - 1) // a hole or a sliver of land in the river: flooded
+                    banked[i] = new Column(col.height(), col.temperature() < 0.22f ? FROZEN_RIVER : RIVER, need, 1, col.temperature());
+                else // a low bank: raised to the water's edge
+                    banked[i] = new Column(need, col.biome(), col.water(), col.river(), col.temperature());
             }
         return banked;
     }

@@ -123,22 +123,40 @@ class ChunkMesherTest {
     void waterSurfaceIsLowered() {
         World w = emptyWorld();
         Chunk c = put(w, 0, 0);
+        // A pool walled in by stone: a flat surface 2/16 below the block top, merged into one quad.
+        for (int x = 2; x <= 6; x++) for (int z = 2; z <= 6; z++) c.set(x, 2, z, Blocks.STONE);
+        for (int x = 2; x <= 6; x++) for (int z = 2; z <= 6; z++)
+            c.set(x, 3, z, x == 2 || x == 6 || z == 2 || z == 6 ? Blocks.STONE : Blocks.WATER);
+        ChunkMesher.Result r = mesh(w, c);
+        int[] d = r.data();
+        int flat = 0;
+        for (int q = 0; q < r.quads(); q++) {
+            assertNotEquals(ChunkMesher.SPECIAL_FLUID_CORNERS, ChunkMesher.special(d, q), "a still pool needs no slopes");
+            if (ChunkMesher.special(d, q) == ChunkMesher.SPECIAL_FLUID) {
+                assertEquals(14, ChunkMesher.fluidHeight(d, q), "a source sits 2/16 below the block top");
+                assertEquals(3, ChunkMesher.face(d, q));
+                assertEquals(4, ChunkMesher.originY(d, q));
+                flat++;
+            }
+        }
+        assertEquals(1, flat, "the 3 x 3 surface is one quad");
+    }
+
+    @Test
+    void waterSlopesDownToAFreeEdge() {
+        World w = emptyWorld();
+        Chunk c = put(w, 0, 0);
         c.set(3, 3, 3, Blocks.WATER);
         c.set(3, 2, 3, Blocks.WATER);
         ChunkMesher.Result r = mesh(w, c);
         int[] d = r.data();
-        int surface = 0;
+        int sloped = 0;
         for (int q = 0; q < r.quads(); q++) {
-            if (ChunkMesher.special(d, q) == ChunkMesher.SPECIAL_FLUID) {
-                assertEquals(14, ChunkMesher.fluidHeight(d, q), "a source sits 2/16 below the block top");
-                surface++;
-                int f = ChunkMesher.face(d, q);
-                assertTrue(f != 2, "the bottom face is never lowered");
-                // The top face sits on y = 4 (block 3 + 1); side quads of the top block start at y = 3.
-                assertEquals(f == 3 ? 4 : 3, ChunkMesher.originY(d, q));
-            }
+            if (ChunkMesher.special(d, q) != ChunkMesher.SPECIAL_FLUID_CORNERS) continue;
+            sloped++;
+            assertNotEquals(2, ChunkMesher.face(d, q), "the bottom face has no surface");
         }
-        assertEquals(1 + 4, surface, "top face + the 4 sides of the top block");
+        assertEquals(1 + 4, sloped, "top face + the 4 sides of the top block, with corner heights");
     }
 
     private static int countSpecial(ChunkMesher.Result r, int special) {

@@ -9,6 +9,7 @@ uniform vec3 uCamOffset;  // camera position relative to its chunk origin (y fro
 uniform vec3 uTints[4];   // none, grass, foliage, water
 uniform float uDaylight;  // 1 at noon, low at night: scales sky light only
 uniform float uMinLight;  // debug floor (--fullbright), 0 normally
+uniform float uTime;      // seconds, wraps: scrolls flowing fluids
 uniform sampler2DArray uBiome; // grass (layer 0) and foliage (layer 1) colour per column, wraps every 512 blocks
 
 out vec2 vUv;
@@ -22,6 +23,12 @@ const float SHADE[7] = float[7](0.6, 0.6, 0.5, 1.0, 0.8, 0.8, 0.9);
 const float AO[4] = float[4](0.45, 0.65, 0.82, 1.0);
 // Corner (u, v) offsets in quad order.
 const ivec2 CORNER[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(1, 1), ivec2(0, 1));
+
+// Surface height (sixteenths) at corner c of a SPECIAL_FLUID_CORNERS quad.
+float cornerHeight(uvec4 q, int c) {
+    uint word = c < 2 ? q.w : q.z;
+    return float((word >> uint(24 + 4 * (c & 1))) & 15u) + 1.0;
+}
 
 float level(float l) {
     // Each light level is ~20% darker than the next, with a small floor so caves are not pitch black.
@@ -50,6 +57,7 @@ void main() {
         bool top = d == 1 ? face == 3u : local.y == yMax;
         bool bottom = d == 1 ? face == 2u : local.y == yMin;
         if (special == 1u && top) local.y -= 1.0 - float((q.w >> 24) & 31u) / 16.0; // fluid surface
+        else if (special == 5u && top) local.y -= 1.0 - cornerHeight(q, c) / 16.0;  // sloping fluid
         else if (special == 2u && top) local.y -= 0.5;     // bottom slab
         else if (special == 4u && bottom) local.y += 0.5;  // top slab
         k = c;
@@ -67,10 +75,22 @@ void main() {
     else if (face < 4u) vUv = vec2(local.x, face == 3u ? local.z : -local.z);
     else if (face < 6u) vUv = vec2(face == 5u ? local.x : -local.x, -local.y);
     else                vUv = vec2(local.x, -local.y); // cross planes: x spans exactly one block
+    if (special == 5u) {
+        // Currents: the texture slides downhill on sloping surfaces, and down the sides of falls.
+        if (face == 3u) {
+            // Top face corners: c -> (x, z) = (CORNER[c].y, CORNER[c].x).
+            float h0 = cornerHeight(q, 0), h1 = cornerHeight(q, 1), h2 = cornerHeight(q, 2), h3 = cornerHeight(q, 3);
+            vec2 down = -vec2((h2 + h3) - (h0 + h1), (h1 + h2) - (h0 + h3)); // (x, z)
+            float len = length(down);
+            if (len > 0.01) vUv -= down / len * uTime * min(1.5, 0.4 + len * 0.15);
+        } else if (face >= 4u || face < 2u) {
+            vUv.y -= uTime * 1.5;
+        }
+    }
 
     uint lightWord = k < 2 ? q.z : q.w;
     uint light = (lightWord >> uint((k & 1) * 12)) & 4095u;
-    uint ao = (q.z >> uint(24 + 2 * k)) & 3u;
+    uint ao = special == 5u ? 3u : (q.z >> uint(24 + 2 * k)) & 3u;
     // Smooth light: sums of the 4 cells around the vertex (0..60), averaged here.
     float sky = level(float(light & 63u) * 0.25) * uDaylight;
     float block = level(float((light >> 6) & 63u) * 0.25);

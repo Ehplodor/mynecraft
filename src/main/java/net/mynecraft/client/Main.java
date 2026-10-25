@@ -498,6 +498,7 @@ public final class Main {
 
             if (!timeFrozen) ticks += dt * 20;
             weatherClock += dt;
+            renderer.time = weatherClock;
             DayCycle.skyColor(ticks, sky);
             renderer.daylight = DayCycle.daylight(ticks);
             applyWeather(weather.here(), weatherRenderer.flash, sky, renderer);

@@ -325,7 +325,11 @@ public final class Hydrology {
             int r = to[k];
             if (r >= 0 && h[r] > sea) surface[r] = Float.isNaN(surface[r]) ? surface[k] : Math.min(surface[r], surface[k]);
         }
+        // Beds: each cell of a disc takes the level of the nearest river centre (not the lowest disc
+        // around, which would cut steps into the water everywhere discs overlap).
         java.util.Arrays.fill(t.level, Float.NaN);
+        float[] near = new float[n];
+        java.util.Arrays.fill(near, Float.MAX_VALUE);
         for (int k = 0; k < n; k++) {
             if (Float.isNaN(surface[k]) || surface[k] <= sea) continue;
             int i = k % N, j = k / N;
@@ -339,18 +343,37 @@ public final class Hydrology {
             int r = (int) Math.ceil(width);
             for (int dj2 = -r; dj2 <= r; dj2++)
                 for (int di2 = -r; di2 <= r; di2++) {
-                    if (di2 * di2 + dj2 * dj2 > width * width + 0.25f) continue;
+                    float d2 = di2 * di2 + dj2 * dj2;
+                    if (d2 > width * width + 0.25f) continue;
                     int ii = i + di2, jj = j + dj2;
                     if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
                     int q = jj * N + ii;
-                    float old = t.level[q];
-                    if (Float.isNaN(old) || surface[k] < old) {
+                    if (d2 < near[q] || (d2 == near[q] && surface[k] < t.level[q])) {
+                        near[q] = d2;
                         t.level[q] = surface[k];
                         t.depth[q] = depth;
-                    } else if (surface[k] == old) {
-                        t.depth[q] = Math.max(t.depth[q], depth);
                     }
                 }
+        }
+        // The water spreads over any lower ground next to it (a few cells at most): no dry holes
+        // below the surface beside a river, which would otherwise need walls of earth.
+        int[] queue = new int[n], hops = new int[n];
+        int head = 0, tail = 0;
+        for (int k = 0; k < n; k++) if (!Float.isNaN(t.level[k])) queue[tail++] = k;
+        while (head < tail) {
+            int k = queue[head++];
+            if (hops[k] >= 6) continue;
+            int i = k % N, j = k / N;
+            for (int d = 0; d < 4; d++) {
+                int ii = i + di[d], jj = j + dj[d];
+                if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
+                int q = jj * N + ii;
+                if (!Float.isNaN(t.level[q]) || h[q] > t.level[k] - 0.5f || h[q] <= sea) continue;
+                t.level[q] = t.level[k];
+                t.depth[q] = Math.max(1, t.level[k] - h[q]);
+                hops[q] = hops[k] + 1;
+                queue[tail++] = q;
+            }
         }
     }
 }

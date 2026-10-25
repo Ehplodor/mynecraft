@@ -20,6 +20,10 @@ import java.util.Arrays;
  *       | ambient occlusion of corners 0..3 &lt;&lt; 24 (2 bits each).</li>
  *   <li>light of corners 2 and 3 | fluid surface height in sixteenths &lt;&lt; 24 (5 bits, SPECIAL_FLUID only).</li>
  * </ol>
+ * SPECIAL_FLUID_CORNERS (moving or sloping fluid, one cell per quad): each corner has its own surface
+ * height, minus one, in 4 bits: corners 0 and 1 in bits 24-31 of the last word, corners 2 and 3 in
+ * bits 24-31 of the third (in place of the AO, which fluids do without). The shader also scrolls
+ * the texture along the slope (currents) and down the sides (falls).
  * Corners are numbered (u0,v0), (u1,v0), (u1,v1), (u0,v1). Smooth light is the exact sum of the 4
  * cells around a vertex. UVs are derived from position in the shader, so merged quads tile their
  * texture. Quads are grouped by render layer: opaque, then cutout, then translucent.
@@ -33,7 +37,7 @@ public final class ChunkMesher {
     private static final int CROSS_FACE = 6;
     /** Vertex adjustments applied by the shader (3-bit field). */
     public static final int SPECIAL_NONE = 0, SPECIAL_FLUID = 1, SPECIAL_SLAB_BOTTOM = 2, SPECIAL_OVERLAY = 3,
-        SPECIAL_SLAB_TOP = 4;
+        SPECIAL_SLAB_TOP = 4, SPECIAL_FLUID_CORNERS = 5;
 
     /**
      * Mesh of one section; {@link #data} holds the layers back to back. {@link #visibility} says which
@@ -227,7 +231,13 @@ public final class ChunkMesher {
                         if (Blocks.isFluid(b) && Blocks.FLUID[padded[idx + up] & 0xFF] != Blocks.FLUID[b & 0xFF]) {
                             blockField |= WATER_SURFACE;
                         }
-                        key = blockField | ao << 8 | light << 16;
+                        if (Blocks.isFluid(b) && fluidCorners(b, idx, up)) {
+                            // Sloping or moving fluid: its own quad, with a height per corner.
+                            emitFluidCell(d, u, v, slice + (positive ? 1 : 0), i, j, face, b, positive, light);
+                            key = 0;
+                        } else {
+                            key = blockField | ao << 8 | light << 16;
+                        }
                     }
                     mask[j * Section.SIZE + i] = key;
                 }
@@ -254,6 +264,67 @@ public final class ChunkMesher {
                 }
             }
         }
+    }
+
+    // Surface heights at the 4 top corners of the fluid cell being meshed: [ox + 2 * oz].
+    private final int[] corner = new int[4];
+
+    /**
+     * Works out the corner heights of a fluid cell and says whether it needs its own sloped quad:
+     * flowing or falling fluid, or a surface whose corners are not all at the cell's own height.
+     */
+    private boolean fluidCorners(byte b, int idx, int up) {
+        int own = surface(idx, up);
+        boolean flat = Blocks.LEVEL[b & 0xFF] == 0;
+        for (int oz = 0; oz < 2; oz++)
+            for (int ox = 0; ox < 2; ox++) {
+                int h = own == 16 ? 16 : cornerHeight(b, idx + (ox - 1) * STRIDE[0] + (oz - 1) * STRIDE[2], up);
+                corner[ox + 2 * oz] = h;
+                if (h != own) flat = false;
+            }
+        return !flat;
+    }
+
+    /**
+     * Surface height at a corner (vanilla-like): full if any of the 4 cells around it has the same
+     * fluid above; otherwise the mean of those cells' surfaces, open air counting as 0 (surfaces
+     * slope down to a free edge), solid blocks not counting.
+     */
+    private int cornerHeight(byte b, int low, int up) {
+        int sum = 0, n = 0;
+        byte type = Blocks.FLUID[b & 0xFF];
+        for (int k = 0; k < 4; k++) {
+            int i = low + (k & 1) * STRIDE[0] + (k >> 1) * STRIDE[2];
+            byte c = padded[i];
+            if (Blocks.FLUID[c & 0xFF] == type) {
+                if (Blocks.FLUID[padded[i + up] & 0xFF] == type) return 16;
+                int h = Blocks.fluidHeight(c);
+                sum += Blocks.LEVEL[c & 0xFF] == 0 ? h * 4 : h; // sources weigh more, like vanilla
+                n += Blocks.LEVEL[c & 0xFF] == 0 ? 4 : 1;
+            } else if (!Blocks.isSolid(c)) {
+                n++;
+            }
+        }
+        return n == 0 ? Blocks.fluidHeight(b) : Math.max(1, Math.min(16, Math.round(sum / (float) n)));
+    }
+
+    /** One fluid cell face with per-corner surface heights (see SPECIAL_FLUID_CORNERS). */
+    private void emitFluidCell(int d, int u, int v, int plane, int i, int j, int face, byte b, boolean positive, long light) {
+        int[] p = new int[3];
+        p[d] = plane;
+        p[u] = i;
+        p[v] = j;
+        int[] nib = new int[4];
+        for (int c = 0; c < 4; c++) {
+            int du = c == 1 || c == 2 ? 1 : 0, dv = c >= 2 ? 1 : 0;
+            int ox = u == 0 ? du : v == 0 ? dv : (positive ? 1 : 0);
+            int oz = u == 2 ? du : v == 2 ? dv : (positive ? 1 : 0);
+            nib[c] = corner[ox + 2 * oz] - 1;
+        }
+        int l0 = (int) light & 0xFFF, l1 = (int) (light >> 12) & 0xFFF, l2 = (int) (light >> 24) & 0xFFF, l3 = (int) (light >>> 36) & 0xFFF;
+        int info = faceInfo[(b & 0xFF) * 6 + face];
+        put(Blocks.LAYER[b & 0xFF], p[0], p[1], p[2], face, 0, 0, SPECIAL_FLUID_CORNERS, false, info,
+            l0 | l1 << 12 | (nib[2] | nib[3] << 4) << 24, l2 | l3 << 12 | (nib[0] | nib[1] << 4) << 24);
     }
 
     /**

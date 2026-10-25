@@ -64,7 +64,7 @@ final class WorldRenderer {
     /** One chunk shader variant and its uniform locations. */
     private static final class Program {
         final Shader shader;
-        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd, uDaylight, uMinLight;
+        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd, uDaylight, uMinLight, uTime;
         Program(String defines) {
             shader = new Shader("/shaders/chunk.vert", "/shaders/chunk.frag", defines);
             uViewProj = shader.uniform("uViewProj");
@@ -76,6 +76,7 @@ final class WorldRenderer {
             glUseProgram(shader.program);
             glUniform1i(shader.uniform("uQuads"), 2);
             uMinLight = shader.uniform("uMinLight");
+            uTime = shader.uniform("uTime");
             glUseProgram(shader.program);
             glUniform1i(shader.uniform("uTextures"), 0);
             glUniform1i(shader.uniform("uBiome"), 1);
@@ -330,6 +331,8 @@ final class WorldRenderer {
     float daylight = 1;
     /** Fog distance as a fraction of the view distance (weather: fog, rain, snow). */
     float fogScale = 1;
+    /** Seconds of game time, for animated fluids. */
+    double time;
     /** Debug: lowest light level shown (1 = everything fully lit). */
     float minLight;
 
@@ -434,6 +437,7 @@ final class WorldRenderer {
         glUniform1f(p.uFogEnd, far * fogScale);
         glUniform1f(p.uDaylight, daylight);
         glUniform1f(p.uMinLight, minLight);
+        glUniform1f(p.uTime, (float) (time % 512.0));
         glMultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts, GL_UNSIGNED_INT, drawOffsets, drawBase);
     }
 
