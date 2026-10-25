@@ -49,7 +49,7 @@ void main() {
         float yMin = origin.y, yMax = origin.y + (u == 1 ? float(w) : v == 1 ? float(h) : 0.0);
         bool top = d == 1 ? face == 3u : local.y == yMax;
         bool bottom = d == 1 ? face == 2u : local.y == yMin;
-        if (special == 1u && top) local.y -= 0.125;        // water surface
+        if (special == 1u && top) local.y -= 1.0 - float((q.w >> 24) & 31u) / 16.0; // fluid surface
         else if (special == 2u && top) local.y -= 0.5;     // bottom slab
         else if (special == 4u && bottom) local.y += 0.5;  // top slab
         k = c;

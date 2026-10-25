@@ -6,7 +6,7 @@ public final class Placement {
 
     /** Cells a placed block may overwrite. */
     private static boolean replaceable(byte b) {
-        return b == Blocks.AIR || b == Blocks.WATER || b == Blocks.SHORT_GRASS;
+        return b == Blocks.AIR || Blocks.isFluid(b) || b == Blocks.SHORT_GRASS;
     }
 
     /**

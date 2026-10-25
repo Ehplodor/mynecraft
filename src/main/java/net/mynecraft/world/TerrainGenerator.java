@@ -175,13 +175,15 @@ public final class TerrainGenerator {
                     if (!carve && y < 20) {
                         carve = colK[iy] + (colK[iy + 1] - colK[iy]) * fy > 0.5f + Math.max(0, y) * 0.004f;
                     }
-                    if (carve) c.set(x, y, z, Blocks.AIR);
+                    if (carve) c.set(x, y, z, y <= LAVA_LEVEL ? Blocks.LAVA : Blocks.AIR);
                 }
             }
         }
     }
 
     private static final float TUNNEL = 0.0025f; // squared radius of a tunnel in noise units
+    /** Cave air at or below this height is lava, as in vanilla (y -55 and below). */
+    public static final int LAVA_LEVEL = -55;
 
     private static float bilinear(float[] v, int i, int n, float fx, float fz) {
         float x0 = v[i] + (v[i + 1] - v[i]) * fx;

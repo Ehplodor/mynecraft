@@ -9,6 +9,7 @@ import net.mynecraft.world.Blocks;
 import net.mynecraft.world.Chunk;
 import net.mynecraft.world.ChunkStreamer;
 import net.mynecraft.world.storage.WorldStorage;
+import net.mynecraft.world.FluidSimulator;
 import net.mynecraft.world.Placement;
 import net.mynecraft.world.Player;
 import net.mynecraft.world.Raycast;
@@ -24,7 +25,7 @@ import static org.lwjgl.opengl.GL33.*;
 
 public final class Main {
     private static final int RENDER_RADIUS = 12; // chunks
-    private static final double PHYSICS_STEP = 1 / 120.0;
+    private static final double PHYSICS_STEP = 1 / 120.0, TICK = 1 / 20.0;
     private static final double REACH = 5;
 
     private static final long AUTOSAVE_NANOS = 30_000_000_000L;
@@ -48,7 +49,8 @@ public final class Main {
 
     /** F3 screen: the figures needed to judge performance live, plus position and target. */
     private static void debugScreen(Hud hud, World world, WorldRenderer renderer, ChunkStreamer streamer, Player player,
-                                    Camera cam, Raycast.Hit hit, double ticks, int fps, double frameMillis, double gpuMillis) {
+                                    Camera cam, Raycast.Hit hit, double ticks, int fps, double frameMillis, double gpuMillis,
+                                    int fluidsPending) {
         Runtime rt = Runtime.getRuntime();
         long[] buf = renderer.bufferBytes();
         int bx = (int) Math.floor(player.x), by = (int) Math.floor(cam.pos.y), bz = (int) Math.floor(player.z);
@@ -74,7 +76,8 @@ public final class Main {
             String.format("Heure : %d ticks | jour %d", (long) ticks % DayCycle.DAY_TICKS, (long) ticks / DayCycle.DAY_TICKS),
             String.format("Sections : %d dessinées / %d maillées | %d quads", renderer.drawnSections,
                 renderer.meshCount(), renderer.totalQuads),
-            String.format("Chunks : %d chargés | %d en chargement", world.loadedChunks().size(), streamer.loadingCount()),
+            String.format("Chunks : %d chargés | %d en chargement | fluides en attente %d", world.loadedChunks().size(),
+                streamer.loadingCount(), fluidsPending),
             String.format("Mémoire : tas %d/%d Mio | GPU %.1f/%.1f Mio | blocs+lumière %.1f Mio",
                 (rt.totalMemory() - rt.freeMemory()) >> 20, rt.maxMemory() >> 20, buf[0] / 1048576.0,
                 buf[1] / 1048576.0, world.storageBytes() / 1048576.0),
@@ -155,7 +158,7 @@ public final class Main {
                 public void chunkHidden(int cx, int cz) { renderer.chunkHidden(cx, cz); }
             });
 
-        boolean editDemo = argv.contains("--edit-demo");
+        boolean editDemo = argv.contains("--edit-demo"), fluidDemo = argv.contains("--fluid-demo");
         Overlay overlay = new Overlay();
         FontLoader font = FontLoader.load(resources);
         if (font == null) System.err.println("[resources] no bitmap font in font/default.json: text disabled");
@@ -214,7 +217,8 @@ public final class Main {
         int[] fbW = new int[1], fbH = new int[1];
         long last = System.nanoTime(), fpsTimer = last;
         int frames = 0;
-        double accumulator = 0;
+        double accumulator = 0, tickAccumulator = 0;
+        FluidSimulator fluids = new FluidSimulator(world, renderer::blockChanged);
         float far = RENDER_RADIUS * 16f;
 
         while (!glfwWindowShouldClose(window)) {
@@ -242,6 +246,12 @@ public final class Main {
             if (stats == null && !paused) input.frame(cam, player, dt);
             else { input.breakRequested = false; input.placeRequested = false; }
             // Fixed physics step: frame-rate independent and stable collisions.
+            // Game ticks (20 per second, like vanilla) drive the fluids.
+            tickAccumulator += dt;
+            while (tickAccumulator >= TICK) {
+                fluids.tick();
+                tickAccumulator -= TICK;
+            }
             accumulator += dt;
             while (accumulator >= PHYSICS_STEP) {
                 if (stats == null) input.move(cam, player);
@@ -257,12 +267,16 @@ public final class Main {
             if (hit != null && (input.breakRequested || (editDemo && streamer.settled()))) {
                 if (world.get(hit.x(), hit.y(), hit.z()) != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
+                    fluids.blockChanged(hit.x(), hit.y(), hit.z());
                 }
             }
             if (hit != null && input.placeRequested) {
                 double dirX = -Math.sin(cam.yaw) * cp, dirY = Math.sin(cam.pitch), dirZ = -Math.cos(cam.yaw) * cp;
                 int[] placed = Placement.place(world, player, hit, hitHeight(hit, cam.pos.x, cam.pos.y, cam.pos.z, dirX, dirY, dirZ), input.selected);
-                if (placed != null) renderer.blockChanged(placed[0], placed[1], placed[2]);
+                if (placed != null) {
+                    renderer.blockChanged(placed[0], placed[1], placed[2]);
+                    fluids.blockChanged(placed[0], placed[1], placed[2]);
+                }
             }
             if (editDemo && streamer.settled()) {
                 // Self-test for incremental remeshing and light: a pillar crossing a section border,
@@ -320,7 +334,8 @@ public final class Main {
                 hud.textCentered(Blocks.NAMES[shownBlock], hud.width() / 2f, hotbarTop - hud.lineHeight() - 2 * hud.scale, 1, 1, 1);
             }
             if (debug) {
-                debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis);
+                debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis,
+                    fluids.pending());
             }
             if (paused) {
                 hud.rect(0, 0, hud.width(), hud.height(), 0, 0, 0, 0.5f);
@@ -344,7 +359,19 @@ public final class Main {
                     glfwSetWindowShouldClose(window, true);
                 }
             }
-            if (screenshot != null && streamer.settled() && renderer.idle()) {
+            if (fluidDemo && streamer.settled()) {
+                // Self-test for fluids: a waterfall from a pillar, a lava pool meeting water.
+                int ox = (int) Math.floor(player.x), oy = (int) player.y, oz = (int) Math.floor(player.z);
+                for (int y = 0; y < 6; y++) demoSet(world, renderer, ox + 2, oy + y, oz - 7, Blocks.STONE);
+                demoSet(world, renderer, ox + 2, oy + 6, oz - 7, Blocks.WATER);
+                demoSet(world, renderer, ox - 4, oy, oz - 9, Blocks.LAVA);
+                demoSet(world, renderer, ox - 4, oy, oz - 6, Blocks.WATER);
+                fluids.blockChanged(ox + 2, oy + 6, oz - 7);
+                fluids.blockChanged(ox - 4, oy, oz - 9);
+                fluids.blockChanged(ox - 4, oy, oz - 6);
+                fluidDemo = false;
+            }
+            if (screenshot != null && streamer.settled() && renderer.idle() && fluids.pending() == 0 && !fluidDemo) {
                 Screenshot.save(screenshot, fbW[0], fbH[0]);
                 long[] buf = renderer.bufferBytes();
                 System.out.printf("[stats] sections: %d drawn (%d in frustum, %d meshed) | quads: %d | GPU buffer %.1f/%.1f MiB%n",

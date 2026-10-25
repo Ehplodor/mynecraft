@@ -118,7 +118,7 @@
 - Option de débogage `--fullbright`
 - Coût mesuré des grottes : ~160 quads/section (vs ~52), ~0,9 à 1,1 M quads chargés, tampon GPU
   ~30 Mio ; sous terre, l'occlusion ne dessine que ~1 % des sections du champ de vision
-- Reste à faire : eau et lave dans les grottes (écoulement)
+- Reste à faire : surfaces de fluide inclinées
 
 ## ✅ M10 — Mémoire GPU divisée par deux, texte, F3, pause
 - Quads de 16 octets (un enregistrement RGBA32UI lu par le vertex shader via un texture buffer,
@@ -136,3 +136,21 @@
 - Occlusion culling par graphe de visibilité des sections (approche « cave culling »)
 - Palette par section (4 bits/bloc) pour la mémoire, ambient occlusion baked dans les 4 bits restants du sommet
 - Benchmarks JMH en CI pour détecter les régressions
+
+## ✅ M11 — Fluides
+- États de fluide = propriété vanilla `level` : eau source / 1..7 / chute, lave source / 2 / 4 / 6 / chute ;
+  lus et écrits dans les sauvegardes (niveaux 8..15 → chute, niveaux de lave impairs arrondis)
+- Simulation par ticks programmés (20/s, gelés en pause) : eau toutes les 5, lave toutes les 30 ;
+  une file FIFO par fluide (délai constant ⇒ déjà triée), seules les cases proches d'un changement
+  sont évaluées, budget de 4 096 mises à jour par tick
+- Règles : chute prioritaire, sinon étalement en perdant 1 niveau (2 pour la lave), assèchement quand
+  la source disparaît, source infinie entre deux sources, eau + lave → obsidienne / pierre taillée / pierre
+- Rendu : hauteur de surface selon le niveau, rangée dans des bits libres de l'enregistrement de quad
+  (toujours 16 o) ; faces entre fluides cachées sauf « marche » vers une surface plus basse ; lave
+  lumineuse (15), opaque mais pas cube plein
+- Joueur : nage (flottabilité, traînée, Espace pour remonter), plus lent dans la lave
+- Génération : lacs de lave au fond des grottes (y ≤ −55) ; obsidienne ajoutée au registre
+- Bugs trouvés par les tests : une chute (niveau 8) était prise pour un niveau trop éloigné et effacée ;
+  un niveau horizontal 8 était confondu avec « chute » et entretenait l'eau sans source
+- Reste à faire : surfaces inclinées (hauteur par coin), courant qui pousse le joueur, priorité
+  d'écoulement vers les pentes, lave qui brûle

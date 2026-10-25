@@ -129,7 +129,8 @@ class ChunkMesherTest {
         int[] d = r.data();
         int surface = 0;
         for (int q = 0; q < r.quads(); q++) {
-            if (ChunkMesher.special(d, q) == ChunkMesher.SPECIAL_WATER) {
+            if (ChunkMesher.special(d, q) == ChunkMesher.SPECIAL_FLUID) {
+                assertEquals(14, ChunkMesher.fluidHeight(d, q), "a source sits 2/16 below the block top");
                 surface++;
                 int f = ChunkMesher.face(d, q);
                 assertTrue(f != 2, "the bottom face is never lowered");

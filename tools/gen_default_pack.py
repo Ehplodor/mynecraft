@@ -130,6 +130,12 @@ def main():
         r.randint(-6, 6) - (25 if y % 4 == 3 else 0)), 34))
     save("spruce_leaves", rgba(lambda x, y, r: (lambda v: (v, v, v, 0 if r.random() < 0.12 else 255))(clamp(95 + r.randint(-25, 25))), 35))
 
+    # Lava (bright, untinted) and obsidian.
+    save("lava_still", rgba(lambda x, y, r: (lambda v: (255, clamp(90 + v), clamp(v // 3), 255))(
+        clamp(60 + r.randint(-40, 60) + (40 if (x * 3 + y * 5) % 7 == 0 else 0))), 36))
+    save("obsidian", rgba(lambda x, y, r: (lambda v: (clamp(v + 12), clamp(v), clamp(v + 28), 255))(
+        18 + r.randint(0, 22) + (30 if r.random() < 0.05 else 0)), 37))
+
     # Biome colormaps (vanilla layout: x = 1 - temperature, y = 1 - downfall * temperature).
     def colormap(name, hot_dry, cold, wet):
         img = Image.new("RGB", (256, 256))
@@ -260,8 +266,10 @@ def main():
                  "rotation": {"origin": [8, 8, 8], "axis": "y", "angle": 45, "rescale": True},
                  "faces": {"west": face, "east": face}}]})
     write_json("models/block/water.json", {"textures": {"particle": "block/water_still"}})
+    write_json("models/block/lava.json", {"textures": {"particle": "block/lava_still"}})
+    write_json("blockstates/lava.json", {"variants": {"": {"model": "minecraft:block/lava"}}})
     for name in ("granite", "diorite", "andesite", "deepslate", "coal_ore", "iron_ore", "gold_ore", "diamond_ore",
-                 "birch_planks", "spruce_planks"):
+                 "birch_planks", "spruce_planks", "obsidian"):
         write_json(f"models/block/{name}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{name}"}})
         write_json(f"blockstates/{name}.json", {"variants": {"": {"model": f"minecraft:block/{name}"}}})
     for wood in ("birch", "spruce"):

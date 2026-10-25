@@ -109,6 +109,18 @@ class StorageTest {
         assertEquals(Blocks.SPRUCE_LEAVES, ChunkCodec.blockFromState("minecraft:spruce_leaves", Map.of("distance", "7")));
         assertEquals(Blocks.IRON_ORE, ChunkCodec.blockFromState("minecraft:deepslate_iron_ore", Map.of()));
         assertEquals(Blocks.DEEPSLATE, ChunkCodec.blockFromState("minecraft:deepslate", Map.of("axis", "x")));
+
+        // Fluids: every level round-trips; vanilla falling levels 8..15 and odd lava levels map to ours.
+        Chunk f = w.getOrGenerateEmpty(1, 0);
+        byte[] fluids = new byte[16];
+        int n = 0;
+        for (int i = 0; i < Blocks.COUNT; i++) if (Blocks.isFluid((byte) i)) fluids[n++] = (byte) i;
+        for (int i = 0; i < n; i++) f.set(i, 70, 0, fluids[i]);
+        Chunk fb = ChunkCodec.decode(Nbt.read(Nbt.toBytes(ChunkCodec.encode(f))), 1, 0);
+        for (int i = 0; i < n; i++) assertEquals(fluids[i], fb.get(i, 70, 0), Blocks.STATE[fluids[i]]);
+        assertEquals(Blocks.WATER_FALLING, ChunkCodec.blockFromState("minecraft:water", Map.of("level", "11")));
+        assertEquals(Blocks.WATER, ChunkCodec.blockFromState("minecraft:water", Map.of()));
+        assertEquals(Blocks.LAVA_FLOW_4, ChunkCodec.blockFromState("minecraft:lava", Map.of("level", "3")));
         assertEquals(Blocks.OAK_SLAB_TOP, ChunkCodec.blockFromState("minecraft:stone_slab", Map.of("type", "top", "waterlogged", "false")));
         assertEquals(Blocks.OAK_LOG, ChunkCodec.blockFromState("minecraft:oak_log", Map.of()));
     }

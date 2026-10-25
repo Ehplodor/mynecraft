@@ -20,7 +20,7 @@ public final class ChunkCodec {
     public static final int DATA_VERSION = 3953; // 1.21
 
     private static final Set<String> NON_SOLID = Set.of(
-        "air", "cave_air", "void_air", "lava", "snow", "vine", "bubble_column", "light", "structure_void",
+        "air", "cave_air", "void_air", "snow", "vine", "bubble_column", "light", "structure_void",
         "kelp", "kelp_plant", "seagrass", "tall_seagrass");
     private static final Set<String> PLANTS = Set.of("short_grass", "grass", "tall_grass", "fern", "large_fern",
         "dead_bush");
@@ -37,6 +37,12 @@ public final class ChunkCodec {
      */
     public static byte blockFromState(String id, Map<String, String> properties) {
         String n = id.startsWith("minecraft:") ? id.substring(10) : id;
+        if (n.equals("water") || n.equals("lava")) {
+            // Vanilla levels: 0 source, 1..7 flowing, 8..15 falling; lava rounds to our even levels.
+            int level = 0;
+            try { level = Integer.parseInt(properties.getOrDefault("level", "0")); } catch (NumberFormatException ignored) {}
+            return Blocks.fluidState(n.equals("water") ? Blocks.FLUID_WATER : Blocks.FLUID_LAVA, level);
+        }
         byte exact = Blocks.fromState(n, properties);
         if (exact >= 0) return exact;
         if (n.endsWith("_slab")) return Blocks.fromState("oak_slab", properties);

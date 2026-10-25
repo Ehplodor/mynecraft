@@ -11,8 +11,10 @@ public final class Blocks {
         OAK_SLAB_TOP = 19, OAK_SLAB_DOUBLE = 20, GRANITE = 21, DIORITE = 22, ANDESITE = 23, DEEPSLATE = 24,
         COAL_ORE = 25, IRON_ORE = 26, GOLD_ORE = 27, DIAMOND_ORE = 28, BIRCH_LOG = 29, BIRCH_LOG_X = 30,
         BIRCH_LOG_Z = 31, BIRCH_PLANKS = 32, BIRCH_LEAVES = 33, SPRUCE_LOG = 34, SPRUCE_LOG_X = 35,
-        SPRUCE_LOG_Z = 36, SPRUCE_PLANKS = 37, SPRUCE_LEAVES = 38;
-    public static final int COUNT = 39; // must stay below 128: the mesher uses bit 7 of the id as a flag
+        SPRUCE_LOG_Z = 36, SPRUCE_PLANKS = 37, SPRUCE_LEAVES = 38,
+        WATER_FLOW_1 = 39, /* ... WATER_FLOW_7 = 45 */ WATER_FALLING = 46,
+        LAVA = 47, LAVA_FLOW_2 = 48, LAVA_FLOW_4 = 49, LAVA_FLOW_6 = 50, LAVA_FALLING = 51, OBSIDIAN = 52;
+    public static final int COUNT = 53; // must stay below 128: the mesher uses bit 7 of the id as a flag
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -22,15 +24,31 @@ public final class Blocks {
         "oak_log", "oak_leaves", "oak_planks", "cobblestone", "glass", "short_grass", "poppy", "glowstone", "gravel",
         "oak_log", "oak_log", "oak_slab", "oak_slab", "oak_slab", "granite", "diorite", "andesite", "deepslate",
         "coal_ore", "iron_ore", "gold_ore", "diamond_ore", "birch_log", "birch_log", "birch_log", "birch_planks",
-        "birch_leaves", "spruce_log", "spruce_log", "spruce_log", "spruce_planks", "spruce_leaves"};
+        "birch_leaves", "spruce_log", "spruce_log", "spruce_log", "spruce_planks", "spruce_leaves",
+        "water", "water", "water", "water", "water", "water", "water", "water",
+        "lava", "lava", "lava", "lava", "lava", "obsidian"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
-        "", "axis=y", "axis=x", "axis=z", "", ""};
+        "", "axis=y", "axis=x", "axis=z", "", "",
+        "level=1", "level=2", "level=3", "level=4", "level=5", "level=6", "level=7", "level=8",
+        "level=0", "level=2", "level=4", "level=6", "level=8", ""};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4;
     public static final byte TINT_NONE = 0, TINT_GRASS = 1, TINT_FOLIAGE = 2, TINT_WATER = 3;
+
+    // ---- fluids ----
+    public static final byte FLUID_NONE = 0, FLUID_WATER = 1, FLUID_LAVA = 2;
+    /** Fluid type of each state. */
+    public static final byte[] FLUID = new byte[COUNT];
+    /**
+     * Vanilla fluid level: 0 source, 1..7 flowing (higher = further from the source), 8 falling.
+     * Lava in the overworld only uses even levels (it loses 2 per block).
+     */
+    public static final byte[] LEVEL = new byte[COUNT];
+    /** Families whose members hide faces between each other (each fluid, glass, each leaves). */
+    private static final byte[] FAMILY = new byte[COUNT];
 
     public static final byte[] LAYER = new byte[COUNT];
     public static final byte[] SHAPE = new byte[COUNT];
@@ -61,11 +79,19 @@ public final class Blocks {
         plant(SHORT_GRASS);
         TINT[SHORT_GRASS] = TINT_GRASS;
         plant(POPPY);
-        LAYER[WATER] = LAYER_TRANSLUCENT;
-        OPACITY[WATER] = 1;
-        SOLID[WATER] = false;
-        CULLS_SELF[WATER] = true;
-        TINT[WATER] = TINT_WATER;
+        for (int i = 0; i < COUNT; i++) FAMILY[i] = (byte) i;
+        for (int i = WATER_FLOW_1 - 1; i <= WATER_FALLING; i++) {
+            byte w = (byte) (i == WATER_FLOW_1 - 1 ? WATER : i);
+            fluid(w, FLUID_WATER, LAYER_TRANSLUCENT, 1, w == WATER ? 0 : w == WATER_FALLING ? 8 : w - WATER_FLOW_1 + 1);
+            TINT[w] = TINT_WATER;
+            FAMILY[w] = WATER;
+        }
+        byte[] lava = {LAVA, LAVA_FLOW_2, LAVA_FLOW_4, LAVA_FLOW_6, LAVA_FALLING};
+        for (int i = 0; i < lava.length; i++) {
+            fluid(lava[i], FLUID_LAVA, LAYER_OPAQUE, 15, i == 4 ? 8 : i * 2);
+            EMISSION[lava[i]] = 15;
+            FAMILY[lava[i]] = LAVA;
+        }
         EMISSION[GLOWSTONE] = 15;
         for (int i = 0; i < COUNT; i++) BOX_MAX[i] = 16;
         SHAPE[OAK_SLAB] = SHAPE_SLAB_BOTTOM;
@@ -73,13 +99,42 @@ public final class Blocks {
         OPACITY[OAK_SLAB] = OPACITY[OAK_SLAB_TOP] = 0;
         BOX_MAX[OAK_SLAB] = 8;
         BOX_MIN[OAK_SLAB_TOP] = 8;
-        for (int i = 1; i < COUNT; i++) FULL_OPAQUE[i] = LAYER[i] == LAYER_OPAQUE && SHAPE[i] == SHAPE_CUBE;
+        // Fluids are never full cubes: their surface is lowered, so neighbours keep their faces.
+        for (int i = 1; i < COUNT; i++) FULL_OPAQUE[i] = LAYER[i] == LAYER_OPAQUE && SHAPE[i] == SHAPE_CUBE && FLUID[i] == FLUID_NONE;
     }
 
     private static void cutout(byte id, int opacity, boolean cullsSelf) {
         LAYER[id] = LAYER_CUTOUT;
         OPACITY[id] = (byte) opacity;
         CULLS_SELF[id] = cullsSelf;
+    }
+
+    private static void fluid(byte id, byte type, byte layer, int opacity, int level) {
+        FLUID[id] = type;
+        LEVEL[id] = (byte) level;
+        LAYER[id] = layer;
+        OPACITY[id] = (byte) opacity;
+        SOLID[id] = false;
+        CULLS_SELF[id] = true;
+    }
+
+    /** Surface height of a fluid in sixteenths when nothing of the same fluid sits above it. */
+    public static int fluidHeight(byte id) {
+        int level = LEVEL[id & 0xFF];
+        if (level == 0 || level == 8) return 14;
+        return Math.max(2, 14 - level * 12 / 8); // shallower further from the source
+    }
+
+    public static boolean isFluid(byte id) {
+        return FLUID[id & 0xFF] != FLUID_NONE;
+    }
+
+    /** The state of a fluid type at a level (0 source, 1..7 flowing, 8 falling); lava levels round up to even. */
+    public static byte fluidState(byte type, int level) {
+        if (type == FLUID_WATER) return level == 0 ? WATER : level >= 8 ? WATER_FALLING : (byte) (WATER_FLOW_1 + level - 1);
+        if (level == 0) return LAVA;
+        if (level >= 8) return LAVA_FALLING;
+        return level <= 2 ? LAVA_FLOW_2 : level <= 4 ? LAVA_FLOW_4 : LAVA_FLOW_6;
     }
 
     private static void plant(byte id) {
@@ -140,11 +195,12 @@ public final class Blocks {
 
     /** Can be aimed at (everything but air and fluids). */
     public static boolean isTargetable(byte id) {
-        return id != AIR && id != WATER;
+        return id != AIR && !isFluid(id);
     }
 
     /** Whether the face of {@code self} against {@code neighbour} must be drawn. */
     public static boolean faceVisible(byte self, byte neighbour) {
-        return !FULL_OPAQUE[neighbour & 0xFF] && !(neighbour == self && CULLS_SELF[self & 0xFF]);
+        return !FULL_OPAQUE[neighbour & 0xFF]
+            && !(FAMILY[neighbour & 0xFF] == FAMILY[self & 0xFF] && CULLS_SELF[self & 0xFF]);
     }
 }

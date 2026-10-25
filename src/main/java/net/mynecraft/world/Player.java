@@ -13,10 +13,23 @@ public final class Player {
     public double x, y, z;
     public double vx, vy, vz;
     public boolean onGround, flying;
+    /** Fluid the body is in (Blocks.FLUID_*), updated every step. */
+    public byte fluid;
 
     /** Integrates one step. Horizontal velocity is set by the controller; gravity is applied here. */
     public void step(World world, double dt) {
-        if (!flying) vy = Math.max(-TERMINAL_VELOCITY, vy - GRAVITY * dt);
+        fluid = fluidAround(world);
+        if (flying) {
+            // no gravity
+        } else if (fluid != Blocks.FLUID_NONE) {
+            // Swimming: weak gravity and strong drag, sinking slowly (more slowly still in lava).
+            double drag = fluid == Blocks.FLUID_LAVA ? 6 : 4;
+            vy -= GRAVITY * 0.15 * dt;
+            vy -= vy * Math.min(1, drag * dt);
+            vy = Math.max(vy, -3);
+        } else {
+            vy = Math.max(-TERMINAL_VELOCITY, vy - GRAVITY * dt);
+        }
         boolean wasOnGround = onGround;
         double dy = vy * dt, dx = vx * dt, dz = vz * dt;
         double my = sweep(world, 1, dy);
@@ -44,7 +57,21 @@ public final class Player {
     }
 
     public void jump() {
-        if (onGround) { vy = JUMP_VELOCITY; onGround = false; }
+        if (fluid != Blocks.FLUID_NONE) vy = fluid == Blocks.FLUID_LAVA ? 2 : 3.5; // swim up
+        else if (onGround) { vy = JUMP_VELOCITY; onGround = false; }
+    }
+
+    /** The fluid touching the body (feet to head), water first; FLUID_NONE if dry. */
+    private byte fluidAround(World w) {
+        byte found = Blocks.FLUID_NONE;
+        for (int by = fl(y); by <= fl(y + HEIGHT - EPS); by++)
+            for (int bz = fl(z - HALF_WIDTH); bz <= fl(z + HALF_WIDTH); bz++)
+                for (int bx = fl(x - HALF_WIDTH); bx <= fl(x + HALF_WIDTH); bx++) {
+                    byte t = Blocks.FLUID[w.get(bx, by, bz) & 0xFF];
+                    if (t == Blocks.FLUID_WATER) return t;
+                    if (t != Blocks.FLUID_NONE) found = t;
+                }
+        return found;
     }
 
     /** True if the box overlaps block (bx, by, bz); used to forbid placing a block inside the player. */

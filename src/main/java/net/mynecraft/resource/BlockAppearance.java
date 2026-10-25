@@ -70,10 +70,11 @@ public final class BlockAppearance {
         String name = "minecraft:" + Blocks.NAMES[id];
         String[] tex = new String[6], overlay = new String[6];
         boolean[] tint = new boolean[6];
-        if (id == Blocks.WATER) {
+        if (Blocks.isFluid((byte) id)) {
             // Fluids have no block model in Java packs: the game draws them from *_still textures.
-            java.util.Arrays.fill(tex, "minecraft:block/water_still");
-            java.util.Arrays.fill(tint, true);
+            boolean water = Blocks.FLUID[id] == Blocks.FLUID_WATER;
+            java.util.Arrays.fill(tex, water ? "minecraft:block/water_still" : "minecraft:block/lava_still");
+            java.util.Arrays.fill(tint, water);
         } else {
             JsonObject variant = variantFromBlockstate(name, Blocks.STATE[id]);
             if (variant == null) {

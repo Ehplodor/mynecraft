@@ -84,6 +84,19 @@ class PlayerTest {
     }
 
     @Test
+    void sinksSlowlyAndSwimsUpInWater() {
+        World w = flat();
+        for (int y = 10; y < 16; y++) for (int x = 0; x < 12; x++) for (int z = 0; z < 12; z++) w.set(x, y, z, Blocks.WATER);
+        Player p = new Player();
+        p.x = 5.5; p.y = 14; p.z = 5.5;
+        run(p, w, 0.5);
+        assertEquals(Blocks.FLUID_WATER, p.fluid);
+        assertTrue(p.y > 12.5, "sinks slowly: y = " + p.y);
+        for (int i = 0; i < 60; i++) { p.jump(); p.step(w, 1 / 120.0); }
+        assertTrue(p.y > 13.5, "swims up: y = " + p.y);
+    }
+
+    @Test
     void standsOnSlabHalfway() {
         World w = flat();
         w.set(5, 10, 5, Blocks.OAK_SLAB);

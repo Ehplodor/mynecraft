@@ -43,7 +43,7 @@ final class Input {
         java.util.List<Byte> ids = new java.util.ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (int i = 1; i < Blocks.COUNT; i++) {
-            if (i == Blocks.WATER || !seen.add(Blocks.NAMES[i])) continue;
+            if (!seen.add(Blocks.NAMES[i])) continue; // first state of each name: sources for fluids
             ids.add((byte) i);
         }
         byte[] out = new byte[ids.size()];
@@ -120,6 +120,7 @@ final class Input {
         double len = Math.sqrt(dx * dx + dz * dz);
         boolean sprint = down(GLFW_KEY_LEFT_CONTROL);
         double speed = player.flying ? (sprint ? 30 : 11) : (sprint ? 5.6 : 4.3);
+        if (!player.flying && player.fluid != Blocks.FLUID_NONE) speed *= player.fluid == Blocks.FLUID_LAVA ? 0.3 : 0.5;
         if (len > 0) { dx = dx / len * speed; dz = dz / len * speed; }
         player.vx = dx;
         player.vz = dz;

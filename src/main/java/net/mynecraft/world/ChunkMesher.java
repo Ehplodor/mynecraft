@@ -18,7 +18,7 @@ import java.util.Arrays;
  *       | section index &lt;&lt; 24.</li>
  *   <li>light of corners 0 and 1 (12 bits each: smooth sky 0..60 | smooth block 0..60 &lt;&lt; 6)
  *       | ambient occlusion of corners 0..3 &lt;&lt; 24 (2 bits each).</li>
- *   <li>light of corners 2 and 3.</li>
+ *   <li>light of corners 2 and 3 | fluid surface height in sixteenths &lt;&lt; 24 (5 bits, SPECIAL_FLUID only).</li>
  * </ol>
  * Corners are numbered (u0,v0), (u1,v0), (u1,v1), (u0,v1). Smooth light is the exact sum of the 4
  * cells around a vertex. UVs are derived from position in the shader, so merged quads tile their
@@ -32,7 +32,7 @@ public final class ChunkMesher {
     private static final int[] STRIDE = {1, P * P, P}; // padded index step along x, y, z
     private static final int CROSS_FACE = 6;
     /** Vertex adjustments applied by the shader (3-bit field). */
-    public static final int SPECIAL_NONE = 0, SPECIAL_WATER = 1, SPECIAL_SLAB_BOTTOM = 2, SPECIAL_OVERLAY = 3,
+    public static final int SPECIAL_NONE = 0, SPECIAL_FLUID = 1, SPECIAL_SLAB_BOTTOM = 2, SPECIAL_OVERLAY = 3,
         SPECIAL_SLAB_TOP = 4;
 
     /**
@@ -63,6 +63,9 @@ public final class ChunkMesher {
     public static int ao(int[] d, int q, int k) { return d[q * 4 + 2] >>> 24 >> (k * 2) & 3; }
 
     public static int sectionWord(int[] d, int q) { return d[q * 4 + 1]; }
+
+    /** Fluid surface height of a SPECIAL_FLUID quad, in sixteenths of a block. */
+    public static int fluidHeight(int[] d, int q) { return d[q * 4 + 3] >>> 24 & 31; }
 
     /** Result for a section that is opaque and walled in: no faces, no sight through it. */
     private static final Result SOLID = new Result(new int[0], 0, 0, 0, 0);
@@ -212,14 +215,18 @@ public final class ChunkMesher {
                     int idx = pIndex(pos[0], pos[1], pos[2]);
                     byte b = padded[idx];
                     long key = 0;
-                    if (Blocks.SHAPE[b & 0xFF] == Blocks.SHAPE_CUBE && Blocks.faceVisible(b, padded[idx + step])) {
+                    if (Blocks.SHAPE[b & 0xFF] == Blocks.SHAPE_CUBE
+                        && (Blocks.faceVisible(b, padded[idx + step]) || fluidStep(b, idx, idx + step, d, up))) {
                         int f = idx + step;
                         // Corners in quad order (u0,v0), (u1,v0), (u1,v1), (u0,v1).
                         long ao = ao(f, -su, -sv) | ao(f, su, -sv) << 2 | ao(f, su, sv) << 4 | ao(f, -su, sv) << 6;
                         long light = (long) smoothLight(f, -su, -sv) | (long) smoothLight(f, su, -sv) << 12
                             | (long) smoothLight(f, su, sv) << 24 | (long) smoothLight(f, -su, sv) << 36;
                         int blockField = b & 0xFF;
-                        if (b == Blocks.WATER && padded[idx + up] != Blocks.WATER) blockField |= WATER_SURFACE;
+                        // Fluid surface: lowered unless the same fluid continues above.
+                        if (Blocks.isFluid(b) && Blocks.FLUID[padded[idx + up] & 0xFF] != Blocks.FLUID[b & 0xFF]) {
+                            blockField |= WATER_SURFACE;
+                        }
                         key = blockField | ao << 8 | light << 16;
                     }
                     mask[j * Section.SIZE + i] = key;
@@ -249,6 +256,21 @@ public final class ChunkMesher {
         }
     }
 
+    /**
+     * A side face between two cells of the same fluid is still visible where the neighbour's surface
+     * is lower (a flowing step), otherwise a gap would show between the two surfaces.
+     */
+    private boolean fluidStep(byte b, int idx, int n, int d, int up) {
+        if (d == 1 || !Blocks.isFluid(b) || Blocks.FLUID[padded[n] & 0xFF] != Blocks.FLUID[b & 0xFF]) return false;
+        return surface(idx, up) > surface(n, up);
+    }
+
+    /** Height of a fluid cell's surface in sixteenths: full when the same fluid continues above. */
+    private int surface(int i, int up) {
+        byte b = padded[i];
+        return Blocks.FLUID[padded[i + up] & 0xFF] == Blocks.FLUID[b & 0xFF] ? 16 : Blocks.fluidHeight(b);
+    }
+
     private void emitQuad(int d, int u, int v, int plane, int i, int j, int w, int h,
                           int face, long key, boolean positive) {
         int blockField = (int) (key & 0xFF), block = blockField & 0x7F;
@@ -259,11 +281,13 @@ public final class ChunkMesher {
         p[u] = i;
         p[v] = j;
         int info = faceInfo[block * 6 + face];
-        int special = (blockField & WATER_SURFACE) != 0 ? SPECIAL_WATER : overlay(info);
+        boolean surface = (blockField & WATER_SURFACE) != 0;
+        int special = surface ? SPECIAL_FLUID : overlay(info);
+        int fluidTop = surface ? Blocks.fluidHeight((byte) block) << 24 : 0;
         // Brightness per corner decides the split diagonal, otherwise light and AO look anisotropic.
         boolean split = score(a0, l0) + score(a2, l2) > score(a1, l1) + score(a3, l3);
         put(Blocks.LAYER[block], p[0], p[1], p[2], face, w - 1, h - 1, special, split, info,
-            l0 | l1 << 12 | (a0 | a1 << 2 | a2 << 4 | a3 << 6) << 24, l2 | l3 << 12);
+            l0 | l1 << 12 | (a0 | a1 << 2 | a2 << 4 | a3 << 6) << 24, l2 | l3 << 12 | fluidTop);
     }
 
     private static int overlay(int info) {
