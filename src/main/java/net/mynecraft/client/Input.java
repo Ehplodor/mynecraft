@@ -9,7 +9,7 @@ import static org.lwjgl.glfw.GLFW.*;
  * Keyboard/mouse controls. Movement keys use physical positions (WASD on QWERTY = ZQSD on AZERTY).
  * Space jump (fly: up), Shift fly down, Ctrl sprint, F toggle flying, 1-9 pick a hotbar slot, mouse
  * wheel changes the block in the current slot (cycling through every placeable block),
- * left click break, right click place, Esc quit.
+ * left click break, right click place, Esc pause (Q quits while paused), F3 debug screen.
  */
 final class Input {
     private static final float SENSITIVITY = 0.0025f;
@@ -21,6 +21,7 @@ final class Input {
     private final double[] mx = new double[1], my = new double[1];
     private double lastX, lastY;
     private boolean first = true, flyKeyWasDown;
+    private final boolean[] wasDown = new boolean[GLFW_KEY_LAST + 1];
     private double breakCooldown, placeCooldown;
 
     /** Default state of every block name except air and fluids, in registry order. */
@@ -58,10 +59,22 @@ final class Input {
         return glfwGetMouseButton(window, button) == GLFW_PRESS;
     }
 
-    /** Once per frame: look, toggles and click actions. */
-    void frame(Camera cam, Player player, double dt) {
-        if (down(GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, true);
+    /** True once when the key goes down (edge), for toggles; call once per frame per key. */
+    boolean pressed(int key) {
+        boolean d = down(key), edge = d && !wasDown[key];
+        wasDown[key] = d;
+        return edge;
+    }
 
+    /** Grabs the mouse for looking around, or releases it (pause). */
+    void capture(boolean captured) {
+        glfwSetInputMode(window, GLFW_CURSOR, captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+        first = true; // avoid a camera jump from the cursor position change
+        scroll = 0;
+    }
+
+    /** Once per frame while playing: look, toggles and click actions. */
+    void frame(Camera cam, Player player, double dt) {
         glfwGetCursorPos(window, mx, my);
         if (!first) {
             cam.yaw -= (float) (mx[0] - lastX) * SENSITIVITY;

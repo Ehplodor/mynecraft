@@ -118,7 +118,18 @@
 - Option de débogage `--fullbright`
 - Coût mesuré des grottes : ~160 quads/section (vs ~52), ~0,9 à 1,1 M quads chargés, tampon GPU
   ~30 Mio ; sous terre, l'occlusion ne dessine que ~1 % des sections du champ de vision
-- Reste à faire : eau et lave dans les grottes (écoulement), texte à l'écran (nom du bloc, F3)
+- Reste à faire : eau et lave dans les grottes (écoulement)
+
+## ✅ M10 — Mémoire GPU divisée par deux, texte, F3, pause
+- Quads de 16 octets (un enregistrement RGBA32UI lu par le vertex shader via un texture buffer,
+  « vertex pulling ») au lieu de 4 sommets de 8 octets ; tampon d'indices partagé conservé pour rester
+  à 4 exécutions du shader par quad (cache post-transformation)
+- Même scène, même image (30 pixels de bord différents sur 921 600) : tampon GPU 29,6 → 14,8 Mio
+- Mesuré sur llvmpipe (rendu logiciel) : −5 % de FPS (lecture de texel coûteuse sur CPU) ; une
+  variante sans indices (6 exécutions/quad) faisait −16 % et a été écartée. À mesurer sur un vrai GPU
+- Police bitmap au format vanilla (`font/default.json`, `ascii.png`), police 5×7 originale avec accents
+- Écran F3 (FPS, temps GPU par requêtes timer, sections, quads, chunks, mémoire, position, bloc visé,
+  lumière, climat, heure), pause sur Échap, nom du bloc choisi au-dessus de la barre
 
 ## Pistes d'optimisation continues
 - Multi-draw indirect (`glMultiDrawElementsIndirect`) + un seul gros VBO → 1 draw call

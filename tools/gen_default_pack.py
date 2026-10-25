@@ -6,6 +6,9 @@ Writes into src/main/resources/defaultpack/ using the vanilla Java pack layout.
 import json
 import os
 import random
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 from PIL import Image
 
@@ -180,6 +183,24 @@ def main():
                     clouds.putpixel((x, y), (255, 255, 255, 255))
                     break
     clouds.save(os.path.join(env, "clouds.png"))
+
+    # Font: original 5x7 glyphs in the vanilla ascii.png grid, plus the matching font/default.json.
+    from font5x7 import GLYPHS, ROWS
+    font = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+    for row, chars in enumerate(ROWS):
+        for col, ch in enumerate(chars):
+            glyph = GLYPHS.get(ch)
+            if not glyph:
+                continue
+            for gy, line in enumerate(glyph.split("/")):
+                for gx, px in enumerate(line):
+                    if px == "#":
+                        font.putpixel((col * 8 + gx, row * 8 + gy), (255, 255, 255, 255))
+    os.makedirs(os.path.join(NS, "textures", "font"), exist_ok=True)
+    font.save(os.path.join(NS, "textures", "font", "ascii.png"))
+    write_json("font/default.json", {"providers": [
+        {"type": "space", "advances": {" ": 4}},
+        {"type": "bitmap", "file": "minecraft:font/ascii.png", "ascent": 7, "chars": ROWS}]})
 
     with open(os.path.join(ROOT, "pack.mcmeta"), "w") as f:
         json.dump({"pack": {"pack_format": 34, "description": "Mynecraft default (original art)"}}, f, indent=2)

@@ -21,9 +21,9 @@ gradle run --args="--benchmark 20"           # vol scripté 20 s : FPS, percenti
 gradle test                                  # tests + micro-benchmark génération/lumière/maillage
 ```
 
-Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
+Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `Échap` pause (`Q` y quitte), souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
-`1`–`9` choisir l'emplacement de la barre, molette changer son bloc (dalles et bûches s'orientent selon la face visée), `Échap` quitter.
+`1`–`9` choisir l'emplacement de la barre, molette changer son bloc (dalles et bûches s'orientent selon la face visée).
 
 ## Architecture
 | Fichier | Rôle |
@@ -36,7 +36,7 @@ Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches)
 | `world/Blocks` | Registre d'**états** (un id par état : `oak_log[axis=x]`, `oak_slab[type=top]`…) : rendu, forme, boîte de collision, opacité, émission, teinte |
 | `world/Placement` | Règles de pose vanilla (axe des bûches, demi-dalles, fusion en dalle double) |
 | `world/LightEngine` | Lumière ciel + blocs (BFS ajout/retrait incrémental, traverse les chunks) |
-| `world/ChunkMesher` | **Greedy meshing** (fusion à lumière et AO égales), lumière lisse + AO par sommet, eau abaissée, plantes en croix, 8 o/sommet |
+| `world/ChunkMesher` | **Greedy meshing** (fusion à lumière et AO égales), lumière lisse + AO par sommet, eau abaissée, plantes en croix, **16 o/quad** (vertex pulling) |
 | `resource/PackSource`, `ResourceManager` | Packs dossier/zip/classpath empilés (le dernier gagne) |
 | `resource/BlockAppearance` | `blockstates` → `models` (héritage `parent`, refs `#`) → textures + `tintindex` |
 | `client/TextureArray` | Toutes les textures dans un `GL_TEXTURE_2D_ARRAY` (mipmaps, répétition sur quads fusionnés) |
@@ -45,7 +45,8 @@ Contrôles : souris pour regarder, `ZQSD`/`WASD` (position physique des touches)
 | `client/WorldRenderer` | Un seul VBO pour tout le monde, **1 appel de dessin par passe** (`glMultiDrawElementsBaseVertex`), 3 passes triées, remaillage incrémental versionné |
 | `client/SkyRenderer` | Soleil, phases de lune, nuages (textures `environment/` du pack) |
 | `client/DayCycle`, `BiomeMap` | Cycle jour/nuit (`DayTime` vanilla), couleurs de biome depuis les colormaps du pack |
-| `client/Hud` | Barre d'objets : 9 emplacements, icônes isométriques tirées du texture array |
+| `client/Hud` | Couche 2D immédiate : barre d'objets (icônes isométriques), texte (police du pack), rectangles — un seul appel de dessin |
+| `resource/FontLoader` | Police bitmap vanilla (`font/default.json` + `ascii.png`, largeurs mesurées) |
 | `client/Overlay` | Réticule et contour du bloc visé |
 
 ## Resource packs

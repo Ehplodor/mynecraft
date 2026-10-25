@@ -2,6 +2,7 @@ package net.mynecraft.client;
 
 import net.mynecraft.resource.BlockAppearance;
 import net.mynecraft.resource.Colormap;
+import net.mynecraft.resource.FontLoader;
 import net.mynecraft.resource.PackSource;
 import net.mynecraft.resource.ResourceManager;
 import net.mynecraft.world.Blocks;
@@ -41,6 +42,49 @@ public final class Main {
         else if (hit.nz() != 0) t = (hit.z() + (hit.nz() > 0 ? 1 : 0) - oz) / dz;
         else return hit.ny() > 0 ? 1 : 0;
         return oy + t * dy - hit.y();
+    }
+
+    private static final String[] FACING = {"sud (+Z)", "ouest (-X)", "nord (-Z)", "est (+X)"};
+
+    /** F3 screen: the figures needed to judge performance live, plus position and target. */
+    private static void debugScreen(Hud hud, World world, WorldRenderer renderer, ChunkStreamer streamer, Player player,
+                                    Camera cam, Raycast.Hit hit, double ticks, int fps, double frameMillis, double gpuMillis) {
+        Runtime rt = Runtime.getRuntime();
+        long[] buf = renderer.bufferBytes();
+        int bx = (int) Math.floor(player.x), by = (int) Math.floor(cam.pos.y), bz = (int) Math.floor(player.z);
+        int light = world.getLight(bx, by, bz);
+        double yawDeg = Math.toDegrees(cam.yaw);
+        int quarter = Math.floorMod((int) Math.round(-yawDeg / 90.0) + 2, 4);
+        String target = "rien";
+        if (hit != null) {
+            byte b = world.get(hit.x(), hit.y(), hit.z());
+            target = Blocks.NAMES[b] + (Blocks.STATE[b].isEmpty() ? "" : "[" + Blocks.STATE[b] + "]")
+                + String.format(" @ %d %d %d", hit.x(), hit.y(), hit.z());
+        }
+        String[] lines = {
+            String.format("Mynecraft | %d FPS (%.1f ms/image) | GPU %.2f ms", fps, frameMillis, gpuMillis),
+            String.format("XYZ : %.2f / %.2f / %.2f | chunk %d %d | section %d", player.x, player.y, player.z,
+                bx >> 4, bz >> 4, Chunk.sectionIndex(by)),
+            String.format("Regard : %s | lacet %d° tangage %.0f°", FACING[quarter],
+                Math.floorMod((long) Math.round(yawDeg), 360), Math.toDegrees(cam.pitch)),
+            "Bloc visé : " + target,
+            String.format("Lumière : ciel %d | bloc %d", light >> 4, light & 15),
+            String.format("Climat : température %.2f | humidité %.2f", world.generator.temperature(bx, bz),
+                world.generator.downfall(bx, bz)),
+            String.format("Heure : %d ticks | jour %d", (long) ticks % DayCycle.DAY_TICKS, (long) ticks / DayCycle.DAY_TICKS),
+            String.format("Sections : %d dessinées / %d maillées | %d quads", renderer.drawnSections,
+                renderer.meshCount(), renderer.totalQuads),
+            String.format("Chunks : %d chargés | %d en chargement", world.loadedChunks().size(), streamer.loadingCount()),
+            String.format("Mémoire : tas %d/%d Mio | GPU %.1f/%.1f Mio | blocs+lumière %.1f Mio",
+                (rt.totalMemory() - rt.freeMemory()) >> 20, rt.maxMemory() >> 20, buf[0] / 1048576.0,
+                buf[1] / 1048576.0, world.storageBytes() / 1048576.0),
+        };
+        float y = 2 * hud.scale;
+        for (String line : lines) {
+            hud.rect(hud.scale, y - hud.scale, hud.textWidth(line) + 2 * hud.scale, hud.lineHeight(), 0, 0, 0, 0.45f);
+            hud.text(line, 2 * hud.scale, y, 1, 1, 1);
+            y += hud.lineHeight();
+        }
     }
 
     private static void demoSet(World world, WorldRenderer renderer, int x, int y, int z, byte b) {
@@ -113,7 +157,15 @@ public final class Main {
 
         boolean editDemo = argv.contains("--edit-demo");
         Overlay overlay = new Overlay();
-        Hud hud = new Hud(appearance.faceInfo);
+        FontLoader font = FontLoader.load(resources);
+        if (font == null) System.err.println("[resources] no bitmap font in font/default.json: text disabled");
+        Hud hud = new Hud(appearance.faceInfo, font);
+        GpuTimer gpuTimer = new GpuTimer();
+        boolean paused = argv.contains("--paused"), debug = argv.contains("--f3"); // also for scripted shots
+        byte shownBlock = -1;
+        long blockShownAt = 0;
+        int fps = 0;
+        double frameMillis = 0;
         SkyRenderer skyRenderer = new SkyRenderer(resources);
         org.joml.Matrix4f skyViewProj = new org.joml.Matrix4f();
         Camera cam = new Camera();
@@ -178,7 +230,17 @@ public final class Main {
                 streamer.autosave();
                 lastAutosave = now;
             }
-            if (stats == null) input.frame(cam, player, dt);
+            if (stats == null && screenshot == null) {
+                if (input.pressed(GLFW_KEY_ESCAPE)) {
+                    paused = !paused;
+                    input.capture(!paused);
+                }
+                if (input.pressed(GLFW_KEY_F3)) debug = !debug;
+                if (paused && input.pressed(GLFW_KEY_Q)) glfwSetWindowShouldClose(window, true);
+            }
+            if (paused) dt = 0; // the world stands still: no physics, no time, no edits
+            if (stats == null && !paused) input.frame(cam, player, dt);
+            else { input.breakRequested = false; input.placeRequested = false; }
             // Fixed physics step: frame-rate independent and stable collisions.
             accumulator += dt;
             while (accumulator >= PHYSICS_STEP) {
@@ -236,6 +298,7 @@ public final class Main {
             float aspect = fbW[0] / (float) Math.max(1, fbH[0]);
             cam.viewProj(skyViewProj, aspect, far);
             skyRenderer.drawCelestial(skyViewProj, ticks);
+            if (debug) gpuTimer.begin();
             renderer.render(cam, aspect, far, sky);
             skyRenderer.drawClouds(skyViewProj, cam.pos.x, cam.pos.y, cam.pos.z, ticks, renderer.daylight, far);
             if (hit != null) {
@@ -246,7 +309,27 @@ public final class Main {
                     (float) (hit.z() - cam.pos.z), lo, hi);
             }
             overlay.crosshair(fbW[0], fbH[0]);
-            hud.draw(fbW[0], fbH[0], input.hotbar, input.slot, textures.id);
+            if (debug) gpuTimer.end();
+            hud.begin(fbW[0], fbH[0]);
+            float hotbarTop = hud.hotbar(input.hotbar, input.slot);
+            if (input.selected != shownBlock) {
+                shownBlock = input.selected;
+                blockShownAt = now;
+            }
+            if (now - blockShownAt < 2_000_000_000L) {
+                hud.textCentered(Blocks.NAMES[shownBlock], hud.width() / 2f, hotbarTop - hud.lineHeight() - 2 * hud.scale, 1, 1, 1);
+            }
+            if (debug) {
+                debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis);
+            }
+            if (paused) {
+                hud.rect(0, 0, hud.width(), hud.height(), 0, 0, 0, 0.5f);
+                float cy = hud.height() / 2f;
+                hud.textCentered("Pause", hud.width() / 2f, cy - 2 * hud.lineHeight(), 1, 1, 1);
+                hud.textCentered("Échap : reprendre", hud.width() / 2f, cy, 0.85f, 0.85f, 0.85f);
+                hud.textCentered("Q : sauvegarder et quitter", hud.width() / 2f, cy + hud.lineHeight(), 0.85f, 0.85f, 0.85f);
+            }
+            hud.end(textures.id);
             if (stats != null) {
                 stats.endGpu();
                 if (frames > 0 || now - fpsTimer > 0) stats.cpuFrame(frameNanos);
@@ -273,6 +356,8 @@ public final class Main {
 
             frames++;
             if (now - fpsTimer >= 1_000_000_000L) {
+                fps = frames;
+                frameMillis = (now - fpsTimer) / 1e6 / Math.max(1, frames);
                 glfwSetWindowTitle(window, String.format("Mynecraft | %d FPS | %d/%d sections | %d quads | chargement %d | %s%s | %.1f %.1f %.1f",
                     frames, renderer.drawnSections, renderer.meshCount(), renderer.totalQuads, streamer.loadingCount(),
                     Blocks.NAMES[input.selected], player.flying ? " | vol" : "", player.x, player.y, player.z));
@@ -291,6 +376,7 @@ public final class Main {
         streamer.close();
         overlay.dispose();
         hud.dispose();
+        gpuTimer.dispose();
         skyRenderer.dispose();
         renderer.dispose();
         glfwDestroyWindow(window);
