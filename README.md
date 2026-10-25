@@ -14,7 +14,7 @@ gradle run                                   # jeu
 gradle run --args="--no-vsync"               # FPS non plafonnés (affichés dans le titre)
 gradle run --args="--screenshot shot.png"    # rend une image, affiche des stats, quitte
                                              #   (--view lacet,tangage en degrés, --pos x,y,z, --time ticks,
-                                             #    --no-occlusion, --fullbright, --weather rain/snow/hail/storm)
+                                             #    --no-occlusion, --fullbright, --weather clear/rain/snow/hail/storm)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
 gradle run --args="--datapack MonData.zip"   # data pack (recettes, tags) ; aussi lus depuis <monde>/datapacks/
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde

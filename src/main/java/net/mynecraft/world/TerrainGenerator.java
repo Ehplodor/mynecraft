@@ -6,6 +6,7 @@ public final class TerrainGenerator {
     public static final int ROCK_LINE = 135;
     private final Noise tunnelA, tunnelB, cavern;
     private final Landscape landscape;
+    private final Streams streams;
     private final long seed;
 
     public TerrainGenerator(long seed) {
@@ -13,6 +14,7 @@ public final class TerrainGenerator {
         this.tunnelB = new Noise(seed + 202);
         this.cavern = new Noise(seed + 303);
         this.landscape = new Landscape(seed);
+        this.streams = new Streams(landscape, seed);
         this.seed = seed;
     }
 
@@ -104,29 +106,10 @@ public final class TerrainGenerator {
         carveCaves(c, heights);
         ores(c, heights);
         decorate(c, heights, biomes);
-        spring(c, cols, heights, biomes);
+        streams.carve(c);
         c.compact();
         LightEngine.initChunk(c);
         return c;
-    }
-
-    /**
-     * Mountain spring: a water source on a slope high above the sea, more often where the climate is
-     * wet. The fluid simulation then runs it downhill, so streams start in the mountains.
-     */
-    private void spring(Chunk c, Landscape.Column[] cols, int[] heights, byte[] biomes) {
-        int wx0 = c.cx << 4, wz0 = c.cz << 4;
-        int r = hash(wx0 * 31 + 7, wz0 * 17 + 3);
-        int x = 2 + r % 12, z = 2 + (r / 12) % 12;
-        int h = heights[z * 16 + x];
-        byte biome = biomes[z * 16 + x];
-        if (h < SEA_LEVEL + 30 || biome == Landscape.GLACIER || h != cols[(z + 1) * 18 + x + 1].height()) return;
-        if (hash(wx0 + 5, wz0 - 9) >= 120 + 500 * landscape.downfall(wx0 + x, wz0 + z)) return;
-        int low = h;
-        for (int[] o : new int[][] {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) low = Math.min(low, heights[(z + o[1]) * 16 + x + o[0]]);
-        if (low > h - 2) return; // needs a slope to run down
-        c.set(x, h, z, Blocks.WATER);
-        c.set(x, h + 1, z, Blocks.AIR); // no plant on the source
     }
 
     /** Top block and the 3 blocks below it for a biome. */

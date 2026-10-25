@@ -28,6 +28,8 @@ public final class FluidSimulator {
     private final LightEngine.LongQueue[] queues = {null, new LightEngine.LongQueue(), new LightEngine.LongQueue()};
     private final HashSet<Long> scheduled = new HashSet<>();
     private long tick;
+    /** Fluid updates run so far (for progress and rate displays). */
+    public long updates;
 
     public FluidSimulator(World world, Listener listener) {
         this.world = world;
@@ -89,6 +91,20 @@ public final class FluidSimulator {
         queues[type].push(p, (int) (tick + (type == Blocks.FLUID_WATER ? WATER_DELAY : LAVA_DELAY)));
     }
 
+    /**
+     * Runs game ticks back to back, as fast as the CPU allows, for at most {@code nanos}: the flows
+     * reach their final shape without waiting 5 ticks per block. Returns the ticks run.
+     */
+    public int fastForward(long nanos) {
+        long end = System.nanoTime() + nanos;
+        int ticks = 0;
+        while (!scheduled.isEmpty() && System.nanoTime() < end) {
+            tick();
+            ticks++;
+        }
+        return ticks;
+    }
+
     /** Advances one game tick and runs the updates that are due (up to the budget). */
     public void tick() {
         tick++;
@@ -98,6 +114,7 @@ public final class FluidSimulator {
             while (!q.isEmpty() && q.peekPayload() <= tick && budget-- > 0) {
                 long p = q.pop();
                 scheduled.remove(p);
+                updates++;
                 update(LightEngine.unpackX(p), LightEngine.unpackY(p), LightEngine.unpackZ(p));
             }
         }

@@ -215,3 +215,9 @@
   amont et larges près des côtes, deltas à plusieurs bras et îlots
 - F3 : bulletin météo (°C, humidité relative, nuages, base, précipitations, vent, hPa, brouillard, orage) ;
   `--weather rain|sleet|snow|hail|storm` fixe la météo pour les captures
+- Ruisseaux pré-calculés à la génération (`Streams`) : depuis chaque source, descente selon la pente
+  lissée de la carte des hauteurs, avec méandres, jusqu'à la mer, une rivière ou un creux ; lit de sources
+  immobiles enfoncé d'un bloc, cascades remplies, berges : aucun débordement, rien à simuler ; tracé
+  identique quel que soit le chunk qui le demande (continu aux frontières), mis en cache
+- Fluides au chargement : écoulements interrompus (ticks non sauvegardés) et eau suspendue repris ;
+  au démarrage, simulation accélérée (`fastForward`) avec barre de progression ; F3 : en attente, mises à jour/s

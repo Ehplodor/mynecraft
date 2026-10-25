@@ -80,7 +80,7 @@ public final class Main {
     /** F3 screen: the figures needed to judge performance live, plus position and target. */
     private static void debugScreen(Hud hud, World world, WorldRenderer renderer, ChunkStreamer streamer, Player player,
                                     Camera cam, Raycast.Hit hit, double ticks, int fps, double frameMillis, double gpuMillis,
-                                    int fluidsPending, Atmosphere.Sample w) {
+                                    int fluidsPending, double fluidRate, boolean settling, Atmosphere.Sample w) {
         Runtime rt = Runtime.getRuntime();
         long[] buf = renderer.bufferBytes();
         int bx = (int) Math.floor(player.x), by = (int) Math.floor(cam.pos.y), bz = (int) Math.floor(player.z);
@@ -113,8 +113,9 @@ public final class Main {
             String.format("Heure : %d ticks | jour %d", (long) ticks % DayCycle.DAY_TICKS, (long) ticks / DayCycle.DAY_TICKS),
             String.format("Sections : %d dessinées / %d maillées | %d quads", renderer.drawnSections,
                 renderer.meshCount(), renderer.totalQuads),
-            String.format("Chunks : %d chargés | %d en chargement | fluides en attente %d", world.loadedChunks().size(),
-                streamer.loadingCount(), fluidsPending),
+            String.format("Chunks : %d chargés | %d en chargement", world.loadedChunks().size(), streamer.loadingCount()),
+            String.format("Fluides : %d en attente | %.0f mises à jour/s%s", fluidsPending, fluidRate,
+                settling ? " | pré-calcul accéléré" : ""),
             String.format("Mémoire : tas %d/%d Mio | GPU %.1f/%.1f Mio | blocs+lumière %.1f Mio",
                 (rt.totalMemory() - rt.freeMemory()) >> 20, rt.maxMemory() >> 20, buf[0] / 1048576.0,
                 buf[1] / 1048576.0, world.storageBytes() / 1048576.0),
@@ -331,6 +332,10 @@ public final class Main {
         weather.second(player.x, player.y, player.z, (float) Math.max(0, DayCycle.sunHeight(ticks)), false);
         WeatherRenderer weatherRenderer = new WeatherRenderer();
         double weatherClock = 0;
+        // Start-up: the water of the first chunks settles at full speed, with a progress bar.
+        boolean settling = true;
+        long settleFrom = 0, rateUpdates = 0;
+        double fluidRate = 0;
         int weatherTicks = 0;
 
         while (!glfwWindowShouldClose(window)) {
@@ -480,6 +485,10 @@ public final class Main {
 
             for (int[] f; (f = springs.poll()) != null; )
                 for (int i = 0; i < f.length; i += 3) fluids.blockChanged(f[i], f[i + 1], f[i + 2]);
+            if (settling) {
+                fluids.fastForward(8_000_000L);
+                if (streamer.settled() && fluids.pending() == 0) settling = false;
+            }
 
             if (!timeFrozen) ticks += dt * 20;
             weatherClock += dt;
@@ -526,7 +535,7 @@ public final class Main {
             }
             if (debug) {
                 debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis,
-                    fluids.pending(), weather.here());
+                    fluids.pending(), fluidRate, settling, weather.here());
             }
             if (screenOpen) {
                 double[] m = screenshot != null ? new double[] {hud.width() * 0.62, hud.height() * 0.42} : input.mouseInFramebuffer();
@@ -537,6 +546,15 @@ public final class Main {
                 float cy = hud.height() / 2f;
                 hud.textCentered("Vous êtes mort !", hud.width() / 2f, cy - hud.lineHeight(), 1, 1, 1);
                 hud.textCentered("R : réapparaître", hud.width() / 2f, cy + hud.lineHeight(), 0.9f, 0.9f, 0.9f);
+            } else if (settling && fluids.pending() > 0) {
+                // Progress of the start-up water settling: updates done against what is still queued.
+                long done = fluids.updates - settleFrom;
+                float f = done / (float) Math.max(1, done + fluids.pending());
+                float w = hud.width() * 0.4f, x = (hud.width() - w) / 2, y = hud.height() * 0.3f;
+                hud.textCentered(String.format("Écoulement de l'eau : %d blocs en attente", fluids.pending()),
+                    hud.width() / 2f, y - 1.5f * hud.lineHeight(), 1, 1, 1);
+                hud.rect(x, y, w, 3 * hud.scale, 0, 0, 0, 0.6f);
+                hud.rect(x, y, w * f, 3 * hud.scale, 0.3f, 0.55f, 1, 0.9f);
             } else if (paused) {
                 hud.rect(0, 0, hud.width(), hud.height(), 0, 0, 0, 0.5f);
                 float cy = hud.height() / 2f;
@@ -584,6 +602,8 @@ public final class Main {
             frames++;
             if (now - fpsTimer >= 1_000_000_000L) {
                 fps = frames;
+                fluidRate = (fluids.updates - rateUpdates) * 1e9 / (now - fpsTimer);
+                rateUpdates = fluids.updates;
                 frameMillis = (now - fpsTimer) / 1e6 / Math.max(1, frames);
                 glfwSetWindowTitle(window, String.format("Mynecraft | %d FPS | %d/%d sections | %d quads | chargement %d | %s%s | %.1f %.1f %.1f",
                     frames, renderer.drawnSections, renderer.meshCount(), renderer.totalQuads, streamer.loadingCount(),

@@ -6,21 +6,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class HydrologyTest {
     @Test
-    void mountainsHaveSpringsThatRunDownhill() {
+    void mountainStreamsArePrecomputedAndStill() {
         TerrainGenerator gen = new TerrainGenerator(7);
-        int springs = 0;
-        for (int cz = -40; cz < 0; cz++)
-            for (int cx = -40; cx < 0; cx++) {
-                if (gen.height(cx * 16 + 8, cz * 16 + 8) < TerrainGenerator.SEA_LEVEL + 30) continue;
+        int streams = 0, unsettled = 0;
+        for (int cz = -30; cz < -10; cz++)
+            for (int cx = -30; cx < -10; cx++) {
                 Chunk c = gen.generate(cx, cz);
-                int[] s = FluidSimulator.unsettled(c);
-                if (s == null) continue;
-                for (int i = 0; i < s.length; i += 3) {
-                    byte b = c.get(s[i] & 15, s[i + 1], s[i + 2] & 15);
-                    if (b == Blocks.WATER && s[i + 1] >= TerrainGenerator.SEA_LEVEL + 30) { springs++; break; }
-                }
+                int[] u = FluidSimulator.unsettled(c);
+                if (u != null) unsettled += u.length / 3;
+                found:
+                for (int z = 0; z < 16; z++)
+                    for (int x = 0; x < 16; x++) {
+                        int h = gen.height((cx << 4) + x, (cz << 4) + z);
+                        if (h >= TerrainGenerator.SEA_LEVEL + 30 && c.get(x, h - 1, z) == Blocks.WATER) { streams++; break found; }
+                    }
             }
-        assertTrue(springs >= 5, "only " + springs + " springs");
+        assertTrue(streams >= 20, "only " + streams + " chunks with streams");
+        assertTrue(unsettled < 100, unsettled + " fluid blocks would still move"); // beds are contained
     }
 
     @Test

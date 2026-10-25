@@ -58,14 +58,18 @@ public final class Weather {
     public Atmosphere.Sample at(double x, double z, int ground) {
         Atmosphere.Sample s = atmosphere.sample(x, z, ground, TerrainGenerator.SEA_LEVEL);
         if (forcedType == null) return s;
+        if (forcedType == Atmosphere.Precipitation.NONE) // clear sky
+            return new Atmosphere.Sample(s.temperature(), s.humidity(), 0.5f, 0, 0, forcedType, s.windX(), s.windZ(), 0,
+                s.cloudBase(), 0, 0.5f);
         return new Atmosphere.Sample(s.temperature(), s.humidity(), 1, Math.max(1.3f, s.cloud()), 0.05f, forcedType,
             s.windX(), s.windZ(), Math.max(s.fog(), 0.3f), Math.min(s.cloudBase(), TerrainGenerator.SEA_LEVEL + 70),
             forcedStorm, -0.6f);
     }
 
-    /** Fixes the weather for reproducible shots: rain, sleet, snow, hail or storm. */
+    /** Fixes the weather for reproducible shots: clear, rain, sleet, snow, hail or storm. */
     public void force(String name) {
         switch (name) {
+            case "clear" -> forcedType = Atmosphere.Precipitation.NONE;
             case "rain" -> forcedType = Atmosphere.Precipitation.RAIN;
             case "sleet" -> forcedType = Atmosphere.Precipitation.SLEET;
             case "snow" -> forcedType = Atmosphere.Precipitation.SNOW;
