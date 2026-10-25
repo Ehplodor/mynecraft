@@ -122,7 +122,9 @@ public final class ChunkStreamer implements AutoCloseable {
             inFlight.add(k);
             loaders.execute(() -> {
                 Chunk c = storage == null ? null : storage.load(cx, cz);
-                completed.add(c != null ? c : world.generator.generate(cx, cz));
+                if (c == null) c = world.generator.generate(cx, cz);
+                c.unsettledFluids = FluidSimulator.unsettled(c);
+                completed.add(c);
             });
         }
     }

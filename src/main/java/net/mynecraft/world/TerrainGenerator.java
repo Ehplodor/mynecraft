@@ -127,7 +127,6 @@ public final class TerrainGenerator {
         if (low > h - 2) return; // needs a slope to run down
         c.set(x, h, z, Blocks.WATER);
         c.set(x, h + 1, z, Blocks.AIR); // no plant on the source
-        c.springs = new int[] {wx0 + x, h, wz0 + z};
     }
 
     /** Top block and the 3 blocks below it for a biome. */

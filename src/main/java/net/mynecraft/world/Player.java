@@ -61,13 +61,22 @@ public final class Player {
         else if (onGround) { vy = JUMP_VELOCITY; onGround = false; }
     }
 
-    /** The fluid touching the body (feet to head), water first; FLUID_NONE if dry. */
+    /**
+     * The fluid the body is in (feet to head), water first; FLUID_NONE if dry. A thin sheet of
+     * flowing fluid around the feet does not count: its surface must rise above WADE_DEPTH.
+     */
+    private static final double WADE_DEPTH = 0.5;
+
     private byte fluidAround(World w) {
         byte found = Blocks.FLUID_NONE;
         for (int by = fl(y); by <= fl(y + HEIGHT - EPS); by++)
             for (int bz = fl(z - HALF_WIDTH); bz <= fl(z + HALF_WIDTH); bz++)
                 for (int bx = fl(x - HALF_WIDTH); bx <= fl(x + HALF_WIDTH); bx++) {
-                    byte t = Blocks.FLUID[w.get(bx, by, bz) & 0xFF];
+                    byte b = w.get(bx, by, bz);
+                    byte t = Blocks.FLUID[b & 0xFF];
+                    if (t == Blocks.FLUID_NONE) continue;
+                    double top = by + (Blocks.FLUID[w.get(bx, by + 1, bz) & 0xFF] == t ? 1 : Blocks.fluidHeight(b) / 16.0);
+                    if (top <= y + WADE_DEPTH) continue;
                     if (t == Blocks.FLUID_WATER) return t;
                     if (t != Blocks.FLUID_NONE) found = t;
                 }

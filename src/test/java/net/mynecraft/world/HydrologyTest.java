@@ -13,11 +13,12 @@ class HydrologyTest {
             for (int cx = -40; cx < 0; cx++) {
                 if (gen.height(cx * 16 + 8, cz * 16 + 8) < TerrainGenerator.SEA_LEVEL + 30) continue;
                 Chunk c = gen.generate(cx, cz);
-                int[] s = c.springs;
+                int[] s = FluidSimulator.unsettled(c);
                 if (s == null) continue;
-                springs++;
-                assertEquals(Blocks.WATER, c.get(s[0] & 15, s[1], s[2] & 15));
-                assertTrue(s[1] >= TerrainGenerator.SEA_LEVEL + 30, "springs are high up");
+                for (int i = 0; i < s.length; i += 3) {
+                    byte b = c.get(s[i] & 15, s[i + 1], s[i + 2] & 15);
+                    if (b == Blocks.WATER && s[i + 1] >= TerrainGenerator.SEA_LEVEL + 30) { springs++; break; }
+                }
             }
         assertTrue(springs >= 5, "only " + springs + " springs");
     }
@@ -44,5 +45,35 @@ class HydrologyTest {
         }
         float inland = cells[0] / (float) Math.max(1, crossings[0]), coast = cells[1] / (float) Math.max(1, crossings[1]);
         assertTrue(coast > inland * 1.3f, "coast " + coast + " vs inland " + inland);
+    }
+
+    @Test
+    void reloadedFlowingWaterAndHangingWaterResume() {
+        Chunk c = new Chunk(2, -1);
+        c.fillSection(0, Blocks.STONE);
+        c.set(3, Chunk.MIN_Y + 16, 3, Blocks.WATER_FLOW_1);  // saved mid-flow, on the ground
+        c.set(8, Chunk.MIN_Y + 20, 8, Blocks.WATER);         // source hanging in the air
+        c.set(12, Chunk.MIN_Y + 15, 12, Blocks.WATER);       // source enclosed in stone: settled
+        int[] u = FluidSimulator.unsettled(c);
+        assertNotNull(u);
+        assertEquals(6, u.length);
+        assertArrayEquals(new int[] {35, Chunk.MIN_Y + 16, -13, 40, Chunk.MIN_Y + 20, -8}, u);
+    }
+
+    @Test
+    void shallowSheetOfWaterIsWadedNotSwum() {
+        World w = new World(1);
+        Chunk c = new Chunk(0, 0);
+        c.fillSection(0, Blocks.STONE);
+        w.put(c);
+        int y = Chunk.MIN_Y + 16;
+        Player p = new Player();
+        p.x = 5.5; p.y = y; p.z = 5.5;
+        c.set(5, y, 5, (byte) (Blocks.WATER_FLOW_1 + 5)); // level 6: a thin sheet
+        p.step(w, 0.01);
+        assertEquals(Blocks.FLUID_NONE, p.fluid);
+        c.set(5, y, 5, Blocks.WATER);
+        p.step(w, 0.01);
+        assertEquals(Blocks.FLUID_WATER, p.fluid);
     }
 }

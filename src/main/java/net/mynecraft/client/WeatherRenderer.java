@@ -38,7 +38,9 @@ final class WeatherRenderer {
     private ByteBuffer dropData = BufferUtils.createByteBuffer(1 << 16);
     private int cloudVertices;
     private long builtStep = -1;
-    private double anchorX, anchorZ, builtAt, driftX, driftZ;
+    // Clouds live in a frame that travels with the wind (shift = wind integrated over time): the
+    // puffs keep their shape and glide, and each rebuild only changes which ones the field fills.
+    private double anchorX, anchorZ, shiftX, shiftZ, lastNow = Double.NaN;
     private final float[] matrix = new float[16];
     // Roof cache: highest blocking block per column around the camera.
     private final int[] roof = new int[(2 * RAIN_RADIUS + 1) * (2 * RAIN_RADIUS + 1)];
@@ -76,23 +78,21 @@ final class WeatherRenderer {
 
     // ---- clouds ----
 
-    private void buildClouds(Weather weather, double camX, double camZ, double now) {
+    private void buildClouds(Weather weather, double camX, double camZ) {
         Atmosphere a = weather.atmosphere;
         builtStep = a.steps();
-        builtAt = now;
-        anchorX = Math.floorDiv((int) Math.floor(camX), PUFF) * PUFF;
-        anchorZ = Math.floorDiv((int) Math.floor(camZ), PUFF) * PUFF;
-        driftX = driftZ = 0;
+        anchorX = Math.floor((camX - shiftX) / PUFF) * PUFF; // in the travelling frame
+        anchorZ = Math.floor((camZ - shiftZ) / PUFF) * PUFF;
         cloudData.clear();
         cloudVertices = 0;
         int r = CLOUD_RANGE / PUFF;
         for (int j = -r; j <= r; j++)
             for (int i = -r; i <= r; i++) {
                 if (i * i + j * j > r * r) continue;
-                double wx = anchorX + i * PUFF + PUFF / 2.0, wz = anchorZ + j * PUFF + PUFF / 2.0;
+                double wx = anchorX + shiftX + i * PUFF + PUFF / 2.0, wz = anchorZ + shiftZ + j * PUFF + PUFF / 2.0;
                 Atmosphere.Sample s = weather.at(wx, wz, TerrainGenerator.SEA_LEVEL);
                 // Puffy edges: a per-box random threshold, so thin cloud is broken and thick is solid.
-                int gx = (int) (anchorX / PUFF) + i, gz = (int) (anchorZ / PUFF) + j;
+                int gx = (int) Math.round(anchorX / PUFF) + i, gz = (int) Math.round(anchorZ / PUFF) + j;
                 float noise = 0.6f * hash(gx >> 1, gz >> 1) + 0.4f * hash(gx, gz); // clumps, not a checkerboard
                 float c = s.cloud();
                 if (c * (0.55f + 0.9f * noise) < 0.22f) continue;
@@ -183,19 +183,20 @@ final class WeatherRenderer {
               double now, float light, float far, boolean frozen) {
         Atmosphere.Sample here = weather.here();
         if (here == null) return;
-        if (weather.atmosphere.steps() != builtStep) buildClouds(weather, camX, camZ, now);
-        else if (!frozen) {
-            double dt = Math.min(1.5, now - builtAt); // slide with the wind until the next step lands
-            driftX = here.windX() * dt;
-            driftZ = here.windZ() * dt;
+        if (!frozen && !Double.isNaN(lastNow)) {
+            double dt = Math.max(0, Math.min(0.25, now - lastNow));
+            shiftX += here.windX() * dt;
+            shiftZ += here.windZ() * dt;
         }
+        lastNow = now;
+        if (weather.atmosphere.steps() != builtStep) buildClouds(weather, camX, camZ);
         glUseProgram(shader.program);
         glUniformMatrix4fv(uViewProj, false, viewProj.get(matrix));
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         float lit = Math.min(1, light + flash * 0.6f);
         if (cloudVertices > 0) {
-            glUniform3f(uOffset, (float) (anchorX + driftX - camX), (float) -camY, (float) (anchorZ + driftZ - camZ));
+            glUniform3f(uOffset, (float) (anchorX + shiftX - camX), (float) -camY, (float) (anchorZ + shiftZ - camZ));
             glUniform4f(uTint, lit, lit, lit, 1);
             glUniform1f(uFadeEnd, Math.min(CLOUD_RANGE, far * 1.6f));
             glBindVertexArray(cloudVao);

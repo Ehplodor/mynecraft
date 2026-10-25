@@ -34,6 +34,41 @@ public final class FluidSimulator {
         this.listener = listener;
     }
 
+    /**
+     * Fluid blocks of a fresh chunk that will not stay as they are: flowing levels (their pending
+     * ticks are not saved) and any fluid with air or a plant beside or below it inside the chunk.
+     * Runs on loader threads; null when the chunk is settled.
+     */
+    public static int[] unsettled(Chunk c) {
+        int[] out = new int[48];
+        int n = 0;
+        for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
+            if (c.section(sy) == null) continue;
+            int y0 = Chunk.sectionMinY(sy);
+            for (int y = y0; y < y0 + 16; y++)
+                for (int z = 0; z < 16; z++)
+                    for (int x = 0; x < 16; x++) {
+                        byte b = c.get(x, y, z);
+                        if (Blocks.FLUID[b & 0xFF] == Blocks.FLUID_NONE) continue;
+                        boolean open = Blocks.LEVEL[b & 0xFF] != 0 || (y > Chunk.MIN_Y && free(c.get(x, y - 1, z)));
+                        for (int i = 0; i < 4 && !open; i++) {
+                            int nx = x + HX[i], nz = z + HZ[i];
+                            open = nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && free(c.get(nx, y, nz));
+                        }
+                        if (!open) continue;
+                        if (n == out.length) out = java.util.Arrays.copyOf(out, n * 2);
+                        out[n++] = (c.cx << 4) + x;
+                        out[n++] = y;
+                        out[n++] = (c.cz << 4) + z;
+                    }
+        }
+        return n == 0 ? null : java.util.Arrays.copyOf(out, n);
+    }
+
+    private static boolean free(byte b) {
+        return b == Blocks.AIR || isPlant(b);
+    }
+
     public int pending() {
         return scheduled.size();
     }

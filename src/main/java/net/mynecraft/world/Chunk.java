@@ -8,8 +8,11 @@ public final class Chunk {
     public static final int SECTIONS = HEIGHT / Section.SIZE;
 
     public final int cx, cz;
-    /** Mountain springs placed by the generator (x, y, z world triples), handed to the fluid simulation once. */
-    public volatile int[] springs;
+    /**
+     * Fluids that must move as soon as the chunk joins the world (x, y, z world triples): springs,
+     * water left hanging by carvers, flowing water saved mid-flow. Handed to the simulation once.
+     */
+    public volatile int[] unsettledFluids;
     final Section[] sections = new Section[SECTIONS];
     /**
      * Light per section, one byte per block: sky &lt;&lt; 4 | block. A null array means full sky light

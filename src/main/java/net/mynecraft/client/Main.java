@@ -189,17 +189,17 @@ public final class Main {
         renderer.occlusion = !argv.contains("--no-occlusion");
         renderer.measureFrustum = screenshot != null;
         if (argv.contains("--fullbright")) renderer.minLight = 1;
-        // Mountain springs of newly visible chunks, handed to the fluid simulation on the main thread.
+        // Unsettled fluids of newly visible chunks (springs, hanging water), for the fluid simulation.
         java.util.concurrent.ConcurrentLinkedQueue<int[]> springs = new java.util.concurrent.ConcurrentLinkedQueue<>();
         ChunkStreamer streamer = new ChunkStreamer(world, storage, RENDER_RADIUS,
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2), new ChunkStreamer.Listener() {
                 public void chunkVisible(int cx, int cz) {
                     renderer.chunkVisible(cx, cz);
                     Chunk c = world.chunk(cx, cz);
-                    int[] spring = c == null ? null : c.springs;
-                    if (spring != null) {
-                        c.springs = null;
-                        springs.add(spring);
+                    int[] fluids = c == null ? null : c.unsettledFluids;
+                    if (fluids != null) {
+                        c.unsettledFluids = null;
+                        springs.add(fluids);
                     }
                 }
                 public void chunkHidden(int cx, int cz) { renderer.chunkHidden(cx, cz); }
@@ -478,7 +478,8 @@ public final class Main {
 
             world.light.drainTouched(k -> renderer.sectionChanged(k, true));
 
-            for (int[] spring; (spring = springs.poll()) != null; ) fluids.blockChanged(spring[0], spring[1], spring[2]);
+            for (int[] f; (f = springs.poll()) != null; )
+                for (int i = 0; i < f.length; i += 3) fluids.blockChanged(f[i], f[i + 1], f[i + 2]);
 
             if (!timeFrozen) ticks += dt * 20;
             weatherClock += dt;
