@@ -289,7 +289,9 @@ public final class Landscape {
         int water = SEA;
         float riverMask = 0;
         if (hydrology != null && !lake && h > SEA) {
-            h += hydrology.carve(wx, wz);
+            // Hillside erosion fades out near rivers: there the valley is shaped by the banks, so the
+            // droplets' own gullies do not run beside a river below its level.
+            h += hydrology.carve(wx, wz) * smoothstep(8, 40, hydrology.waterDistance(wx, wz));
             float[] w = hydrology.water(wx, wz);
             if (w != null && w[0] > SEA) {
                 water = Math.round(w[0]);
@@ -340,6 +342,9 @@ public final class Landscape {
         float v = Math.abs(ravine.fbm(wx / 150f, wz / 150f, 2));
         if (v >= RAVINE_WIDTH) return 0;
         float profile = (float) Math.sqrt(1 - v / RAVINE_WIDTH);   // deepest along the centre line
-        return Math.min(col.height() - (SEA - 20), Math.round(40 * profile));
+        // Rivers and lakes keep clear of ravines: the cut fades out towards the water (none within
+        // 12 blocks), so a ravine dies away into a valley instead of leaving a river on a spur.
+        float clear = hydrology == null ? 1 : smoothstep(12, 32, hydrology.waterDistance(wx, wz));
+        return Math.min(col.height() - (SEA - 20), Math.round(40 * profile * clear));
     }
 }

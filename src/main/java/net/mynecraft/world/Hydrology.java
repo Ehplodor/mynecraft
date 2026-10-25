@@ -21,11 +21,14 @@ public final class Hydrology {
     public static final int CELL = 4, TILE = 1024, MARGIN = 512;
     static final int N = (TILE + 2 * MARGIN) / CELL;   // grid cells per side, margin included
     private static final int CORE0 = MARGIN / CELL, CORE = TILE / CELL;
+    /** Width (blocks) of the band along tile borders where the hillside erosion of both tiles is blended. */
+    static final int BAND = 128;
 
     // Droplet physics (heights in blocks, distances in cells).
     private static final float INERTIA = 0.35f, CAPACITY = 6, MIN_SLOPE = 0.02f, ERODE = 0.25f, DEPOSIT = 0.2f,
         GRAVITY = 4, EVAPORATE = 0.0015f, MAX_DIG = 30, MAX_FILL = 12;
     private static final int MAX_STEPS = 3000;
+    private static final float NEAR_CAP = 64;
     /** Flow (drained cells, weighted by rain) from which a cell is a stream. */
     static final float STREAM_FLOW = 400;
 
@@ -44,6 +47,7 @@ public final class Hydrology {
         final float[] level;         // water surface where there is a river, NaN elsewhere
         final float[] depth;         // bed depth below the surface
         final float[] bank;          // highest the ground may be here: gentle banks up from the nearest water
+        final float[] near;          // distance to the nearest river or lake above the sea (blocks, capped)
 
         Tile(int x0, int z0, int n) {
             this.x0 = x0;
@@ -54,12 +58,23 @@ public final class Hydrology {
             level = new float[n * n];
             depth = new float[n * n];
             bank = new float[n * n];
+            near = new float[n * n];
         }
 
         /** The tile's core plus one cell all round: what columns of the tile read (1 MB, not 4). */
+        // Erosion is also kept a band beyond the core, to blend with the neighbouring tiles.
+        float[] carveWide;
+        int wx0, wz0, wn;
+
         Tile crop() {
             int m = CORE + 2, o = CORE0 - 1;
             Tile c = new Tile(x0 + o * CELL, z0 + o * CELL, m);
+            int b = BAND / CELL + 1, mw = CORE + 2 * b, ow = CORE0 - b;
+            c.carveWide = new float[mw * mw];
+            c.wn = mw;
+            c.wx0 = x0 + ow * CELL;
+            c.wz0 = z0 + ow * CELL;
+            for (int j = 0; j < mw; j++) System.arraycopy(carve, (j + ow) * n + ow, c.carveWide, j * mw, mw);
             for (int j = 0; j < m; j++) {
                 int from = (j + o) * n + o;
                 System.arraycopy(carve, from, c.carve, j * m, m);
@@ -67,6 +82,7 @@ public final class Hydrology {
                 System.arraycopy(level, from, c.level, j * m, m);
                 System.arraycopy(depth, from, c.depth, j * m, m);
                 System.arraycopy(bank, from, c.bank, j * m, m);
+                System.arraycopy(near, from, c.near, j * m, m);
             }
             return c;
         }
@@ -96,8 +112,37 @@ public final class Hydrology {
 
     /** Terrain change (blocks) at a column. */
     public float carve(int wx, int wz) {
-        Tile t = tile(wx, wz);
-        return bilinear(t, t.carve, wx, wz);
+        // Each tile eroded its hillsides on its own: near a tile border, the erosion of the tiles on
+        // both sides is cross-faded (half and half on the border), so the ground has no seam.
+        int tx = Math.floorDiv(wx, TILE), tz = Math.floorDiv(wz, TILE);
+        float lx = wx - tx * TILE + 0.5f, lz = wz - tz * TILE + 0.5f;
+        int nx = lx < BAND ? -1 : lx > TILE - BAND ? 1 : 0, nz = lz < BAND ? -1 : lz > TILE - BAND ? 1 : 0;
+        float ax = nx == 0 ? 0 : 0.5f * (1 - smooth(Math.min(lx, TILE - lx) / BAND));
+        float az = nz == 0 ? 0 : 0.5f * (1 - smooth(Math.min(lz, TILE - lz) / BAND));
+        float sum = 0;
+        for (int k = 0; k < 4; k++) {
+            int ox = (k & 1) == 0 ? 0 : nx, oz = (k >> 1) == 0 ? 0 : nz;
+            float w = (ox == 0 ? 1 - ax : ax) * (oz == 0 ? 1 - az : az);
+            if (w <= 0) continue;
+            Tile t = tile((tx + ox) * TILE, (tz + oz) * TILE);
+            sum += w * wide(t, wx, wz);
+        }
+        return sum;
+    }
+
+    private static float smooth(float v) {
+        v = Math.max(0, Math.min(1, v));
+        return v * v * (3 - 2 * v);
+    }
+
+    private static float wide(Tile t, int wx, int wz) {
+        float gx = (wx - t.wx0) / (float) CELL - 0.5f, gz = (wz - t.wz0) / (float) CELL - 0.5f;
+        int i = (int) Math.floor(gx), j = (int) Math.floor(gz), n = t.wn;
+        float fx = gx - i, fz = gz - j;
+        float[] f = t.carveWide;
+        float a = f[j * n + i] + (f[j * n + i + 1] - f[j * n + i]) * fx;
+        float b = f[(j + 1) * n + i] + (f[(j + 1) * n + i + 1] - f[(j + 1) * n + i]) * fx;
+        return a + (b - a) * fz;
     }
 
     /**
@@ -105,6 +150,11 @@ public final class Hydrology {
      * lake, then a gentle slope away from it (a valley floor you can climb out of), wider along big
      * rivers. Very high far from any water.
      */
+    public float waterDistance(int wx, int wz) {
+        Tile t = tile(wx, wz);
+        return bilinear(t, t.near, wx, wz);
+    }
+
     public float bank(int wx, int wz) {
         Tile t = tile(wx, wz);
         return bilinear(t, t.bank, wx, wz);
@@ -203,7 +253,7 @@ public final class Hydrology {
                 if (base[k] <= sea) t.carve[k] = Math.min(t.carve[k], Math.max(0, sea - 0.5f - base[k]));
                 h[k] = base[k] + t.carve[k];
             }
-            rivers(t, h);
+            rivers(t, base.clone(), base); // the network comes from the base relief: the same in every tile
             return t.crop();
         } finally {
             computing.decrementAndGet();
@@ -300,7 +350,7 @@ public final class Hydrology {
      * streams; their surface follows the ground one block down, never rising downstream (the bed is
      * cut through bumps: gorges), and the bed is a disc whose width grows with the flow.
      */
-    private void rivers(Tile t, float[] h) {
+    private void rivers(Tile t, float[] h, float[] base) {
         int n = N * N;
         float[] fill = new float[n];
         int[] to = new int[n], order = new int[n];
@@ -346,7 +396,7 @@ public final class Hydrology {
             if (h[k] <= sea) continue;
             boolean lake = fill[k] - h[k] > 1.2f;
             if (!lake && t.flow[k] < STREAM_FLOW) continue;
-            float s0 = lake ? (float) Math.floor(fill[k]) : (float) Math.floor(h[k]) - 1;
+            float s0 = lake ? (float) Math.floor(fill[k]) : (float) Math.floor(Math.min(h[k], base[k])) - 1; // channels never rise on their own sediment
             surface[k] = Float.isNaN(surface[k]) ? s0 : Math.min(surface[k], s0);
             int r = to[k];
             if (r >= 0 && h[r] > sea) surface[r] = Float.isNaN(surface[r]) ? surface[k] : Math.min(surface[r], surface[k]);
@@ -405,16 +455,41 @@ public final class Hydrology {
         }
         // Banks: from every water cell (and the sea) outwards, the ground may rise one block above
         // the water, then BANK_SLOPE blocks per block; big rivers get a flatter, wider floor.
+        // Distance to rivers and lakes (for features that must keep clear of them, like ravines).
+        java.util.Arrays.fill(t.near, NEAR_CAP);
+        int[] dq = new int[n];
+        int dh = 0, dt = 0;
+        for (int k = 0; k < n; k++) if (!Float.isNaN(t.level[k])) { t.near[k] = 0; dq[dt++] = k; }
+        while (dh < dt) {
+            int k = dq[dh++];
+            if (t.near[k] + CELL >= NEAR_CAP) continue;
+            int i = k % N, j = k / N;
+            for (int d = 0; d < 4; d++) {
+                int ii = i + di[d], jj = j + dj[d];
+                if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
+                int q = jj * N + ii;
+                if (t.near[q] <= t.near[k] + CELL) continue;
+                t.near[q] = t.near[k] + CELL;
+                dq[dt++] = q;
+            }
+        }
+        // Banks follow the NEAREST water (breadth-first, each cell once): one block above it at the
+        // edge, then a gentle slope; a lower river or the sea further away does not drag the land
+        // beside a higher river down (which left rivers perched on spurs).
         java.util.Arrays.fill(t.bank, 400);
+        float[] source = new float[n];
+        int[] ring = new int[n];
+        boolean[] seen = new boolean[n];
         head = 0;
         tail = 0;
         for (int k = 0; k < n; k++) {
             boolean water = !Float.isNaN(t.level[k]);
             if (!water && h[k] > sea) continue;
-            float lvl = water ? t.level[k] : sea;
-            t.bank[k] = lvl + 1;
+            source[k] = water ? t.level[k] : sea;
+            t.bank[k] = source[k] + 1;
             float f = water ? Math.max(t.flow[k], STREAM_FLOW) : STREAM_FLOW * 50;
             slope[k] = CELL * Math.max(0.35f, Math.min(1.2f, 1.6f / (float) Math.log10(f / STREAM_FLOW * 10 + 1)));
+            seen[k] = true;
             queue[tail++] = k;
         }
         while (head < tail) {
@@ -424,11 +499,14 @@ public final class Hydrology {
                 int ii = i + di[d], jj = j + dj[d];
                 if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
                 int q = jj * N + ii;
-                boolean edge = !Float.isNaN(t.level[k]) || h[k] <= sea;
-                float cap = t.bank[k] + (edge ? 0 : slope[k]); // the first ring stays at the water's edge
-                if (cap >= t.bank[q] || cap > h[q] + 40) continue; // already lower, or far up a mountain side
-                t.bank[q] = cap;
+                if (seen[q]) continue;
+                seen[q] = true;
+                ring[q] = ring[k] + 1;
+                source[q] = source[k];
                 slope[q] = slope[k];
+                float cap = source[q] + 1 + (ring[q] - 1) * slope[q]; // the first ring stays at the water's edge
+                if (cap > h[q] + 40) continue; // far up a mountain side: no limit there
+                t.bank[q] = cap;
                 queue[tail++] = q;
             }
         }

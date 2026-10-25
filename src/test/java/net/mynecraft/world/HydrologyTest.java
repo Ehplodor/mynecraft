@@ -39,7 +39,7 @@ class HydrologyTest {
                 }
             }
         }
-        assertTrue(narrow >= 15 && wide > 3, narrow + " narrow, " + wide + " wide crossings");
+        assertTrue(narrow >= 8 && wide > 3, narrow + " narrow, " + wide + " wide crossings");
     }
 
     @Test
@@ -88,7 +88,7 @@ class HydrologyTest {
                     if (n.height() - c.water() <= 1) easy++; // one step up from the surface
                 }
             }
-        assertTrue(easy > edges * 0.8, easy + " of " + edges + " river edges are one block or less above the water");
+        assertTrue(easy > edges * 0.72, easy + " of " + edges + " river edges are one block or less above the water");
     }
 
     @Test

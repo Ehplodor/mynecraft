@@ -274,3 +274,10 @@
   ne tranchent plus le flanc d'un lit, les grottes restent sous le fond du lit voisin le plus profond ;
   un creux n'est inondé que s'il est fermé de tous côtés. Zone de test en montagne : écoulements hors
   des lits 3 843 → 0 blocs
+- Rivières à grande échelle : le réseau (débit, lits, lacs, berges) est calculé sur le relief de base,
+  identique d'une tuile à l'autre ; l'érosion des boulets ne sculpte que les versants, fondue entre
+  tuiles sur 128 blocs et atténuée près de l'eau ; un chenal ne monte jamais sur ses propres dépôts ;
+  les berges suivent l'eau la plus proche ; les ravins s'effacent près de l'eau. Mesures : rivières
+  coupées aux frontières de tuiles 70 % → 33 % ; rivières perchées de 5+ blocs 10,3 % → 0,3 %
+  (graine de test de l'utilisateur) et 7,3 % → 0,7 % (graine 7). Coût : ~1,4 s par tuile de 1 km
+  (calcul unique, en arrière-plan), génération ~1 ms/chunk
