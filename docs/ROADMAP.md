@@ -310,3 +310,9 @@
 - Mixage : niveaux lissés selon lieu, heure, météo ; réverbération selon l'endroit (plein air, forêt,
   abri, grotte) et sons extérieurs étouffés sous un toit avec EFX ; synthèse en arrière-plan au démarrage
 - Vérifié hors jeu : spectres, raccords de boucle, fins sans clic (test `SynthTest`) ; planches d'écoute
+- Seconde passe après écoute (« artificiel, grésille, trop fort ») : chaque son réglé sur une sonie cible
+  par nature (pas −36 dB, casse −30, tonnerre proche −24...) au lieu de sa crête (crêtes 0,04-0,47 au lieu
+  de 0,8-0,97) ; plus de saturation ; grains à enveloppe en cosinus (plus d'attaques instantanées), contenu
+  surtout entre 0,5 et 5 kHz (énergie > 6 kHz : 11 % au plus) ; premières réflexions sur les sons ponctuels ;
+  ruisseau en résonances mouvantes plutôt qu'en nuée de bulles ; chants d'oiseaux avec micro-instabilités ;
+  réglage du volume dans le menu pause (60 % par défaut, `options.properties` partagé par les mondes)

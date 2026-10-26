@@ -13,7 +13,7 @@ import java.util.List;
  * Starting another world relaunches the game with the new arguments (see {@link Main}).
  */
 final class PauseMenu {
-    enum Action { NONE, RESUME, RESPAWN, RELOAD, NEW_RANDOM, NEW_SAME_SEED, NEW_TYPED_SEED, OPEN_WORLD, QUIT }
+    enum Action { NONE, RESUME, VOLUME_UP, VOLUME_DOWN, RESPAWN, RELOAD, NEW_RANDOM, NEW_SAME_SEED, NEW_TYPED_SEED, OPEN_WORLD, QUIT }
 
     private record Button(String label, Action action) {}
 
@@ -24,6 +24,8 @@ final class PauseMenu {
     /** Seed being typed (the field has the focus while {@link #typing}). */
     final StringBuilder seedText = new StringBuilder();
     boolean typing;
+    /** Master volume shown on its button (percent). */
+    int volume = 60;
 
     PauseMenu(Path current, long seed) {
         this.current = current;
@@ -42,6 +44,7 @@ final class PauseMenu {
     private List<Button> buttons() {
         List<Button> b = new ArrayList<>();
         b.add(new Button("Reprendre", Action.RESUME));
+        b.add(new Button("Volume : " + volume + " %   (clic gauche : plus, clic droit : moins)", Action.VOLUME_UP));
         b.add(new Button("Réapparaître au point de départ", Action.RESPAWN));
         b.add(new Button("Recharger ce monde (" + current.getFileName() + ")", Action.RELOAD));
         b.add(new Button("Nouveau monde : graine aléatoire", Action.NEW_RANDOM));
@@ -102,6 +105,7 @@ final class PauseMenu {
             float y = l[1] + i * (l[3] + l[4]);
             if (mx < l[0] || mx >= l[0] + l[2] || my < y || my >= y + l[3]) continue;
             Action a = b.get(i).action;
+            if (a == Action.VOLUME_UP && right) return Action.VOLUME_DOWN;
             if (a == Action.OPEN_WORLD && right) {
                 worldIndex = (worldIndex + 1) % worlds.size();
                 return Action.NONE;

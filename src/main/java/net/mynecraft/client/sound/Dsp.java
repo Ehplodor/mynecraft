@@ -213,6 +213,62 @@ final class Dsp {
         return normalize(s, peak);
     }
 
+    /**
+     * Perceived loudness in dB (full scale = 0): RMS through a rough A-weighting (the ear hears
+     * little below 300 Hz and above 10 kHz, most around 2-4 kHz). The quiet tail of a one-shot
+     * would drag a plain RMS down, so only the loudest 300 ms window counts.
+     */
+    static double loudness(float[] s) {
+        float[] w = s.clone();
+        Biquad.highpass(300, 0.6).apply(w);
+        Biquad.lowpass(10000, 0.6).apply(w);
+        int win = Math.min(w.length, samples(0.3)), hop = Math.max(1, win / 4);
+        double best = 1e-12;
+        for (int start = 0; start + win <= w.length; start += hop) {
+            double sum = 0;
+            for (int i = start; i < start + win; i++) sum += w[i] * w[i];
+            best = Math.max(best, sum / win);
+        }
+        return 10 * Math.log10(best);
+    }
+
+    /**
+     * Sets a sound to a perceived loudness (dB, e.g. -30), never letting a peak pass 0.9: sounds
+     * are mixed by how loud they feel, not by their peaks (a click and a hiss with the same peak
+     * are very different in loudness).
+     */
+    static float[] level(float[] s, double db) {
+        double g = Math.pow(10, (db - loudness(s)) / 20);
+        double m = 1e-9;
+        for (float v : s) m = Math.max(m, Math.abs(v));
+        return scale(s, Math.min(g, 0.9 / m));
+    }
+
+    /**
+     * A few early reflections (ground and nearby surfaces: 6-30 ms, each darker and weaker): a
+     * dry synthetic sound sounds as if it were somewhere.
+     */
+    static float[] space(float[] s, double wet) {
+        float[] out = java.util.Arrays.copyOf(s, s.length + samples(0.04));
+        double[][] taps = {{0.0063, 0.5}, {0.0117, 0.35}, {0.0171, 0.25}, {0.0233, 0.18}, {0.0297, 0.12}};
+        Biquad dark = Biquad.lowpass(3500, 0.7);
+        float[] darker = dark.apply(s.clone());
+        for (double[] t : taps) mix(out, darker, samples(t[0]), wet * t[1]);
+        return out;
+    }
+
+    /**
+     * A soft grain: band-limited noise under a raised-cosine envelope (no instant attack, which is
+     * what makes synthesised crunches sizzle). Centre {@code f} Hz, length {@code seconds}.
+     */
+    static float[] grain(SplittableRandom r, double f, double seconds) {
+        int n = Math.max(8, samples(seconds));
+        float[] g = new float[n];
+        for (int i = 0; i < n; i++) g[i] = (float) (white(r) * 0.5 * (1 - Math.cos(2 * Math.PI * i / n)));
+        Biquad.bandpass(f, 1.2).apply(g);
+        return g;
+    }
+
     /** Scales so the peak is {@code peak} (0..1). */
     static float[] normalize(float[] s, double peak) {
         double m = 1e-9;

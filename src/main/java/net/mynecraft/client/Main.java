@@ -343,6 +343,15 @@ public final class Main {
         Minimap minimap = new Minimap(world.generator, explored);
         WorldMap worldMap = new WorldMap(world.generator, explored, waypoints);
         SoundEngine sound = new SoundEngine();
+        // Options shared by all worlds, next to them: for now the master volume.
+        java.util.Properties options = new java.util.Properties();
+        Path optionsFile = worldDir.toAbsolutePath().getParent().resolve("options.properties");
+        try (var in = java.nio.file.Files.newBufferedReader(optionsFile)) {
+            options.load(in);
+        } catch (IOException ignored) { // first run: defaults
+        }
+        pauseMenu.volume = Math.max(0, Math.min(100, Integer.parseInt(options.getProperty("volume", "60").trim())));
+        sound.setVolume(pauseMenu.volume / 100f);
         double stepDistance = 0, lastStepX = player.x, lastStepZ = player.z, waterScanAt = -1;
         SoundEngine.Ambience ambience = new SoundEngine.Ambience();
         double nextHitSound = 0;
@@ -456,6 +465,16 @@ public final class Main {
                             player.vx = player.vy = player.vz = 0;
                             paused = false;
                             input.capture(true);
+                        }
+                        case VOLUME_UP, VOLUME_DOWN -> {
+                            pauseMenu.volume = Math.max(0, Math.min(100, pauseMenu.volume + (action == PauseMenu.Action.VOLUME_UP ? 10 : -10)));
+                            sound.setVolume(pauseMenu.volume / 100f);
+                            options.setProperty("volume", Integer.toString(pauseMenu.volume));
+                            try (var out = java.nio.file.Files.newBufferedWriter(optionsFile)) {
+                                options.store(out, "Mynecraft");
+                            } catch (IOException e) {
+                                System.err.println("[options] cannot save: " + e.getMessage());
+                            }
                         }
                         case RELOAD -> restart = relaunchArgs(args, worldDir, null);
                         case NEW_RANDOM -> restart = relaunchArgs(args, pauseMenu.newWorldDir(), new java.util.Random().nextLong());

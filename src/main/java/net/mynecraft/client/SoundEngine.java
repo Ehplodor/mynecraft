@@ -75,10 +75,19 @@ final class SoundEngine {
             alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
             efx = caps.ALC_EXT_EFX;
             enabled = true;
+            alListenerf(AL_GAIN, volume);
             synthesis = CompletableFuture.supplyAsync(SoundEngine::synthesise);
         } catch (Throwable e) {
             System.err.println("[sound] disabled: " + e);
         }
+    }
+
+    private float volume = 0.6f;
+
+    /** Master volume 0..1 (the pause menu). */
+    void setVolume(float v) {
+        volume = Math.max(0, Math.min(1, v));
+        if (enabled) alListenerf(AL_GAIN, volume);
     }
 
     boolean enabled() {
