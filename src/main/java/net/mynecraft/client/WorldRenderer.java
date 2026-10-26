@@ -64,7 +64,8 @@ final class WorldRenderer {
     /** One chunk shader variant and its uniform locations. */
     private static final class Program {
         final Shader shader;
-        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd, uDaylight, uMinLight, uTime;
+        final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd, uDaylight, uMinLight, uTime,
+            uShadowVP, uSunDir, uShadowStrength, uSkyColor, uCamWorld, uScreen, uDepthRange;
         Program(String defines) {
             shader = new Shader("/shaders/chunk.vert", "/shaders/chunk.frag", defines);
             uViewProj = shader.uniform("uViewProj");
@@ -77,9 +78,19 @@ final class WorldRenderer {
             glUniform1i(shader.uniform("uQuads"), 2);
             uMinLight = shader.uniform("uMinLight");
             uTime = shader.uniform("uTime");
+            uShadowVP = shader.uniform("uShadowVP");
+            uSunDir = shader.uniform("uSunDir");
+            uShadowStrength = shader.uniform("uShadowStrength");
+            uSkyColor = shader.uniform("uSkyColor");
+            uCamWorld = shader.uniform("uCamWorld");
+            uScreen = shader.uniform("uScreen");
+            uDepthRange = shader.uniform("uDepthRange");
             glUseProgram(shader.program);
             glUniform1i(shader.uniform("uTextures"), 0);
             glUniform1i(shader.uniform("uBiome"), 1);
+            glUniform1i(shader.uniform("uShadowMap"), 3);
+            glUniform1i(shader.uniform("uSceneColor"), 4);
+            glUniform1i(shader.uniform("uSceneDepth"), 5);
             // Tint colours by type: none, grass, foliage, water. Grass and foliage come from the biome map.
             glUniform3fv(shader.uniform("uTints"), new float[] {
                 1, 1, 1, 0.57f, 0.74f, 0.35f, 0.47f, 0.70f, 0.27f, 0.25f, 0.46f, 0.89f});
@@ -87,7 +98,16 @@ final class WorldRenderer {
     }
 
     private final World world;
-    private final Program opaqueProgram, cutoutProgram, translucentProgram;
+    private final Program opaqueProgram, cutoutProgram, translucentProgram, shadowProgram, shadowCutoutProgram;
+    final ShadowMap shadow = new ShadowMap();
+    final SceneTarget scene = new SceneTarget();
+    /** Towards the sun (set each frame), how much it lights (0 at night), the sky's colour overhead. */
+    final org.joml.Vector3d sunDir = new org.joml.Vector3d(0, 1, 0);
+    float shadowStrength;
+    final float[] skyColor = {0.5f, 0.7f, 1f};
+    /** Sun shadows on (the shadow pass costs a second drawing of the nearby terrain). */
+    boolean shadows = true;
+    private float far = 200;
     private final int quadTexture; // GL_TEXTURE_BUFFER view (RGBA32UI) of the shared buffer
     private final int ebo;
     private final HashMap<Long, Mesh> meshes = new HashMap<>();
@@ -123,7 +143,8 @@ final class WorldRenderer {
     private final TextureArray textures;
     private final FrustumIntersection frustum = new FrustumIntersection();
     private final Matrix4f viewProj = new Matrix4f();
-    private final float[] matrixBuf = new float[16];
+    private final float[] matrixBuf = new float[16], shadowBuf = new float[16];
+    private double camWorldX, camWorldZ;
     private Mesh[] drawList = new Mesh[256];
 
     private final AtomicInteger pendingJobs = new AtomicInteger();
@@ -142,6 +163,8 @@ final class WorldRenderer {
         opaqueProgram = new Program("");
         cutoutProgram = new Program("#define CUTOUT\n");
         translucentProgram = new Program("#define TRANSLUCENT\n");
+        shadowProgram = new Program("#define SHADOW\n");
+        shadowCutoutProgram = new Program("#define SHADOW\n#define CUTOUT\n");
 
         vao = glGenVertexArrays(); // core profile needs one bound, even with no attributes
         glBindVertexArray(vao);
@@ -338,6 +361,8 @@ final class WorldRenderer {
 
     void render(Camera cam, float aspect, float far, float[] fog) {
         drainUploads(4_000_000L);
+        this.far = far;
+        if (shadows && shadowStrength > 0) renderShadows(cam, fog);
         cam.viewProj(viewProj, aspect, far);
         frustum.set(viewProj);
         viewProj.get(matrixBuf);
@@ -348,6 +373,8 @@ final class WorldRenderer {
         glActiveTexture(GL_TEXTURE0);
 
         double px = cam.pos.x, py = cam.pos.y, pz = cam.pos.z;
+        camWorldX = px;
+        camWorldZ = pz;
         int camCx = (int) Math.floor(px) >> 4, camCz = (int) Math.floor(pz) >> 4;
         int camSy = Chunk.sectionIndex((int) Math.floor(py));
         drawCount = 0;
@@ -383,6 +410,13 @@ final class WorldRenderer {
         float offX = (float) (px - (camCx << 4)), offY = (float) (py - Chunk.MIN_Y), offZ = (float) (pz - (camCz << 4));
         pass(opaqueProgram, false, 0, fog, far, camCx, camCz, offX, offY, offZ);
         pass(cutoutProgram, false, 1, fog, far, camCx, camCz, offX, offY, offZ);
+        // The water samples the opaque world drawn so far (refraction, depth under the surface).
+        scene.snapshot();
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, scene.copyColor());
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, scene.copyDepth());
+        glActiveTexture(GL_TEXTURE0);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(false);
@@ -393,6 +427,47 @@ final class WorldRenderer {
     }
 
     private int drawCount;
+
+    /**
+     * Shadow pass: the opaque and cutout layers of every section within the shadow radius (not
+     * only those in view: a hill behind the player still casts its shadow) into the sun's depth map.
+     */
+    private void renderShadows(Camera cam, float[] fog) {
+        double px = cam.pos.x, py = cam.pos.y, pz = cam.pos.z;
+        shadow.update(sunDir, px, py, pz);
+        int camCx = (int) Math.floor(px) >> 4, camCz = (int) Math.floor(pz) >> 4;
+        float reach = ShadowMap.RADIUS + 24;
+        drawCount = 0;
+        for (Mesh m : meshes.values()) {
+            if (m == null || m.offset < 0) continue;
+            float ox = (float) ((m.cx << 4) + 8 - px), oz = (float) ((m.cz << 4) + 8 - pz);
+            if (Math.abs(ox) > reach || Math.abs(oz) > reach) continue;
+            if (drawCount == drawList.length) drawList = Arrays.copyOf(drawList, drawCount * 2);
+            drawList[drawCount++] = m;
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, shadow.fbo);
+        glViewport(0, 0, ShadowMap.SIZE, ShadowMap.SIZE);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.5f, 3f);
+        glDisable(GL_CULL_FACE); // thin things (leaves, slabs) cast from both sides
+        shadow.viewProj.get(matrixBuf);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, textures.id);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_BUFFER, quadTexture);
+        glActiveTexture(GL_TEXTURE0);
+        glBindVertexArray(vao);
+        float offX = (float) (px - (camCx << 4)), offY = (float) (py - Chunk.MIN_Y), offZ = (float) (pz - (camCz << 4));
+        pass(shadowProgram, false, 0, fog, far, camCx, camCz, offX, offY, offZ);
+        pass(shadowCutoutProgram, false, 1, fog, far, camCx, camCz, offX, offY, offZ);
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        glEnable(GL_CULL_FACE);
+        scene.bind(scene.width(), scene.height()); // back to the world picture
+        glViewport(0, 0, scene.width(), scene.height());
+        drawCount = 0;
+    }
+
 
     private void addDraw(Mesh m, double px, double py, double pz, boolean testFrustum) {
         if (m == null || m.offset < 0) return;
@@ -438,6 +513,13 @@ final class WorldRenderer {
         glUniform1f(p.uDaylight, daylight);
         glUniform1f(p.uMinLight, minLight);
         glUniform1f(p.uTime, (float) (time % 512.0));
+        glUniformMatrix4fv(p.uShadowVP, false, shadow.viewProj.get(shadowBuf));
+        glUniform3f(p.uSunDir, (float) sunDir.x, (float) sunDir.y, (float) sunDir.z);
+        glUniform1f(p.uShadowStrength, shadows ? shadowStrength : 0);
+        glUniform3f(p.uSkyColor, skyColor[0], skyColor[1], skyColor[2]);
+        glUniform2f(p.uCamWorld, (float) (camWorldX % 1024.0), (float) (camWorldZ % 1024.0));
+        glUniform2f(p.uScreen, scene.width(), scene.height());
+        glUniform2f(p.uDepthRange, 0.05f, this.far);
         glMultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts, GL_UNSIGNED_INT, drawOffsets, drawBase);
     }
 
@@ -456,6 +538,8 @@ final class WorldRenderer {
     }
 
     void dispose() {
+        shadow.dispose();
+        scene.dispose();
         workers.shutdownNow();
         editWorker.shutdownNow();
         glDeleteBuffers(vbo);

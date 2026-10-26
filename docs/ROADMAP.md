@@ -330,3 +330,8 @@
 - Noms affichés depuis un fichier de langue (`lang/fr_fr.json` du pack par défaut, remplaçable par un
   resource pack), sinon tirés de l'identifiant ; recettes ajoutées : glace compactée, andésite
 - Logique testée sans écran (`RecipeIndex`, `CraftingMenu`)
+
+## ✅ M20 — Ombres solaires, reflets de l'eau, textures animées
+- Carte d'ombres du soleil : 2048², rayon 96 blocs, orthographique, calée sur les texels (pas de scintillement), filtrage PCF matériel 4 prises, décalage selon la normale ; s'efface la nuit et par temps couvert.
+- Monde rendu hors écran (`SceneTarget`) et copié avant la passe translucide : l'eau réfracte le fond (déformé par les vaguelettes), s'assombrit avec l'épaisseur, reflète le ciel selon Fresnel, et le soleil y scintille.
+- Textures animées depuis `.png.mcmeta` (frametime, frames, interpolate) : seule la couche qui change est renvoyée au GPU. Eau et lave du pack par défaut animées.

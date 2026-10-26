@@ -11,6 +11,8 @@ uniform float uDaylight;  // 1 at noon, low at night: scales sky light only
 uniform float uMinLight;  // debug floor (--fullbright), 0 normally
 uniform float uTime;      // seconds, wraps: scrolls flowing fluids
 uniform sampler2DArray uBiome; // grass (layer 0) and foliage (layer 1) colour per column, wraps every 512 blocks
+uniform mat4 uShadowVP;   // sun's view-projection (camera-relative), for shadows
+uniform vec3 uSunDir;     // towards the sun
 
 out vec2 vUv;
 flat out float vLayer;
@@ -18,6 +20,17 @@ flat out float vOverlay;
 out vec3 vTint;
 out float vLight;
 out float vDist;
+out float vSky;           // sky light (with daylight), block light, AO x face shade: lit in the fragment
+out float vBlock;
+out float vShade;
+out float vSun;           // how squarely the face meets the sun (0..1)
+out vec3 vShadow;         // position in the shadow map (0..1)
+out vec3 vPos;            // camera-relative position
+flat out float vWater;    // 1 on water faces (reflections, depth)
+
+// Face normals: -x, +x, -y, +y, -z, +z, cross planes (lit as if facing up a little).
+const vec3 NORMAL[7] = vec3[7](vec3(-1, 0, 0), vec3(1, 0, 0), vec3(0, -1, 0), vec3(0, 1, 0), vec3(0, 0, -1), vec3(0, 0, 1),
+                               vec3(0, 0.7, 0));
 
 const float SHADE[7] = float[7](0.6, 0.6, 0.5, 1.0, 0.8, 0.8, 0.9);
 const float AO[4] = float[4](0.45, 0.65, 0.82, 1.0);
@@ -95,6 +108,11 @@ void main() {
     float sky = level(float(light & 63u) * 0.25) * uDaylight;
     float block = level(float((light >> 6) & 63u) * 0.25);
     float lit = max(max(sky, block), uMinLight) * AO[ao] * SHADE[face];
+    vSky = sky;
+    vBlock = max(block, uMinLight);
+    vShade = AO[ao] * SHADE[face];
+    vec3 normal = NORMAL[face];
+    vSun = face == 6u ? 0.6 : max(dot(normal, uSunDir), 0.0);
 
     uint tint = (q.y >> 10) & 3u;
     vLayer = float(q.y & 1023u);
@@ -115,5 +133,9 @@ void main() {
     vLight = lit;
     vec3 p = vec3(dx * 16, sy * 16, dz * 16) + local - uCamOffset;
     vDist = length(p);
+    vPos = p;
+    // Pushed a little along the normal before the lookup: no self-shadowing speckles ("acne").
+    vShadow = (uShadowVP * vec4(p + (face == 6u ? vec3(0, 0.1, 0) : normal * 0.08), 1.0)).xyz * 0.5 + 0.5;
+    vWater = tint == 3u ? 1.0 : 0.0;
     gl_Position = uViewProj * vec4(p, 1.0);
 }

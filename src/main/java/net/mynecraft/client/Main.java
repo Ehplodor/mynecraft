@@ -664,11 +664,25 @@ public final class Main {
             renderer.time = weatherClock;
             DayCycle.skyColor(ticks, sky);
             renderer.daylight = DayCycle.daylight(ticks);
+            {   // The sun for shadows and water: same path as the sun drawn in the sky, slightly tilted.
+                double a = (ticks % DayCycle.DAY_TICKS) / DayCycle.DAY_TICKS * 2 * Math.PI;
+                renderer.sunDir.set(Math.cos(a), Math.sin(a), 0.18).normalize();
+                double h = Math.sin(a);
+                Atmosphere.Sample w = weather.here();
+                float overcast = w == null ? 0 : Math.min(1, Math.max(0, w.cloud() - 0.2f) * 1.2f);
+                renderer.shadowStrength = (float) Math.max(0, Math.min(1, (h - 0.03) / 0.15)) * (1 - 0.85f * overcast);
+            }
             applyWeather(weather.here(), weatherRenderer.flash, sky, renderer);
+            // Overhead, the sky is deeper than at the horizon (the fog colour): water mirrors both.
+            renderer.skyColor[0] = sky[0] * 0.7f;
+            renderer.skyColor[1] = sky[1] * 0.82f;
+            renderer.skyColor[2] = Math.min(1, sky[2] * 1.02f);
             glClearColor(sky[0], sky[1], sky[2], 1);
 
             glfwGetFramebufferSize(window, fbW, fbH);
             if (stats != null) stats.beginGpu();
+            textures.animate(org.lwjgl.glfw.GLFW.glfwGetTime() * 20); // animated textures run on real time
+            renderer.scene.bind(fbW[0], fbH[0]); // the world is drawn off-screen (water samples it), then shown
             glViewport(0, 0, fbW[0], fbH[0]);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             float aspect = fbW[0] / (float) Math.max(1, fbH[0]);
@@ -687,6 +701,7 @@ public final class Main {
             }
             overlay.crosshair(fbW[0], fbH[0]);
             if (debug) gpuTimer.end();
+            renderer.scene.present();
             hud.begin(fbW[0], fbH[0]);
             float hotbarTop = creative ? hud.hotbar(input.hotbar, null, input.slot)
                 : hud.hotbar(java.util.Arrays.copyOf(inventory.ids, Inventory.HOTBAR),
