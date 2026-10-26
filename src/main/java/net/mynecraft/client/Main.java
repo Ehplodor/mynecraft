@@ -10,6 +10,7 @@ import net.mynecraft.world.weather.Weather;
 import net.mynecraft.world.Blocks;
 import net.mynecraft.world.Chunk;
 import net.mynecraft.world.ExploredMap;
+import net.mynecraft.client.sound.Synth;
 import net.mynecraft.world.ChunkStreamer;
 import net.mynecraft.world.storage.WorldStorage;
 import net.mynecraft.world.FluidSimulator;
@@ -343,7 +344,9 @@ public final class Main {
         WorldMap worldMap = new WorldMap(world.generator, explored, waypoints);
         SoundEngine sound = new SoundEngine();
         double stepDistance = 0, lastStepX = player.x, lastStepZ = player.z, waterScanAt = -1;
-        double[][] waterSpots = new double[0][];
+        SoundEngine.Ambience ambience = new SoundEngine.Ambience();
+        double nextHitSound = 0;
+        byte lastFluid = Blocks.FLUID_NONE;
         String mapMode = option(args, "--minimap", null); // scripted shots: relief, biomes, waters, clouds, weather
         if (mapMode != null) minimap.mode = Minimap.Mode.valueOf(mapMode.toUpperCase());
         if (argv.contains("--worldmap")) worldMap.open(player.x, player.z); // scripted shots
@@ -390,6 +393,7 @@ public final class Main {
                     double[] m = input.mouseInFramebuffer();
                     boolean left = input.clicked(GLFW_MOUSE_BUTTON_LEFT), right = input.clicked(GLFW_MOUSE_BUTTON_RIGHT);
                     int slot = (left || right) ? inventoryScreen.slotAt(hud, menu, m[0], m[1]) : -1;
+                    if (slot >= 0) sound.click();
                     if (slot >= 0) {
                         if (menu != null) menu.click(slot, right, input.shiftDown());
                         else if (inventoryScreen.isPalette(null, slot)) input.hotbar[input.slot] = inventoryScreen.paletteBlock(slot);
@@ -438,6 +442,7 @@ public final class Main {
                     if (left || right) {
                         double[] m = input.mouseInFramebuffer();
                         action = pauseMenu.click(hud, m[0], m[1], right);
+                        sound.click();
                     }
                     switch (action) {
                         case RESUME -> {
@@ -502,7 +507,7 @@ public final class Main {
                 if (stepDistance > (wading ? 2.2 : 1.7)) {
                     stepDistance = 0;
                     byte under = world.get((int) Math.floor(player.x), (int) Math.floor(player.y - 0.2), (int) Math.floor(player.z));
-                    sound.step(wading ? SoundEngine.Step.WATER : stepKind(under), player.x, player.y, player.z);
+                    sound.step(wading ? Synth.Material.WATER : material(under), player.x, player.y, player.z);
                 }
             }
 
@@ -517,8 +522,12 @@ public final class Main {
                 }
                 byte target = world.get(hit.x(), hit.y(), hit.z());
                 miningProgress += dt / Blocks.breakSeconds(target);
+                if (weatherClock >= nextHitSound && dt > 0) { // the tool striking, four times a second
+                    sound.hit(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
+                    nextHitSound = weatherClock + 0.25;
+                }
                 if (miningProgress >= 1 && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
-                    sound.blockBroken(hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
+                    sound.blockBroken(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     inventory.add(Blocks.DROP[target & 0xFF], Blocks.DROP_COUNT[target & 0xFF]);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
@@ -530,8 +539,9 @@ public final class Main {
                 miningProgress = 0;
             }
             if (hit != null && ((creative && input.breakRequested) || (editDemo && streamer.settled()))) {
-                if (world.get(hit.x(), hit.y(), hit.z()) != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
-                    sound.blockBroken(hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
+                byte broken = world.get(hit.x(), hit.y(), hit.z());
+                if (broken != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
+                    sound.blockBroken(material(broken), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                 }
@@ -545,7 +555,7 @@ public final class Main {
                 double dirX = -Math.sin(cam.yaw) * cp, dirY = Math.sin(cam.pitch), dirZ = -Math.cos(cam.yaw) * cp;
                 int[] placed = Placement.place(world, player, hit, hitHeight(hit, cam.pos.x, cam.pos.y, cam.pos.z, dirX, dirY, dirZ), input.selected);
                 if (placed != null) {
-                    sound.blockPlaced(placed[0] + 0.5, placed[1] + 0.5, placed[2] + 0.5);
+                    sound.blockPlaced(material(world.get(placed[0], placed[1], placed[2])), placed[0] + 0.5, placed[1] + 0.5, placed[2] + 0.5);
                     if (!creative) inventory.takeOne(input.slot);
                     renderer.blockChanged(placed[0], placed[1], placed[2]);
                     fluids.blockChanged(placed[0], placed[1], placed[2]);
@@ -675,21 +685,27 @@ public final class Main {
                 worldMap.overlay(hud, input, player.x, player.z, cam.yaw);
                 hud.end(textures.id);
             }
-            // Sound: listener at the eyes, rain (muffled under a roof), wind (stronger up high),
-            // running water nearby (looked for twice a second), thunder after each flash.
+            // Sound: thunder after each flash; the ambience from the place, the hour and the weather
+            // (the surroundings are looked at twice a second).
             double[] strike = weatherRenderer.takeStrike();
             if (strike != null) sound.lightning(strike[0], strike[1], strike[2], cam.pos.x, cam.pos.y, cam.pos.z, weatherClock);
+            if (player.fluid == Blocks.FLUID_WATER && lastFluid == Blocks.FLUID_NONE && player.vy < -3)
+                sound.splash(player.x, player.y + 0.5, player.z); // jumped or fell in
+            lastFluid = player.fluid;
             if (sound.enabled()) {
                 Atmosphere.Sample here = weather.here();
                 if (weatherClock >= waterScanAt) {
-                    waterSpots = runningWater(world, cam.pos.x, cam.pos.y, cam.pos.z);
+                    surroundings(world, cam.pos.x, cam.pos.y, cam.pos.z, ambience);
                     waterScanAt = weatherClock + 0.5;
                 }
-                float rainLevel = here == null || here.type() == Atmosphere.Precipitation.NONE ? 0
-                    : Math.min(1, here.precipitation() / 0.03f) * (sheltered(world, cam.pos.x, cam.pos.y, cam.pos.z) ? 0.35f : 1);
-                float windSpeed = here == null ? 0 : (float) (Math.hypot(here.windX(), here.windZ()) * (1 + Math.max(0, cam.pos.y - 80) / 80));
-                sound.update(cam.pos.x, cam.pos.y, cam.pos.z, cam.yaw, cam.pitch, paused ? 0 : rainLevel, paused ? 0 : windSpeed,
-                    waterSpots, weatherClock);
+                boolean wet = here != null && here.type() != Atmosphere.Precipitation.NONE && !paused;
+                ambience.rain = wet ? Math.min(1, here.precipitation() / 0.03f) : 0;
+                ambience.hail = wet && here.type() == Atmosphere.Precipitation.HAIL;
+                ambience.snow = wet && here.type() == Atmosphere.Precipitation.SNOW;
+                ambience.sheltered = sheltered(world, cam.pos.x, cam.pos.y, cam.pos.z);
+                ambience.wind = here == null || paused ? 0 : (float) (Math.hypot(here.windX(), here.windZ()) * (1 + Math.max(0, cam.pos.y - 80) / 80));
+                ambience.daylight = (DayCycle.daylight(ticks) - 0.15f) / 0.85f;
+                sound.update(cam.pos.x, cam.pos.y, cam.pos.z, cam.yaw, cam.pitch, ambience, weatherClock);
             }
             if (stats != null) {
                 stats.endGpu();
@@ -771,13 +787,19 @@ public final class Main {
         if (restart != null) relaunch(restart);
     }
 
-    /** Footstep sound for the block under the feet. */
-    private static SoundEngine.Step stepKind(byte b) {
-        if (b == Blocks.STONE || b == Blocks.COBBLESTONE || b == Blocks.DEEPSLATE || b == Blocks.PACKED_ICE || b == Blocks.ICE) return SoundEngine.Step.STONE;
-        if (b == Blocks.SAND || b == Blocks.GRAVEL) return SoundEngine.Step.SAND;
-        if (b == Blocks.OAK_PLANKS || b == Blocks.OAK_LOG || b == Blocks.CRAFTING_TABLE || Blocks.isSlab(b)) return SoundEngine.Step.WOOD;
-        if (b == Blocks.SNOW_BLOCK) return SoundEngine.Step.SNOW;
-        return SoundEngine.Step.GRASS;
+    /** What a block sounds like (steps, breaking, placing). */
+    private static Synth.Material material(byte b) {
+        if (b == Blocks.GRASS) return Synth.Material.GRASS;
+        if (b == Blocks.DIRT) return Synth.Material.DIRT;
+        if (b == Blocks.SAND) return Synth.Material.SAND;
+        if (b == Blocks.GRAVEL) return Synth.Material.GRAVEL;
+        if (b == Blocks.SNOW_BLOCK) return Synth.Material.SNOW;
+        if (b == Blocks.GLASS || b == Blocks.ICE || b == Blocks.PACKED_ICE || b == Blocks.GLOWSTONE) return Synth.Material.GLASS;
+        if (b == Blocks.OAK_LEAVES || Blocks.SHAPE[b & 0xFF] == Blocks.SHAPE_CROSS) return Synth.Material.LEAVES;
+        if (b == Blocks.OAK_PLANKS || b == Blocks.OAK_LOG || b == Blocks.OAK_LOG_X || b == Blocks.OAK_LOG_Z
+            || b == Blocks.CRAFTING_TABLE || Blocks.isSlab(b)) return Synth.Material.WOOD;
+        if (Blocks.isFluid(b)) return Synth.Material.WATER;
+        return Synth.Material.STONE;
     }
 
     /** True if something solid stands over this point (rain is heard muffled). */
@@ -788,37 +810,59 @@ public final class Main {
     }
 
     /**
-     * Up to 3 spots of running water near the listener {x, y, z, loudness}: river columns (louder
-     * with more flow) and falling or flowing water blocks (rapids, waterfalls), nearest first,
-     * kept at least 12 blocks apart.
+     * Looks around the listener for the sound ambience: up to 3 spots of running water (river
+     * columns by their flow: a brook or a river; moving water blocks: a fall), nearest first and
+     * at least 12 blocks apart; the nearest shore; how wooded and how grassy it is; whether we are
+     * in a cave (no sky light and rock overhead).
      */
-    private static double[][] runningWater(World world, double x, double y, double z) {
+    private static void surroundings(World world, double x, double y, double z, SoundEngine.Ambience a) {
         java.util.List<double[]> found = new java.util.ArrayList<>();
         int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
         var hydrology = world.generator.landscape().hydrology();
-        for (int dz = -40; dz <= 40; dz += 4)
-            for (int dx = -40; dx <= 40; dx += 4) {
+        int trees = 0, grass = 0, columns = 0;
+        double coastD = Double.MAX_VALUE;
+        a.coast = null;
+        for (int dz = -44; dz <= 44; dz += 4)
+            for (int dx = -44; dx <= 44; dx += 4) {
                 var c = world.generator.column(bx + dx, bz + dz);
+                columns++;
+                byte biome = c.biome();
+                if (biome == Landscape.FOREST || biome == Landscape.BIRCH_FOREST || biome == Landscape.DARK_FOREST
+                    || biome == Landscape.TAIGA || biome == Landscape.SNOWY_TAIGA) trees++;
+                if (biome == Landscape.PLAINS || biome == Landscape.DRY_PLAINS || biome == Landscape.FOREST || biome == Landscape.BIRCH_FOREST) grass++;
                 if (c.river() > 0) {
                     float flow = hydrology.flow(bx + dx, bz + dz);
                     found.add(new double[] {bx + dx + 0.5, c.water() + 0.5, bz + dz + 0.5,
-                        Math.min(1, 0.3 + Math.log10(flow / 400 + 1) * 0.35)});
+                        Math.min(1, 0.35 + Math.log10(flow / 400 + 1) * 0.35), flow < 2500 ? 0 : 1});
                 }
-                for (int dy = -12; dy <= 12; dy += 3) { // falls and rapids: moving water blocks
-                    byte b = world.get(bx + dx, by + dy, bz + dz);
-                    if (Blocks.isFluid(b) && Blocks.LEVEL[b & 0xFF] != 0 && Blocks.FLUID[b & 0xFF] == Blocks.FLUID_WATER)
-                        found.add(new double[] {bx + dx + 0.5, by + dy + 0.5, bz + dz + 0.5, Blocks.LEVEL[b & 0xFF] == 8 ? 1 : 0.6});
+                if ((biome == Landscape.OCEAN || biome == Landscape.FROZEN_OCEAN) && c.height() > net.mynecraft.world.TerrainGenerator.SEA_LEVEL - 4) {
+                    double d = dx * dx + dz * dz; // shallow sea near the shore: where waves break
+                    if (d < coastD) {
+                        coastD = d;
+                        a.coast = new double[] {bx + dx + 0.5, net.mynecraft.world.TerrainGenerator.SEA_LEVEL + 0.5, bz + dz + 0.5};
+                    }
                 }
+                if (Math.abs(dx) <= 24 && Math.abs(dz) <= 24)
+                    for (int dy = -12; dy <= 12; dy += 3) { // falls and rapids: moving water blocks
+                        byte b = world.get(bx + dx, by + dy, bz + dz);
+                        if (Blocks.FLUID[b & 0xFF] == Blocks.FLUID_WATER && Blocks.LEVEL[b & 0xFF] != 0)
+                            found.add(new double[] {bx + dx + 0.5, by + dy + 0.5, bz + dz + 0.5, Blocks.LEVEL[b & 0xFF] == 8 ? 1 : 0.6,
+                                Blocks.LEVEL[b & 0xFF] == 8 ? 2 : 0});
+                    }
             }
+        a.forest = Math.min(1, trees * 2f / columns);
+        a.grass = Math.min(1, grass * 1.5f / columns);
         found.sort(java.util.Comparator.comparingDouble(p -> (p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y) + (p[2] - z) * (p[2] - z)));
-        java.util.List<double[]> out = new java.util.ArrayList<>();
+        java.util.List<double[]> spots = new java.util.ArrayList<>();
         for (double[] p : found) {
             boolean far = true;
-            for (double[] q : out) if (Math.abs(p[0] - q[0]) + Math.abs(p[2] - q[2]) < 12) far = false;
-            if (far) out.add(p);
-            if (out.size() == 3) break;
+            for (double[] q : spots) if (Math.abs(p[0] - q[0]) + Math.abs(p[2] - q[2]) < 12) far = false;
+            if (far) spots.add(p);
+            if (spots.size() == 3) break;
         }
-        return out.toArray(new double[0][]);
+        a.water = spots.toArray(new double[0][]);
+        int sky = world.getLight(bx, by, bz) >> 4;
+        a.underground = sheltered(world, x, y, z) ? Math.max(0, Math.min(1, (10 - sky) / 8f)) : 0;
     }
 
     /** Waypoints in the world: a marker and "name (distance)" over each one in front of the camera. */

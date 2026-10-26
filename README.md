@@ -42,7 +42,7 @@ Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `
 | `world/Hydrology` | Bassins versants : érosion par boulets d'eau, lacs, débit cumulé, lits de rivières par tuiles de 1024 blocs |
 | `client/Minimap`, `WorldMap`, `MapPainter` | Minimap et carte du monde à couches (relief, biomes, eaux, nuages, température), calculées en arrière-plan, inexploré grisé |
 | `client/Waypoints`, `world/ExploredMap` | Repères nommés (`waypoints.json`) et chunks explorés (`explored.bin`), sauvegardés avec le monde |
-| `client/SoundEngine` | Sons OpenAL synthétisés : pluie, vent, rivières et chutes spatialisées, tonnerre retardé, pas, blocs |
+| `client/SoundEngine`, `client/sound/*` | Sons synthétisés (aucun fichier) et mixés selon lieu, heure, météo ; réverbération EFX ; voir docs/ROADMAP M18 bis |
 | `client/WeatherRenderer` | Nuages en blocs depuis le champ nuageux, précipitations abritées par les toits, éclairs |
 | `world/Player`, `Raycast` | Physique AABB par balayage d'axe sur les vraies boîtes (dalles), montée de marche 0,6, raycast DDA |
 | `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |

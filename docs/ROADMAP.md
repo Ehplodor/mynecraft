@@ -294,3 +294,19 @@
   rivières et chutes placées en 3D au plus près, tonnerre retardé selon la distance (343 m/s), pas selon
   le sol (herbe, pierre, sable, bois, neige, eau), blocs cassés et posés ; silencieux sans périphérique audio
 - Touches selon la disposition réelle du clavier (M, J, B, C justes en AZERTY) ; minimap affichée par défaut
+
+## ✅ M18 bis — Bruitages
+- Synthèse physique (`client/sound/Synth`, `Dsp`), aucun fichier audio : impacts = transitoire + modes
+  amortis ; bulles = résonance de Minnaert (sinus qui monte et s'éteint) ; frottements et craquements
+  = nuages de micro-grains filtrés ; boucles rendues plus longues puis fondues sur elles-mêmes, modulations
+  lentes en nombre entier de cycles ; graves gardés dans la bande audible des petits haut-parleurs
+- Ambiances : pluie légère / forte / sur un toit, grêle, vent à rafales et sifflement, feuillage en forêt,
+  ruisseau (bulles), rivière (grondement), chute d'eau, ressac sur le rivage le plus proche, grillons la
+  nuit en prairie, grotte (bourdonnement, gouttes avec échos), oiseaux le jour (6 chants), tonnerre
+  proche (claquement, déchirure, roulement) ou lointain, retardé selon la distance
+- Pas (herbe, terre, sable, gravier, pierre, bois, neige, eau, feuilles, verre) : talon puis pointe,
+  4 variantes ; blocs : coups de minage, casse (débris qui rebondissent, bois qui se fend, éclats de verre,
+  terre qui s'effrite...), pose ; plongeon ; clic d'interface
+- Mixage : niveaux lissés selon lieu, heure, météo ; réverbération selon l'endroit (plein air, forêt,
+  abri, grotte) et sons extérieurs étouffés sous un toit avec EFX ; synthèse en arrière-plan au démarrage
+- Vérifié hors jeu : spectres, raccords de boucle, fins sans clic (test `SynthTest`) ; planches d'écoute
