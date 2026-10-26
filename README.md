@@ -13,8 +13,10 @@ Voir l'[étude de faisabilité](docs/ETUDE_FAISABILITE.md) et la [feuille de rou
 gradle run                                   # jeu
 gradle run --args="--no-vsync"               # FPS non plafonnés (affichés dans le titre)
 gradle run --args="--screenshot shot.png"    # rend une image, affiche des stats, quitte
-                                             #   (--view lacet,tangage en degrés, --pos x,y,z, --time ticks,
-                                             #    --no-occlusion, --fullbright, --weather clear/rain/snow/hail/storm)
+                                             #   (--view lacet,tangage en degrés, --pos x,y,z (y "~" : au sol), --time ticks,
+                                             #    --no-occlusion, --fullbright, --weather clear/rain/snow/hail/storm,
+                                             #    --showcase : une créature de chaque espèce devant la caméra,
+                                             #    --life-seconds N : laisse vivre les animaux N s avant la capture)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
 gradle run --args="--datapack MonData.zip"   # data pack (recettes, tags) ; aussi lus depuis <monde>/datapacks/
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
@@ -25,6 +27,10 @@ gradle test                                  # tests + micro-benchmark générat
 Modes : **survie** par défaut (vie, chutes, noyade, lave, minage chronométré, inventaire), **créatif** avec
 `F4` ou `--creative` (blocs illimités, vol avec `F`). En survie, la molette change d'emplacement ; à la mort, `R`
 fait réapparaître au point d'apparition.
+
+Animaux (M22) : cerfs, lapins, renards, truites, hérons, bouquetins, et quatre créatures fantastiques (lanternes des
+brumes la nuit sur l'eau, moussards des forêts, givrelins des neiges, voiliers des cimes). Viser un animal affiche son
+nom, clic gauche le frappe ; se baisser (`Maj`) permet d'approcher les animaux craintifs de plus près.
 
 `E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
 `E` ouvre la palette de tous les blocs.

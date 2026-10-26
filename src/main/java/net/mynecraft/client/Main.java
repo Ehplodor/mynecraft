@@ -5,6 +5,8 @@ import net.mynecraft.resource.Colormap;
 import net.mynecraft.resource.FontLoader;
 import net.mynecraft.resource.PackSource;
 import net.mynecraft.resource.ResourceManager;
+import net.mynecraft.world.life.Creature;
+import net.mynecraft.world.life.Life;
 import net.mynecraft.world.weather.Atmosphere;
 import net.mynecraft.world.weather.Weather;
 import net.mynecraft.world.Blocks;
@@ -217,6 +219,13 @@ public final class Main {
             });
 
         boolean editDemo = argv.contains("--edit-demo"), fluidDemo = argv.contains("--fluid-demo");
+        // Animals (M22): simulated around the player, drawn with the world and its shadows.
+        Life life = new Life(world, world.seed);
+        CreatureRenderer creatureRenderer = new CreatureRenderer();
+        renderer.creatures = creatureRenderer;
+        boolean showcase = argv.contains("--showcase");
+        double lifeWait = Double.parseDouble(option(argv.toArray(new String[0]), "--life-seconds", showcase ? "2" : "0")), lifeClock = 0;
+        Creature aimed = null;
         Overlay overlay = new Overlay();
         FontLoader font = FontLoader.load(resources);
         if (font == null) System.err.println("[resources] no bitmap font in font/default.json: text disabled");
@@ -302,12 +311,15 @@ public final class Main {
             survival.health = 13;
             survival.air = 130;
         }
-        String pos = option(args, "--pos", null); // "x,y,z": start there, flying (scripted views)
+        String pos = option(args, "--pos", null); // "x,y,z" (y "~": on the ground): start there, flying (scripted views)
         if (pos != null) {
             String[] xyz = pos.split(",");
             player.x = Double.parseDouble(xyz[0]);
-            player.y = Double.parseDouble(xyz[1]);
             player.z = Double.parseDouble(xyz[2]);
+            if (xyz[1].equals("~")) { // on the ground (or the water) there
+                var col = world.generator.column((int) Math.floor(player.x), (int) Math.floor(player.z));
+                player.y = Math.max(col.height(), col.water()) + 1.2;
+            } else player.y = Double.parseDouble(xyz[1]);
             player.flying = true;
         }
         double ticks = Double.parseDouble(option(args, "--time", Long.toString(storage.dayTime)));
@@ -579,9 +591,29 @@ public final class Main {
                 }
             }
 
+            if (!paused && !survival.dead) {
+                life.eco.update(ticks, DayCycle.daylight(ticks), DayCycle.DAY_TICKS);
+                if (showcase && streamer.settled()) {
+                    life.showcase(player.x, player.y, player.z, cam.yaw);
+                    showcase = false;
+                }
+                life.tick(dt, player.x, player.y, player.z, input.shiftDown());
+                if (streamer.settled()) lifeClock += dt;
+            }
             double cp = Math.cos(cam.pitch);
             Raycast.Hit hit = Raycast.cast(world, cam.pos.x, cam.pos.y, cam.pos.z,
                 -Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp, REACH);
+            // An animal in front of the block aimed at is struck instead of the block.
+            aimed = life.raycast(cam.pos.x, cam.pos.y, cam.pos.z, -Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp,
+                hit == null ? REACH : Math.max(0, Math.sqrt(Math.pow(hit.x() + 0.5 - cam.pos.x, 2) + Math.pow(hit.y() + 0.5 - cam.pos.y, 2)
+                    + Math.pow(hit.z() + 0.5 - cam.pos.z, 2)) - 0.5));
+            if (aimed != null) {
+                if (input.breakRequested && !screenOpen && !paused) {
+                    life.strike(aimed, creative ? 100 : 4, player.x, player.z);
+                    sound.hit(Synth.Material.WOOD, aimed.x, aimed.y + aimed.height() / 2, aimed.z);
+                }
+                hit = null;
+            }
             // Survival mining: hold the button for the block's break time, then collect its drop.
             if (!creative && input.breakHeld && hit != null) {
                 if (mining == null || mining[0] != hit.x() || mining[1] != hit.y() || mining[2] != hit.z()) {
@@ -689,6 +721,7 @@ public final class Main {
             cam.viewProj(skyViewProj, aspect, far);
             skyRenderer.drawCelestial(skyViewProj, ticks);
             if (debug) gpuTimer.begin();
+            creatureRenderer.prepare(life, world, cam, skyViewProj, renderer.shadows && renderer.shadowStrength > 0);
             renderer.render(cam, aspect, far, sky);
             weatherRenderer.draw(skyViewProj, weather, world, cam.pos.x, cam.pos.y, cam.pos.z, weatherClock,
                 renderer.daylight, far, timeFrozen);
@@ -714,6 +747,10 @@ public final class Main {
             if (input.selected != shownBlock) {
                 shownBlock = input.selected;
                 blockShownAt = now;
+            }
+            if (aimed != null && !screenOpen) { // the name of the animal under the crosshair
+                hud.textCentered(aimed.species.displayName + (aimed.adult() ? "" : " (jeune)"), hud.width() / 2f,
+                    hud.height() / 2f + 2 * hud.lineHeight(), 1, 1, 0.85f);
             }
             if (now - blockShownAt < 2_000_000_000L) {
                 hud.textCentered(itemNames.name(shownBlock), hud.width() / 2f, hotbarTop - hud.lineHeight() - 2 * hud.scale, 1, 1, 1);
@@ -822,7 +859,7 @@ public final class Main {
                 fluids.blockChanged(ox - 4, oy, oz - 6);
                 fluidDemo = false;
             }
-            if (screenshot != null && streamer.settled() && renderer.idle() && fluids.pending() == 0 && !fluidDemo
+            if (screenshot != null && streamer.settled() && renderer.idle() && fluids.pending() == 0 && !fluidDemo && lifeClock >= lifeWait
                 && (!worldMap.open || worldMap.ready())
                 && (minimap.mode == Minimap.Mode.OFF || minimap.ready())) {
                 Screenshot.save(screenshot, fbW[0], fbH[0]);
@@ -830,6 +867,8 @@ public final class Main {
                 System.out.printf("[stats] sections: %d drawn (%d in frustum, %d meshed) | quads: %d | GPU buffer %.1f/%.1f MiB%n",
                     renderer.drawnSections, renderer.frustumSections, renderer.meshCount(), renderer.totalQuads,
                     buf[0] / 1048576.0, buf[1] / 1048576.0);
+                System.out.printf("[life] %d creatures (%d drawn) | spawned %d, born %d, eaten %d%n", life.creatures.size(),
+                    creatureRenderer.drawn, life.spawned, life.born, life.eaten);
                 glfwSetWindowShouldClose(window, true);
             }
             glfwSwapBuffers(window);
@@ -870,6 +909,7 @@ public final class Main {
         minimap.dispose();
         worldMap.dispose();
         sound.dispose();
+        creatureRenderer.dispose();
         renderer.dispose();
         glfwDestroyWindow(window);
         glfwTerminate();

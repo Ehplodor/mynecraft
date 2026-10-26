@@ -335,3 +335,19 @@
 - Carte d'ombres du soleil : 2048², rayon 96 blocs, orthographique, calée sur les texels (pas de scintillement), filtrage PCF matériel 4 prises, décalage selon la normale ; s'efface la nuit et par temps couvert.
 - Monde rendu hors écran (`SceneTarget`) et copié avant la passe translucide : l'eau réfracte le fond (déformé par les vaguelettes), s'assombrit avec l'épaisseur, reflète le ciel selon Fresnel, et le soleil y scintille.
 - Textures animées depuis `.png.mcmeta` (frametime, frames, interpolate) : seule la couche qui change est renvoyée au GPU. Eau et lave du pack par défaut animées.
+
+## ✅ M22 — Animaux et créatures
+Dix espèces vivent autour du joueur (`world/life`), chacune avec un habitat (biomes, climat), un régime, un rythme (jour, nuit, crépuscule), un tempérament et un modèle animé en boîtes :
+- **Réelles** : cerf (hardes, broute, fuit), lapin (bondit, pelage blanc dans la neige), renard (chasse les lapins la nuit, pelage blanc en zone enneigée), truite (bancs, fuit, s'agite hors de l'eau), héron cendré (pêche immobile dans les hauts-fonds, s'envole quand on approche), bouquetin (pics et plateaux).
+- **Fantastiques, originales** : *Lanterne des brumes* (cloche lumineuse dérivant la nuit au-dessus de l'eau, tentacules ondulants), *Moussard* (tortue géante des forêts portant un arbre et des champignons lumineux, curieuse, rentre dans sa carapace si on la frappe), *Givrelin* (petite créature de glace vivante qui bondit et tourne autour du joueur), *Voilier des cimes* (raie géante planant en grands cercles au-dessus des sommets, nervures lumineuses).
+- Comportements : errance, repos, sommeil hors de leurs heures, broutage (tête baissée, faim qui diminue), chasse et prédation (renard → lapin, héron → truite), fuite (distance réduite de moitié en se baissant), cohésion de harde, petits qui suivent un adulte, évitement de l'eau, des falaises et des murs, saut des marches.
+- Population : chaque lieu nourrit un nombre d'animaux par espèce (`Ecosystem.capacity` : nourriture du biome × densité de l'espèce, proies plus nombreuses que prédateurs) ; les nouveaux arrivants comblent ce qui manque ; les adultes nourris se reproduisent si le lieu peut nourrir un petit de plus ; les petits grandissent.
+- Animation : marche diagonale des quadrupèdes, bonds, têtes qui regardent le joueur, battements d'ailes (repliées au sol), nageoires, queues, oreilles qui frémissent, tentacules, inclinaison en virage, couché pour dormir, héron sur une patte, éclair rouge quand on frappe, chute sur le flanc à la mort. Éclairés comme les blocs et projetant des ombres.
+- Joueur : viser un animal affiche son nom ; clic gauche le frappe (recul, fuite).
+- `--showcase` place une espèce de chaque devant la caméra ; `--pos x,~,z` démarre au sol.
+- Correctif M20 : la carte d'ombres n'était pas liée à son unité de texture ; les ombres sont maintenant réellement visibles.
+
+### Préparé pour M23 (saisons et écosystème vivant)
+- `Ecosystem` centralise tout ce qui dépendra de la saison : `Season` (nom, phase, végétation, période de reproduction, limite des neiges), `seasonAt(jour)` donne déjà une année de 32 jours en quatre saisons, `setTurning(true)` suffira à la faire tourner (fixée à la fin du printemps pour l'instant).
+- Nourriture (`forage`), capacité d'accueil, faim, reproduction et pelage blanc lisent déjà la saison : l'hiver réduira la nourriture, donc les populations ; les pelages blanchiront avec la neige.
+- Reste à faire en M23 : sauvegarde des animaux, migrations saisonnières, hibernation, végétation qui pousse/jaunit, chaîne alimentaire avec effet sur la végétation, butin.

@@ -107,7 +107,7 @@ final class WorldRenderer {
     final float[] skyColor = {0.5f, 0.7f, 1f};
     /** Sun shadows on (the shadow pass costs a second drawing of the nearby terrain). */
     boolean shadows = true;
-    private float far = 200;
+    float far = 200;
     private final int quadTexture; // GL_TEXTURE_BUFFER view (RGBA32UI) of the shared buffer
     private final int ebo;
     private final HashMap<Long, Mesh> meshes = new HashMap<>();
@@ -359,6 +359,9 @@ final class WorldRenderer {
     /** Debug: lowest light level shown (1 = everything fully lit). */
     float minLight;
 
+    /** Animals, drawn with the opaque world (before the water samples it) and into the shadow map. */
+    CreatureRenderer creatures;
+
     void render(Camera cam, float aspect, float far, float[] fog) {
         drainUploads(4_000_000L);
         this.far = far;
@@ -370,6 +373,8 @@ final class WorldRenderer {
         glBindTexture(GL_TEXTURE_2D_ARRAY, textures.id);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D_ARRAY, biomes.id);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, shadow.depth);
         glActiveTexture(GL_TEXTURE0);
 
         double px = cam.pos.x, py = cam.pos.y, pz = cam.pos.z;
@@ -410,6 +415,10 @@ final class WorldRenderer {
         float offX = (float) (px - (camCx << 4)), offY = (float) (py - Chunk.MIN_Y), offZ = (float) (pz - (camCz << 4));
         pass(opaqueProgram, false, 0, fog, far, camCx, camCz, offX, offY, offZ);
         pass(cutoutProgram, false, 1, fog, far, camCx, camCz, offX, offY, offZ);
+        if (creatures != null) {
+            creatures.draw(this, matrixBuf, false, fog);
+            glBindVertexArray(vao);
+        }
         // The water samples the opaque world drawn so far (refraction, depth under the surface).
         scene.snapshot();
         glActiveTexture(GL_TEXTURE4);
@@ -461,6 +470,7 @@ final class WorldRenderer {
         float offX = (float) (px - (camCx << 4)), offY = (float) (py - Chunk.MIN_Y), offZ = (float) (pz - (camCz << 4));
         pass(shadowProgram, false, 0, fog, far, camCx, camCz, offX, offY, offZ);
         pass(shadowCutoutProgram, false, 1, fog, far, camCx, camCz, offX, offY, offZ);
+        if (creatures != null) creatures.draw(this, matrixBuf, true, fog);
         glDisable(GL_POLYGON_OFFSET_FILL);
         glEnable(GL_CULL_FACE);
         scene.bind(scene.width(), scene.height()); // back to the world picture
