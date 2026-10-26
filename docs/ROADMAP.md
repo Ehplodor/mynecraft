@@ -316,3 +316,17 @@
   surtout entre 0,5 et 5 kHz (énergie > 6 kHz : 11 % au plus) ; premières réflexions sur les sons ponctuels ;
   ruisseau en résonances mouvantes plutôt qu'en nuée de bulles ; chants d'oiseaux avec micro-instabilités ;
   réglage du volume dans le menu pause (60 % par défaut, `options.properties` partagé par les mondes)
+
+## ✅ M19 — Visionneuse de recettes et confort d'inventaire
+- Visionneuse façon JEI à droite de l'inventaire : tous les objets, recherche par nom ou identifiant (sans
+  tenir compte des accents ni de la casse), pages (molette) ; clic ou R : recettes de l'objet, clic droit
+  ou U : ses utilisations (R / U marchent aussi sur les objets de l'inventaire) ; panneau de recette à
+  gauche : grille avec les alternatives d'un ingrédient qui défilent, résultat, « Fabricable xN » compté
+  sur l'inventaire et la grille, « Établi requis » pour les recettes 3x3 dans l'inventaire, bouton « + »
+  qui pose les ingrédients dans la grille (Maj : autant que possible) ; clic sur un ingrédient : ses recettes
+- Confort : T trie l'inventaire principal (piles fusionnées, par bloc), 1-9 au-dessus d'une case l'échange
+  avec la barre, double-clic regroupe le même objet sur le curseur, glisser une pile tenue la répartit
+  également (clic droit : une par case)
+- Noms affichés depuis un fichier de langue (`lang/fr_fr.json` du pack par défaut, remplaçable par un
+  resource pack), sinon tirés de l'identifiant ; recettes ajoutées : glace compactée, andésite
+- Logique testée sans écran (`RecipeIndex`, `CraftingMenu`)

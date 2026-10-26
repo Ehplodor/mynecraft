@@ -148,6 +148,71 @@ public final class CraftingMenu {
         set(slot, id, n);
     }
 
+    /**
+     * Sorts the main inventory (not the hotbar, which the player arranges): same items merged into
+     * full stacks, ordered by block, empty slots at the end.
+     */
+    public void sort() {
+        java.util.TreeMap<Byte, Integer> total = new java.util.TreeMap<>();
+        for (int i = Inventory.HOTBAR; i < Inventory.SIZE; i++)
+            if (inventory.counts[i] > 0) total.merge(inventory.ids[i], inventory.counts[i], Integer::sum);
+        int slot = Inventory.HOTBAR;
+        for (var e : total.entrySet()) {
+            int n = e.getValue();
+            while (n > 0) {
+                int put = Math.min(n, Inventory.MAX_STACK);
+                inventory.ids[slot] = e.getKey();
+                inventory.counts[slot] = put;
+                n -= put;
+                slot++;
+            }
+        }
+        for (; slot < Inventory.SIZE; slot++) set(slot, Blocks.AIR, 0);
+    }
+
+    /** Double click with a stack held: gathers the same item from the inventory onto the cursor (up to 64). */
+    public void collect() {
+        if (cursorCount == 0) return;
+        for (int pass = 0; pass < 2 && cursorCount < Inventory.MAX_STACK; pass++) // part stacks first, like vanilla
+            for (int i = 0; i < Inventory.SIZE && cursorCount < Inventory.MAX_STACK; i++) {
+                int c = inventory.counts[i];
+                if (c == 0 || inventory.ids[i] != cursorId || (pass == 0 && c == Inventory.MAX_STACK)) continue;
+                int take = Math.min(c, Inventory.MAX_STACK - cursorCount);
+                cursorCount += take;
+                set(i, cursorId, c - take);
+            }
+    }
+
+    /** Number key over a slot: swaps it with that hotbar slot (0..8). */
+    public void swapWithHotbar(int slot, int hotbar) {
+        if (slot < 0 || slot >= resultSlot() || hotbar < 0 || hotbar >= Inventory.HOTBAR || slot == hotbar) return;
+        byte a = id(slot), b = id(hotbar);
+        int na = count(slot), nb = count(hotbar);
+        set(slot, b, nb);
+        set(hotbar, a, na);
+    }
+
+    /**
+     * Dragging the held stack over several slots: left button spreads it evenly over them (the
+     * remainder stays held), right button drops one item in each. Slots holding another item or
+     * the result slot are skipped.
+     */
+    public void spread(int[] slots, boolean oneEach) {
+        java.util.List<Integer> ok = new java.util.ArrayList<>();
+        for (int s : slots)
+            if (s >= 0 && s < resultSlot() && !ok.contains(s) && (count(s) == 0 || id(s) == cursorId) && count(s) < Inventory.MAX_STACK) ok.add(s);
+        if (cursorCount == 0 || ok.isEmpty()) return;
+        int each = oneEach ? 1 : cursorCount / ok.size();
+        if (each == 0) each = 1;
+        for (int s : ok) {
+            if (cursorCount == 0) break;
+            int put = Math.min(Math.min(each, cursorCount), Inventory.MAX_STACK - count(s));
+            set(s, cursorId, count(s) + put);
+            cursorCount -= put;
+        }
+        if (cursorCount == 0) cursorId = Blocks.AIR;
+    }
+
     /** Closing the screen: whatever is held or left in the grid goes back to the inventory. Returns what was lost. */
     public int close() {
         int lost = inventory.add(cursorId, cursorCount);

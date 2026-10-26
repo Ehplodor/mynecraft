@@ -12,6 +12,8 @@ import net.mynecraft.world.crafting.CraftingMenu;
 final class InventoryScreen {
     private static final int SLOT = 18, COLS = 9;
     private final byte[] palette;
+    /** Display names (set by the game; ids are shown without it). */
+    ItemNames names;
 
     InventoryScreen(byte[] palette) {
         this.palette = palette;
@@ -67,6 +69,13 @@ final class InventoryScreen {
         return palette[slot - Inventory.SIZE];
     }
 
+    /** The item in a slot (menu, palette or creative hotbar). */
+    byte idAt(CraftingMenu menu, int slot, byte[] creativeHotbar) {
+        if (menu != null) return menu.id(slot);
+        if (slot >= Inventory.SIZE) return palette[slot - Inventory.SIZE];
+        return slot < Inventory.HOTBAR ? creativeHotbar[slot] : Blocks.AIR;
+    }
+
     void draw(Hud hud, CraftingMenu menu, Inventory inventory, byte[] creativeHotbar, int selectedSlot,
               double mx, double my) {
         float s = hud.scale, x0 = (hud.width() - 176 * s) / 2, y0 = (hud.height() - 166 * s) / 2;
@@ -110,7 +119,7 @@ final class InventoryScreen {
             byte id = menu != null ? menu.id(hover) : hover >= Inventory.SIZE ? palette[hover - Inventory.SIZE]
                 : hover < Inventory.HOTBAR ? creativeHotbar[hover] : Blocks.AIR;
             if (id != Blocks.AIR && (menu == null || menu.cursorCount == 0)) {
-                hud.text(Blocks.NAMES[id], (float) mx + 10 * s, (float) my - 12 * s, 1, 1, 0.6f);
+                hud.text(names != null ? names.name(id) : Blocks.NAMES[id], (float) mx + 10 * s, (float) my - 12 * s, 1, 1, 0.6f);
             }
         }
     }

@@ -15,6 +15,7 @@ import net.mynecraft.world.ChunkStreamer;
 import net.mynecraft.world.storage.WorldStorage;
 import net.mynecraft.world.FluidSimulator;
 import net.mynecraft.world.crafting.CraftingMenu;
+import net.mynecraft.world.crafting.RecipeIndex;
 import net.mynecraft.world.crafting.RecipeBook;
 import net.mynecraft.world.Inventory;
 import net.mynecraft.world.Landscape;
@@ -269,6 +270,13 @@ public final class Main {
         RecipeBook recipes = RecipeBook.load(dataPacks);
         recipes.warnings.forEach(w -> System.err.println("[data] " + w));
         InventoryScreen inventoryScreen = new InventoryScreen(Input.placeableBlocks());
+        ItemNames itemNames = new ItemNames(resources);
+        inventoryScreen.names = itemNames;
+        RecipeViewer viewer = new RecipeViewer(new RecipeIndex(recipes), itemNames, Input.placeableBlocks());
+        int[] drag = new int[64];      // slots crossed while dragging a held stack
+        int dragCount = 0, dragButton = -1;
+        long lastClickAt = 0;
+        int lastClickSlot = -1;
         CraftingMenu menu = null;   // open survival screen (2x2 inventory or 3x3 table)
         boolean screenOpen = false; // any screen, including the creative palette (menu == null)
         if (argv.contains("--inventory-demo")) { // scripted screenshot: a crafting grid in use
@@ -276,6 +284,8 @@ public final class Main {
             inventory.add(Blocks.BIRCH_PLANKS, 3);
             inventory.add(Blocks.COBBLESTONE, 40);
             inventory.add(Blocks.GLASS, 6);
+            inventory.add(Blocks.OAK_PLANKS, 9);
+            viewer.show(Blocks.CRAFTING_TABLE, false); // and the recipe viewer on the crafting table
             if (!creative) {
                 menu = new CraftingMenu(inventory, recipes, 2);
                 menu.click(0, true, false);                 // half the logs on the cursor
@@ -382,6 +392,11 @@ public final class Main {
             }
             if (stats == null && screenshot == null) {
                 boolean escape = input.pressed(GLFW_KEY_ESCAPE), inventoryKey = input.pressed(GLFW_KEY_E);
+                if (screenOpen && viewer.typing) { // typing a search: letters are text, Esc stops typing
+                    viewer.type(input.takeTyped(), input.pressed(GLFW_KEY_BACKSPACE));
+                    if (escape || input.pressed(GLFW_KEY_ENTER)) viewer.typing = false;
+                    escape = inventoryKey = false;
+                }
                 if (worldMap.open && escape) {
                     worldMap.open = false;
                     input.capture(true);
@@ -401,12 +416,46 @@ public final class Main {
                 if (screenOpen) {
                     double[] m = input.mouseInFramebuffer();
                     boolean left = input.clicked(GLFW_MOUSE_BUTTON_LEFT), right = input.clicked(GLFW_MOUSE_BUTTON_RIGHT);
-                    int slot = (left || right) ? inventoryScreen.slotAt(hud, menu, m[0], m[1]) : -1;
-                    if (slot >= 0) sound.click();
-                    if (slot >= 0) {
-                        if (menu != null) menu.click(slot, right, input.shiftDown());
-                        else if (inventoryScreen.isPalette(null, slot)) input.hotbar[input.slot] = inventoryScreen.paletteBlock(slot);
-                        else if (slot < Inventory.HOTBAR) input.slot = slot;
+                    int hover = inventoryScreen.slotAt(hud, menu, m[0], m[1]);
+                    viewer.scroll(hud, m[0], m[1], input.takeScroll());
+                    if (!viewer.typing) input.takeTyped();
+                    // Dragging a held stack over slots: released, it is spread over them (one each with
+                    // the right button); a press and release on one slot stays a plain click.
+                    if (dragButton >= 0) {
+                        if (hover >= 0 && hover < menu.resultSlot() && dragCount < drag.length
+                            && java.util.Arrays.stream(drag, 0, dragCount).noneMatch(x -> x == hover)) drag[dragCount++] = hover;
+                        if (!input.held(dragButton)) {
+                            if (dragCount > 1) menu.spread(java.util.Arrays.copyOf(drag, dragCount), dragButton == GLFW_MOUSE_BUTTON_RIGHT);
+                            else if (dragCount == 1) menu.click(drag[0], dragButton == GLFW_MOUSE_BUTTON_RIGHT, false);
+                            dragButton = -1;
+                            dragCount = 0;
+                        }
+                    } else if ((left || right) && viewer.click(hud, m[0], m[1], right, input.shiftDown(), menu, input.hotbar, input.slot)) {
+                        sound.click();
+                    } else if ((left || right) && hover >= 0) {
+                        sound.click();
+                        if (menu != null) {
+                            long t = System.nanoTime();
+                            boolean dbl = left && hover == lastClickSlot && t - lastClickAt < 300_000_000L;
+                            lastClickAt = t;
+                            lastClickSlot = hover;
+                            if (dbl && menu.cursorCount > 0) menu.collect(); // double click: gather the same item
+                            else if (menu.cursorCount > 0 && !input.shiftDown() && hover < menu.resultSlot()) {
+                                dragButton = left ? GLFW_MOUSE_BUTTON_LEFT : GLFW_MOUSE_BUTTON_RIGHT; // maybe a drag
+                                drag[0] = hover;
+                                dragCount = 1;
+                            } else menu.click(hover, right, input.shiftDown());
+                        } else if (inventoryScreen.isPalette(null, hover)) input.hotbar[input.slot] = inventoryScreen.paletteBlock(hover);
+                        else if (hover < Inventory.HOTBAR) input.slot = hover;
+                    }
+                    if (!viewer.typing) {
+                        // R / U over any item: its recipes / what it is used for (JEI keys).
+                        byte under = hover >= 0 ? inventoryScreen.idAt(menu, hover, input.hotbar) : viewer.hovered(hud, m[0], m[1]);
+                        if (under != Blocks.AIR && input.pressedChar('r')) viewer.show(under, false);
+                        if (under != Blocks.AIR && input.pressedChar('u')) viewer.show(under, true);
+                        if (menu != null && input.pressedChar('t')) menu.sort();
+                        for (int k = 0; k < Inventory.HOTBAR; k++) // number key over a slot: swap with the hotbar
+                            if (input.pressed(GLFW_KEY_1 + k) && menu != null && hover >= 0) menu.swapWithHotbar(hover, k);
                     }
                 }
                 if (input.pressed(GLFW_KEY_F3)) debug = !debug;
@@ -652,7 +701,7 @@ public final class Main {
                 blockShownAt = now;
             }
             if (now - blockShownAt < 2_000_000_000L) {
-                hud.textCentered(Blocks.NAMES[shownBlock], hud.width() / 2f, hotbarTop - hud.lineHeight() - 2 * hud.scale, 1, 1, 1);
+                hud.textCentered(itemNames.name(shownBlock), hud.width() / 2f, hotbarTop - hud.lineHeight() - 2 * hud.scale, 1, 1, 1);
             }
             if (debug) {
                 debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis,
@@ -661,6 +710,12 @@ public final class Main {
             if (screenOpen) {
                 double[] m = screenshot != null ? new double[] {hud.width() * 0.62, hud.height() * 0.42} : input.mouseInFramebuffer();
                 inventoryScreen.draw(hud, menu, inventory, input.hotbar, input.slot, m[0], m[1]);
+                viewer.draw(hud, menu, menu != null ? inventory : null, m[0], m[1]);
+                String help = menu != null
+                    ? "T : trier | 1-9 : vers la barre | double-clic : regrouper | glisser : répartir | R / U : recettes / utilisations"
+                    : "clic : prendre un bloc | R / U : recettes / utilisations";
+                hud.rect(0, hud.height() - hud.lineHeight() - 4 * hud.scale, hud.width(), hud.lineHeight() + 4 * hud.scale, 0, 0, 0, 0.55f);
+                hud.textCentered(help, hud.width() / 2f, hud.height() - hud.lineHeight() - 2 * hud.scale, 0.85f, 0.85f, 0.85f);
             }
             if (!worldMap.open) drawWaypoints(hud, renderer, cam, waypoints);
             int basins = world.generator.landscape().hydrology().computing.get();
@@ -688,7 +743,7 @@ public final class Main {
             }
             hud.end(textures.id);
             minimap.update(player.x, player.z, weather, now);
-            if (minimap.ready()) {
+            if (minimap.ready() && !screenOpen) {
                 minimap.draw(hud);
                 hud.begin(fbW[0], fbH[0]);
                 minimap.overlay(hud, player.x, player.z, cam.yaw, waypoints);

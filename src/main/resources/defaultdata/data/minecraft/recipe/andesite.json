@@ -1,0 +1,5 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": ["minecraft:diorite", "minecraft:cobblestone"],
+  "result": {"id": "minecraft:andesite", "count": 2}
+}

@@ -29,7 +29,7 @@ fait réapparaître au point d'apparition.
 `E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
 `E` ouvre la palette de tous les blocs.
 
-Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `M` minimap (relief, biomes, eaux, nuages, température, masquée), `J` carte du monde (zoom molette, glisser, clic droit : repère), `B` repère ici, `Échap` menu pause (reprendre, réapparaître, recharger, nouveau monde avec graine aléatoire/identique/saisie, ouvrir un autre monde, sauvegarder et quitter), souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
+Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `M` minimap (relief, biomes, eaux, nuages, température, masquée), `J` carte du monde (zoom molette, glisser, clic droit : repère), `B` repère ici, `E` inventaire avec visionneuse de recettes (R / U, recherche, T trier), `Échap` menu pause (reprendre, réapparaître, recharger, nouveau monde avec graine aléatoire/identique/saisie, ouvrir un autre monde, sauvegarder et quitter), souris pour regarder, `ZQSD`/`WASD` (position physique des touches), `Espace` sauter,
 `F` mode vol (`Espace`/`Maj` monter/descendre), `Ctrl` sprint, clic gauche casser, clic droit poser,
 `1`–`9` choisir l'emplacement de la barre, molette changer son bloc (dalles et bûches s'orientent selon la face visée).
 

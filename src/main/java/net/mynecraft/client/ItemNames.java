@@ -1,0 +1,58 @@
+package net.mynecraft.client;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import net.mynecraft.resource.ResourceManager;
+import net.mynecraft.world.Blocks;
+
+import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
+
+/**
+ * Display names of blocks, from the packs' language file ({@code assets/minecraft/lang/fr_fr.json},
+ * then {@code en_us.json}: a resource pack can rename or translate), else made from the id
+ * ("oak_planks" gives "Oak planks"). Also a folded form for searching (no case, no accents).
+ */
+final class ItemNames {
+    private final String[] names = new String[Blocks.COUNT];
+    private final String[] folded = new String[Blocks.COUNT];
+
+    ItemNames(ResourceManager resources) {
+        JsonObject lang = load(resources, "fr_fr"), english = load(resources, "en_us");
+        for (int i = 0; i < Blocks.COUNT; i++) {
+            String id = Blocks.NAMES[i], key = "block.minecraft." + id, name = null;
+            if (lang != null && lang.has(key)) name = lang.get(key).getAsString();
+            else if (english != null && english.has(key)) name = english.get(key).getAsString();
+            if (name == null) {
+                String t = id.replace('_', ' ');
+                name = t.isEmpty() ? t : Character.toUpperCase(t.charAt(0)) + t.substring(1);
+            }
+            names[i] = name;
+            folded[i] = fold(name) + " " + fold(id);
+        }
+    }
+
+    private static JsonObject load(ResourceManager resources, String locale) {
+        byte[] data = resources.read("assets/minecraft/lang/" + locale + ".json");
+        if (data == null) return null;
+        try {
+            return JsonParser.parseString(new String(data, StandardCharsets.UTF_8)).getAsJsonObject();
+        } catch (RuntimeException e) {
+            System.err.println("[resources] unreadable lang/" + locale + ".json: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** Lower case without accents: "Établi" and "etabli" match. */
+    static String fold(String s) {
+        return Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
+    }
+
+    String name(byte id) {
+        return names[id & 0xFF];
+    }
+
+    boolean matches(byte id, String query) {
+        return query.isEmpty() || folded[id & 0xFF].contains(fold(query.trim()));
+    }
+}
