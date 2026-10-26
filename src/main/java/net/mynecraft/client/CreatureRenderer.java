@@ -169,11 +169,17 @@ final class CreatureRenderer {
                 default -> {
                 }
             }
-            int color = p.coat() ? multiply(c.coat, p.color()) : p.color();
+            int color = p.coat() ? multiply(c.sick ? dull(c.coat) : c.coat, p.color()) : p.color();
             float cr = ((color >> 16) & 255) / 255f, cg = ((color >> 8) & 255) / 255f, cb = (color & 255) / 255f;
             if (hurt > 0) { cr += (1 - cr) * hurt * 0.7f; cg *= 1 - hurt * 0.6f; cb *= 1 - hurt * 0.6f; }
             box(p.ox(), p.oy(), p.oz(), p.w(), p.h(), p.d(), cr, cg, cb, p.glow(), sky, block);
         }
+    }
+
+    /** A sick animal's coat: greyer and darker. */
+    private static int dull(int rgb) {
+        int r = (rgb >> 16) & 255, g = (rgb >> 8) & 255, b = rgb & 255, grey = (r + g + b) / 3;
+        return ((r + grey) * 2 / 5) << 16 | ((g + grey) * 2 / 5) << 8 | (b + grey) * 2 / 5;
     }
 
     private static int multiply(int a, int b) {

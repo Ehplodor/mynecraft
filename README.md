@@ -16,7 +16,8 @@ gradle run --args="--screenshot shot.png"    # rend une image, affiche des stats
                                              #   (--view lacet,tangage en degrés, --pos x,y,z (y "~" : au sol), --time ticks,
                                              #    --no-occlusion, --fullbright, --weather clear/rain/snow/hail/storm,
                                              #    --showcase : une créature de chaque espèce devant la caméra,
-                                             #    --life-seconds N : laisse vivre les animaux N s avant la capture)
+                                             #    --life-seconds N : laisse vivre les animaux N s avant la capture,
+                                             #    --season printemps/ete/automne/hiver, --notebook : carnet ouvert)
 gradle run --args="--pack MonPack.zip"       # resource pack Java (zip ou dossier), répétable
 gradle run --args="--datapack MonData.zip"   # data pack (recettes, tags) ; aussi lus depuis <monde>/datapacks/
 gradle run --args="--world saves/test --seed 42"   # dossier du monde (défaut saves/world), seed d'un nouveau monde
@@ -31,6 +32,11 @@ fait réapparaître au point d'apparition.
 Animaux (M22) : cerfs, lapins, renards, truites, hérons, bouquetins, et quatre créatures fantastiques (lanternes des
 brumes la nuit sur l'eau, moussards des forêts, givrelins des neiges, voiliers des cimes). Viser un animal affiche son
 nom, clic gauche le frappe ; se baisser (`Maj`) permet d'approcher les animaux craintifs de plus près.
+
+Saisons et écosystème (M23) : une année de 32 jours (8 par saison) ; feuillages d'automne, bois nus et neige en
+hiver, migrations, hibernation, populations qui suivent la nourriture, les prédateurs et les maladies. `N` ouvre le
+carnet du naturaliste : la parcelle où l'on se trouve vue par le modèle écologique (végétation, fleurs, sol,
+détritus, vie aquatique, populations et tendances, interactions à l'œuvre).
 
 `E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
 `E` ouvre la palette de tous les blocs.

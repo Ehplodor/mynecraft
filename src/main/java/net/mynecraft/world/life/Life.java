@@ -21,6 +21,12 @@ public final class Life {
     public static final int MAX_CREATURES = 90;
 
     public final Ecosystem eco = new Ecosystem();
+    /** The community model behind the animals met (populations, plants, soil, interactions). */
+    public final Ecology ecology;
+    private final Flora flora;
+    /** Blocks changed by living things (grass grown, withered or grazed), for the renderer to remesh. */
+    public final java.util.ArrayDeque<int[]> edits = new java.util.ArrayDeque<>();
+    private double ecologyClock;
     public final List<Creature> creatures = new ArrayList<>();
     private final World world;
     /** Biome and climate of a column (the terrain generator's; tests give a fixed one). */
@@ -37,6 +43,8 @@ public final class Life {
         this.world = world;
         this.rng = new SplittableRandom(seed ^ 0x5EED_A11CEL);
         this.columns = world.generator::column;
+        this.ecology = new Ecology(seed, eco, (x, z) -> columns.apply(x, z));
+        this.flora = new Flora(world, ecology, seed);
     }
 
     // ------------------------------------------------------------------------------- spawning
@@ -48,6 +56,18 @@ public final class Life {
     public void tick(double dt, double px, double py, double pz, boolean sneaking) {
         dt = Math.min(dt, 0.1);
         spawnClock += dt;
+        // The ecosystem follows the calendar (a long gap, like a jump to another season, is not replayed).
+        double gap = eco.day() - ecology.day();
+        if (gap < 0 || gap > Ecosystem.YEAR_DAYS * 2) ecology.setDay(eco.day());
+        else if (gap > 0.01) ecology.advance(gap);
+        ecologyClock -= dt;
+        if (ecologyClock <= 0) { // the patches around the player exist (bootstrapped on first visit)
+            ecologyClock = 1;
+            int cx = Math.floorDiv((int) Math.floor(px), Ecology.PATCH), cz = Math.floorDiv((int) Math.floor(pz), Ecology.PATCH);
+            for (int dz = -2; dz <= 2; dz++)
+                for (int dx = -2; dx <= 2; dx++) ecology.patch(cx + dx, cz + dz);
+        }
+        if (spawning) flora.tick(dt, px, pz, eco.season(), edits::add);
         boolean first = creatures.isEmpty();
         for (int i = 0; spawning && spawnClock >= 0.2 && i < (first ? 40 : 1); i++) trySpawn(px, pz, first ? 8 : SPAWN_MIN);
         if (spawnClock >= 0.2) spawnClock = 0;
@@ -74,9 +94,8 @@ public final class Life {
         double total = 0;
         double[] want = new double[Species.values().length];
         for (Species s : Species.values()) {
-            float cap = eco.capacity(s, biome, temp);
-            if (cap <= 0 || !eco.active(s) && (s.kind == Species.Kind.FLY || s.kind == Species.Kind.FLOAT)) continue;
-            double lack = cap - count(s, wx, wz, 64);
+            if (!eco.active(s) && (s.kind == Species.Kind.FLY || s.kind == Species.Kind.FLOAT)) continue;
+            double lack = ecology.expected(s, wx, wz) - count(s, wx, wz, 64);
             if (lack <= 0) continue;
             want[s.ordinal()] = lack;
             total += lack;
@@ -168,6 +187,8 @@ public final class Life {
     private Creature add(Species s, double x, double y, double z, byte biome, float temp) {
         Creature c = new Creature(s, nextId++, x, y, z);
         c.coat = s.coat(temp, eco.snowCover(temp, biome), rng.nextDouble());
+        Ecology.Patch patch = ecology.existing(x, z);
+        c.sick = patch != null && rng.nextDouble() < patch.sick[s.ordinal()];
         c.size = (float) (0.9 + rng.nextDouble() * 0.2);
         c.scale = c.size;
         c.yaw = c.targetYaw = (float) (rng.nextDouble() * Math.PI * 2);
@@ -327,6 +348,7 @@ public final class Life {
                 c.goalZ = c.z + Math.cos(c.yaw + turn) * 6;
                 v = 0;
             }
+            if (c.sick) v *= 0.65; // the ill lag behind (and are caught first)
             c.vx = Math.sin(c.yaw) * v;
             c.vz = Math.cos(c.yaw) * v;
             // Rabbits and frostlings bound along; everyone jumps a one-block step.
@@ -364,6 +386,7 @@ public final class Life {
             c.goalZ = prey.z;
             if (Math.hypot(prey.x - c.x, prey.z - c.z) < c.halfWidth() + prey.halfWidth() + 0.4) {
                 prey.dying = 1.2f;
+                ecology.died(prey.species, prey.x, prey.z);
                 c.hunger = 0;
                 eaten++;
                 c.state = Creature.State.IDLE;
@@ -379,6 +402,7 @@ public final class Life {
                 Creature fish = nearest(c, 2.5, o -> o.species == Species.TROUT && o.dying <= 0);
                 if (fish != null && rng.nextDouble() < dt * 0.5) {
                     fish.dying = 0.6f;
+                    ecology.died(fish.species, fish.x, fish.z);
                     c.hunger = 0;
                     eaten++;
                     c.headPitch = 1.2f; // the strike
@@ -400,15 +424,20 @@ public final class Life {
                 if (c.state != Creature.State.GRAZE) { c.state = Creature.State.GRAZE; c.stateTime = 4 + rng.nextDouble() * 6; }
                 c.hunger = Math.max(0, c.hunger - dt / 25);
                 if (c.stateTime > 0 && c.hunger > 0.02) return 0;
+                if (at == Blocks.SHORT_GRASS && s != Species.RABBIT) { // the tuft is eaten
+                    int bx = Creature.fl(c.x), by = Creature.fl(c.y), bz = Creature.fl(c.z);
+                    if (world.set(bx, by, bz, Blocks.AIR)) edits.add(new int[] {bx, by, bz});
+                    ecology.grazed(c.x, c.z);
+                }
                 c.state = Creature.State.IDLE;
                 c.stateTime = 1;
             }
         }
         // Breeding: a fed adult with a fed mate nearby, where the land can feed one more.
-        if (s.adultAge > 0 && eco.season().breeding() && c.adult() && c.hunger < 0.3 && c.breedCooldown <= 0) {
+        if (s.adultAge > 0 && Ecology.breeding(s, eco.season().phase()) > 0.3 && c.adult() && c.hunger < 0.3 && c.breedCooldown <= 0) {
             Creature mate = nearest(c, 6, o -> o.species == s && o != c && o.adult() && o.breedCooldown <= 0 && o.hunger < 0.4);
             Landscape.Column col = columns.apply(Creature.fl(c.x), Creature.fl(c.z));
-            if (mate != null && count(s, c.x, c.z, 64) < eco.capacity(s, col.biome(), col.temperature())) {
+            if (mate != null && count(s, c.x, c.z, 64) < ecology.expected(s, c.x, c.z) + 1) {
                 Creature young = add(s, (c.x + mate.x) / 2, Math.max(c.y, mate.y), (c.z + mate.z) / 2, col.biome(), col.temperature());
                 young.coat = c.coat;
                 young.age = 0;
@@ -699,7 +728,10 @@ public final class Life {
         c.hurt = 0.5f;
         c.state = Creature.State.IDLE; // re-decides: flees
         c.stateTime = 0;
-        if (c.health <= 0) c.dying = 1.2f;
+        if (c.health <= 0) {
+            c.dying = 1.2f;
+            ecology.died(c.species, c.x, c.z);
+        }
     }
 
     static float wrap(float a) {

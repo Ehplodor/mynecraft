@@ -45,6 +45,8 @@ public final class Creature {
     /** Flinch timer after a hit (red flash), and 1 while dying (removed at 0 after fading). */
     public float hurt, dying;
     public boolean dead;
+    /** Carries the disease of its herd (slower, dull coat). */
+    public boolean sick;
 
     Creature(Species species, int id, double x, double y, double z) {
         this.species = species;

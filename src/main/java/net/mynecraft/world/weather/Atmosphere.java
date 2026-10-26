@@ -59,6 +59,8 @@ public final class Atmosphere {
     private int originX = Integer.MIN_VALUE, originZ;
     private long steps;
     private double time; // seconds of game time, for the slow turning of the wind
+    /** The season's warming or cooling of the whole climate (deg C), set by the ecosystem calendar. */
+    public volatile float seasonOffset;
 
     public Atmosphere(Terrain terrain, long seed) {
         this.terrain = terrain;
@@ -127,8 +129,8 @@ public final class Atmosphere {
     private float surfaceTemperature(int i, float sun) {
         float cover = Math.min(1, cloud[i] / 1.2f);
         float diurnal = (sun - 0.5f) * 10 * (1 - 0.6f * cover); // about -5..+5 deg C, less under clouds
-        float t = climateT[i] - LAPSE * Math.max(0, elevation[i]) + diurnal;
-        return water[i] > 0.5f ? 0.7f * t + 0.3f * climateT[i] : t; // water damps the daily swing
+        float t = climateT[i] + seasonOffset - LAPSE * Math.max(0, elevation[i]) + diurnal;
+        return water[i] > 0.5f ? 0.7f * t + 0.3f * (climateT[i] + seasonOffset) : t; // water damps the daily swing
     }
 
     // ---- dynamics ----

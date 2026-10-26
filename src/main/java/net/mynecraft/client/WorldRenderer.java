@@ -134,6 +134,20 @@ final class WorldRenderer {
     private final ConcurrentHashMap<Long, Long> latest = new ConcurrentHashMap<>();
     private final AtomicLong sequence = new AtomicLong();
     private final HashSet<Long> visibleChunks = new HashSet<>();
+    /** Visible chunks whose grass and leaf colours still show the previous season (redrawn a few per frame). */
+    private final java.util.ArrayDeque<Long> biomeRefresh = new java.util.ArrayDeque<>();
+
+    /** True when every visible chunk shows the current season's colours. */
+    boolean biomesSettled() {
+        return biomeRefresh.isEmpty();
+    }
+
+    /** The year moved on: grass and foliage colours are redrawn, a few chunks per frame. */
+    void seasonChanged(double phase) {
+        if (!biomes.setSeason(phase)) return;
+        biomeRefresh.clear();
+        biomeRefresh.addAll(visibleChunks);
+    }
     private final ConcurrentLinkedQueue<Pending> uploads = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<Pending> urgentUploads = new ConcurrentLinkedQueue<>();
     private final ExecutorService workers;
@@ -364,6 +378,10 @@ final class WorldRenderer {
 
     void render(Camera cam, float aspect, float far, float[] fog) {
         drainUploads(4_000_000L);
+        for (int i = 0; i < 24 && !biomeRefresh.isEmpty(); i++) {
+            long k = biomeRefresh.poll();
+            if (visibleChunks.contains(k)) biomes.chunkVisible((int) (k >> 32), (int) k);
+        }
         this.far = far;
         if (shadows && shadowStrength > 0) renderShadows(cam, fog);
         cam.viewProj(viewProj, aspect, far);

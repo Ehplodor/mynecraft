@@ -44,6 +44,14 @@ public final class Main {
     private static final long AUTOSAVE_NANOS = 30_000_000_000L;
     private static final double BENCH_SPEED = 20; // blocks per second, about elytra cruising
 
+    private static void saveEcology(Life life, Path worldDir) {
+        try {
+            life.ecology.save(worldDir.resolve("ecology.bin"));
+        } catch (IOException e) {
+            System.err.println("[life] cannot save ecology.bin: " + e.getMessage());
+        }
+    }
+
     private static String option(String[] args, String name, String def) {
         for (int i = 0; i < args.length - 1; i++) if (args[i].equals(name)) return args[i + 1];
         return def;
@@ -221,6 +229,13 @@ public final class Main {
         boolean editDemo = argv.contains("--edit-demo"), fluidDemo = argv.contains("--fluid-demo");
         // Animals (M22): simulated around the player, drawn with the world and its shadows.
         Life life = new Life(world, world.seed);
+        try { // the ecosystem's patches as they were left (else bootstrapped afresh)
+            life.ecology.load(worldDir.resolve("ecology.bin"));
+        } catch (IOException e) {
+            System.err.println("[life] cannot read ecology.bin: " + e.getMessage());
+        }
+        Notebook notebook = new Notebook();
+        notebook.open = argv.contains("--notebook");
         CreatureRenderer creatureRenderer = new CreatureRenderer();
         renderer.creatures = creatureRenderer;
         boolean showcase = argv.contains("--showcase");
@@ -323,6 +338,16 @@ public final class Main {
             player.flying = true;
         }
         double ticks = Double.parseDouble(option(args, "--time", Long.toString(storage.dayTime)));
+        String seasonName = option(args, "--season", null); // printemps, ete, automne, hiver: jump to that season
+        if (seasonName != null) {
+            int season = switch (seasonName.toLowerCase(java.util.Locale.ROOT)) {
+                case "ete", "été", "summer" -> 1;
+                case "automne", "autumn", "fall" -> 2;
+                case "hiver", "winter" -> 3;
+                default -> 0;
+            };
+            ticks = net.mynecraft.world.life.Ecosystem.ticksForSeason(season, ticks, DayCycle.DAY_TICKS);
+        }
         boolean timeFrozen = screenshot != null; // scripted shots must be reproducible
         float[] sky = new float[3];
         // Benchmark: fly east at a fixed speed and height through fresh terrain, then report timings.
@@ -400,6 +425,7 @@ public final class Main {
             if (now - lastAutosave > AUTOSAVE_NANOS) {
                 streamer.autosave();
                 explored.save();
+                saveEcology(life, worldDir);
                 lastAutosave = now;
             }
             if (stats == null && screenshot == null) {
@@ -479,6 +505,7 @@ public final class Main {
                         worldMap.open(player.x, player.z);
                         input.capture(false);
                     }
+                    if (input.pressedChar('n')) notebook.open = !notebook.open; // naturalist's notebook
                     if (input.pressedChar('b')) // waypoint where the player stands
                         waypoints.add((int) Math.floor(player.x), (int) Math.floor(player.y), (int) Math.floor(player.z));
                 }
@@ -593,12 +620,15 @@ public final class Main {
 
             if (!paused && !survival.dead) {
                 life.eco.update(ticks, DayCycle.daylight(ticks), DayCycle.DAY_TICKS);
+                weather.atmosphere.seasonOffset = (float) net.mynecraft.world.life.Ecosystem.temperatureOffset(life.eco.season().phase());
+                renderer.seasonChanged(life.eco.season().phase());
                 if (showcase && streamer.settled()) {
                     life.showcase(player.x, player.y, player.z, cam.yaw);
                     showcase = false;
                 }
                 life.tick(dt, player.x, player.y, player.z, input.shiftDown());
                 if (streamer.settled()) lifeClock += dt;
+                for (int[] e; (e = life.edits.poll()) != null; ) renderer.blockChanged(e[0], e[1], e[2]); // grass grown, eaten
             }
             double cp = Math.cos(cam.pitch);
             Raycast.Hit hit = Raycast.cast(world, cam.pos.x, cam.pos.y, cam.pos.z,
@@ -748,6 +778,7 @@ public final class Main {
                 shownBlock = input.selected;
                 blockShownAt = now;
             }
+            if (notebook.open && !screenOpen && !worldMap.open) notebook.draw(hud, life, player.x, player.z);
             if (aimed != null && !screenOpen) { // the name of the animal under the crosshair
                 hud.textCentered(aimed.species.displayName + (aimed.adult() ? "" : " (jeune)"), hud.width() / 2f,
                     hud.height() / 2f + 2 * hud.lineHeight(), 1, 1, 0.85f);
@@ -859,7 +890,7 @@ public final class Main {
                 fluids.blockChanged(ox - 4, oy, oz - 6);
                 fluidDemo = false;
             }
-            if (screenshot != null && streamer.settled() && renderer.idle() && fluids.pending() == 0 && !fluidDemo && lifeClock >= lifeWait
+            if (screenshot != null && streamer.settled() && renderer.idle() && fluids.pending() == 0 && !fluidDemo && lifeClock >= lifeWait && renderer.biomesSettled()
                 && (!worldMap.open || worldMap.ready())
                 && (minimap.mode == Minimap.Mode.OFF || minimap.ready())) {
                 Screenshot.save(screenshot, fbW[0], fbH[0]);
@@ -894,9 +925,10 @@ public final class Main {
             playerData.air = survival.air;
             playerData.creative = creative;
             playerData.selectedSlot = input.slot;
-            storage.saveLevel(playerData, (long) ticks % DayCycle.DAY_TICKS);
+            storage.saveLevel(playerData, (long) ticks); // the whole calendar: the seasons go on from here
             storage.close();
             explored.save();
+            saveEcology(life, worldDir);
         } catch (IOException | InterruptedException e) {
             System.err.println("[storage] save failed: " + e.getMessage());
         }

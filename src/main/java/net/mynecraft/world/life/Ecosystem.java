@@ -3,10 +3,9 @@ package net.mynecraft.world.life;
 import net.mynecraft.world.Landscape;
 
 /**
- * The living conditions the creatures read: time of day, season, how much food a place offers,
- * how many of a species it can feed. Everything that varies with the seasons goes through here
- * so that M23 (seasons and a living ecosystem) only has to make {@link #season} turn: for now the
- * year stays in late spring.
+ * The living conditions the creatures read: time of day, the season (a year of {@link #YEAR_DAYS}
+ * days turning with the world's clock), how much food a place offers, how many of a species it
+ * can feed. The spatial community model is {@link Ecology}.
  */
 public final class Ecosystem {
     /** Days in a year (four seasons of 8 days), used once the seasons turn. */
@@ -18,23 +17,47 @@ public final class Ecosystem {
      */
     public record Season(String name, double phase, float vegetation, boolean breeding, float snowline) {}
 
-    /** Late spring, the season the world stays in until M23. */
-    public static final Season LATE_SPRING = new Season("printemps", 0.18, 1.0f, true, 0.2f);
+    /** Late spring, where a new world's year starts. */
+    public static final Season LATE_SPRING = seasonAt(YEAR_DAYS * 0.18);
 
     private Season season = LATE_SPRING;
     /** 1 at noon, ~0 at night (same as the sky light multiplier, without the weather). */
     private float daylight = 1;
-    private boolean turning;
+    private boolean turning = true;
+    private double day = YEAR_DAYS * 0.18;
 
-    /** Lets the seasons turn with the days (M23); off by default. */
+    /** Lets the seasons turn with the days (on by default; off keeps late spring). */
     public void setTurning(boolean on) {
         turning = on;
+        if (!on) season = LATE_SPRING;
     }
 
-    /** Called once per frame with the game time. */
+    /**
+     * Called once per frame with the game time. Day 0 of a world is the start of spring shifted to
+     * late spring, so new worlds open green and young animals are about.
+     */
     public void update(double ticks, float daylight, long dayTicks) {
         this.daylight = daylight;
-        if (turning) season = seasonAt(ticks / dayTicks);
+        day = ticks / dayTicks + YEAR_DAYS * 0.18;
+        if (turning) season = seasonAt(day);
+    }
+
+    /** The calendar day (fractional) the season is read from. */
+    public double day() {
+        return day;
+    }
+
+    /** Game ticks at which a season starts (0 spring .. 3 winter) in the given year, keeping the hour of {@code ticks}. */
+    public static double ticksForSeason(int season, double ticks, long dayTicks) {
+        double hour = ticks % dayTicks;
+        double startDay = season * YEAR_DAYS / 4.0 + 2 - YEAR_DAYS * 0.18; // two days into it
+        if (startDay < 0) startDay += YEAR_DAYS;
+        return Math.floor(startDay) * dayTicks + hour;
+    }
+
+    /** Air temperature swing of the season (deg C): about +7 in midsummer, -11 in midwinter. */
+    public static double temperatureOffset(double phase) {
+        return 9 * Math.cos((phase - 0.375) * 2 * Math.PI) - 2;
     }
 
     public Season season() {
@@ -47,7 +70,7 @@ public final class Ecosystem {
 
     /** The season on a given day (fractional): smooth vegetation over the year, snowline lowest in winter. */
     public static Season seasonAt(double day) {
-        double phase = (day / YEAR_DAYS) % 1.0;
+        double phase = ((day / YEAR_DAYS) % 1.0 + 1.0) % 1.0;
         String[] names = {"printemps", "été", "automne", "hiver"};
         String name = names[(int) (phase * 4) % 4];
         float vegetation = (float) (0.55 + 0.45 * Math.cos((phase - 0.3) * 2 * Math.PI));
@@ -57,6 +80,7 @@ public final class Ecosystem {
 
     /** Whether a species is out at this hour. */
     public boolean active(Species s) {
+        if (s == Species.MOSSBACK && season.phase() >= 0.75) return false; // hibernating
         return switch (s.rhythm) {
             case DAY -> daylight > 0.45f;
             case NIGHT -> daylight < 0.5f;
@@ -74,6 +98,11 @@ public final class Ecosystem {
 
     /** Plant food a biome offers (0..1) at this season. */
     public float forage(byte biome) {
+        return forageBase(biome) * season.vegetation();
+    }
+
+    /** Plant food a biome offers (0..1) at the height of the growing season. */
+    public float forageBase(byte biome) {
         float base = switch (biome) {
             case Landscape.PLAINS, Landscape.FOREST, Landscape.BIRCH_FOREST -> 1.0f;
             case Landscape.DARK_FOREST, Landscape.TAIGA, Landscape.LAKE, Landscape.RIVER -> 0.8f;
@@ -81,7 +110,7 @@ public final class Ecosystem {
             case Landscape.STONY_PEAKS, Landscape.SNOWY_PLAINS, Landscape.BEACH -> 0.35f;
             default -> 0.15f;
         };
-        return base * season.vegetation();
+        return base;
     }
 
     /**
