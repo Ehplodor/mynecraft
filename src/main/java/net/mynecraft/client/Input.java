@@ -91,6 +91,35 @@ final class Input {
         return edge;
     }
 
+    /** Mouse button held down. */
+    boolean held(int button) {
+        return mouse(button);
+    }
+
+    /** Wheel movement since the last call (screens that zoom), taken away from the hotbar. */
+    double takeScroll() {
+        double s = scroll;
+        scroll = 0;
+        return s;
+    }
+
+    private final java.util.Map<Character, Integer> keyOfChar = new java.util.HashMap<>();
+
+    /**
+     * True once when the key printing this letter goes down, whatever the keyboard layout (GLFW key
+     * codes are positions on a US keyboard: M is not where the M is on an AZERTY keyboard).
+     */
+    boolean pressedChar(char c) {
+        Integer key = keyOfChar.computeIfAbsent(c, ch -> {
+            for (int k = GLFW_KEY_SPACE; k <= GLFW_KEY_LAST; k++) {
+                String name = glfwGetKeyName(k, 0);
+                if (name != null && name.equalsIgnoreCase(String.valueOf(ch))) return k;
+            }
+            return GLFW_KEY_A + Character.toLowerCase(ch) - 'a'; // no layout information: US position
+        });
+        return key >= 0 && key <= GLFW_KEY_LAST && pressed(key);
+    }
+
     boolean shiftDown() {
         return down(GLFW_KEY_LEFT_SHIFT) || down(GLFW_KEY_RIGHT_SHIFT);
     }

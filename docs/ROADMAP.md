@@ -281,3 +281,16 @@
   coupées aux frontières de tuiles 70 % → 33 % ; rivières perchées de 5+ blocs 10,3 % → 0,3 %
   (graine de test de l'utilisateur) et 7,3 % → 0,7 % (graine 7). Coût : ~1,4 s par tuile de 1 km
   (calcul unique, en arrière-plan), génération ~1 ms/chunk
+
+## ✅ M18 — Carte du monde, repères, exploration, sons
+- Carte du monde plein écran (J) : zoom 1 à 16 blocs/pixel autour du curseur, glisser pour se déplacer,
+  couches (M), recentrage (C), coordonnées / hauteur / biome sous le curseur, échelle ; image calculée
+  en arrière-plan pour la vue, l'ancienne affichée déplacée et mise à l'échelle en attendant
+- Mémoire de l'exploré : chunks vus enregistrés (`explored.bin`) ; l'inexploré est grisé sur les deux cartes
+- Repères : B (ici) ou clic droit sur la carte (clic droit dessus : retiré), noms et couleurs, sauvegardés
+  (`waypoints.json`), affichés sur les cartes (épinglés au bord de la minimap) et dans le monde
+  (nom et distance)
+- Sons (OpenAL, synthétisés, aucun fichier) : pluie (étouffée sous un toit), vent (plus fort en altitude),
+  rivières et chutes placées en 3D au plus près, tonnerre retardé selon la distance (343 m/s), pas selon
+  le sol (herbe, pierre, sable, bois, neige, eau), blocs cassés et posés ; silencieux sans périphérique audio
+- Touches selon la disposition réelle du clavier (M, J, B, C justes en AZERTY) ; minimap affichée par défaut

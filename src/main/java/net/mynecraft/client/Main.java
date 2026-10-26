@@ -9,6 +9,7 @@ import net.mynecraft.world.weather.Atmosphere;
 import net.mynecraft.world.weather.Weather;
 import net.mynecraft.world.Blocks;
 import net.mynecraft.world.Chunk;
+import net.mynecraft.world.ExploredMap;
 import net.mynecraft.world.ChunkStreamer;
 import net.mynecraft.world.storage.WorldStorage;
 import net.mynecraft.world.FluidSimulator;
@@ -187,6 +188,8 @@ public final class Main {
         }
         World world = new World(storage.seed);
         PauseMenu pauseMenu = new PauseMenu(worldDir, storage.seed);
+        ExploredMap explored = new ExploredMap(worldDir);
+        Waypoints waypoints = new Waypoints(worldDir);
         java.util.List<String> restart = null; // arguments to relaunch with (another world), set by the menu
         BiomeMap biomes = new BiomeMap(world.generator,
             Colormap.load(resources, "grass", 0x91BD59), Colormap.load(resources, "foliage", 0x77AB2F));
@@ -200,6 +203,7 @@ public final class Main {
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2), new ChunkStreamer.Listener() {
                 public void chunkVisible(int cx, int cz) {
                     renderer.chunkVisible(cx, cz);
+                    explored.see(cx, cz);
                     Chunk c = world.chunk(cx, cz);
                     int[] fluids = c == null ? null : c.unsettledFluids;
                     if (fluids != null) {
@@ -335,9 +339,14 @@ public final class Main {
         if (forced >= 0 && forced + 1 < args.length) weather.force(args[forced + 1]);
         weather.second(player.x, player.y, player.z, (float) Math.max(0, DayCycle.sunHeight(ticks)), false);
         WeatherRenderer weatherRenderer = new WeatherRenderer();
-        Minimap minimap = new Minimap(world.generator);
+        Minimap minimap = new Minimap(world.generator, explored);
+        WorldMap worldMap = new WorldMap(world.generator, explored, waypoints);
+        SoundEngine sound = new SoundEngine();
+        double stepDistance = 0, lastStepX = player.x, lastStepZ = player.z, waterScanAt = -1;
+        double[][] waterSpots = new double[0][];
         String mapMode = option(args, "--minimap", null); // scripted shots: relief, biomes, waters, clouds, weather
         if (mapMode != null) minimap.mode = Minimap.Mode.valueOf(mapMode.toUpperCase());
+        if (argv.contains("--worldmap")) worldMap.open(player.x, player.z); // scripted shots
         double weatherClock = 0;
         // Start-up: the water of the first chunks settles at full speed, with a progress bar.
         boolean settling = true;
@@ -356,11 +365,15 @@ public final class Main {
             world.light.drainTouched(k -> renderer.sectionChanged(k, false));
             if (now - lastAutosave > AUTOSAVE_NANOS) {
                 streamer.autosave();
+                explored.save();
                 lastAutosave = now;
             }
             if (stats == null && screenshot == null) {
                 boolean escape = input.pressed(GLFW_KEY_ESCAPE), inventoryKey = input.pressed(GLFW_KEY_E);
-                if (screenOpen && (escape || inventoryKey)) {
+                if (worldMap.open && escape) {
+                    worldMap.open = false;
+                    input.capture(true);
+                } else if (screenOpen && (escape || inventoryKey)) {
                     if (menu != null && menu.close() > 0) System.err.println("[inventory] full: items lost");
                     menu = null;
                     screenOpen = false;
@@ -384,7 +397,17 @@ public final class Main {
                     }
                 }
                 if (input.pressed(GLFW_KEY_F3)) debug = !debug;
-                if (input.pressed(GLFW_KEY_M)) minimap.cycle();
+                if (worldMap.open) {
+                    if (!worldMap.input(input, hud, player.x, player.z, (int) player.y)) input.capture(true);
+                } else if (!paused && !screenOpen) {
+                    if (input.pressedChar('m')) minimap.cycle();
+                    if (input.pressedChar('j')) { // world map
+                        worldMap.open(player.x, player.z);
+                        input.capture(false);
+                    }
+                    if (input.pressedChar('b')) // waypoint where the player stands
+                        waypoints.add((int) Math.floor(player.x), (int) Math.floor(player.y), (int) Math.floor(player.z));
+                }
                 if (!paused && input.pressed(GLFW_KEY_F4)) {
                     creative = !creative; // like vanilla's game mode switch
                     input.creative = creative;
@@ -443,7 +466,7 @@ public final class Main {
                 }
             }
             if (paused || survival.dead) dt = 0; // the world stands still: no physics, no time, no edits
-            if (stats == null && dt > 0 && !screenOpen) input.frame(cam, player, dt);
+            if (stats == null && dt > 0 && !screenOpen && !worldMap.open) input.frame(cam, player, dt);
             else { input.breakRequested = false; input.placeRequested = false; input.breakHeld = false; }
             if (!creative) input.selected = inventory.id(input.slot);
             // Fixed physics step: frame-rate independent and stable collisions.
@@ -462,13 +485,26 @@ public final class Main {
             }
             accumulator += dt;
             while (accumulator >= PHYSICS_STEP) {
-                if (stats == null && !screenOpen) input.move(cam, player);
+                if (stats == null && !screenOpen && !worldMap.open) input.move(cam, player);
                 else if (stats == null) { player.vx = 0; player.vz = 0; }
                 else { player.vx = BENCH_SPEED; player.vz = 0; player.vy = 0; }
                 player.step(world, PHYSICS_STEP);
                 accumulator -= PHYSICS_STEP;
             }
             cam.pos.set(player.x, player.y + Player.EYE_HEIGHT, player.z);
+            // Footsteps: one every 1.7 blocks walked on the ground (a splash in water), by material.
+            double walked = Math.hypot(player.x - lastStepX, player.z - lastStepZ);
+            lastStepX = player.x;
+            lastStepZ = player.z;
+            if ((player.onGround || player.fluid != Blocks.FLUID_NONE) && !player.flying && walked < 2) {
+                stepDistance += walked;
+                boolean wading = player.fluid == Blocks.FLUID_WATER;
+                if (stepDistance > (wading ? 2.2 : 1.7)) {
+                    stepDistance = 0;
+                    byte under = world.get((int) Math.floor(player.x), (int) Math.floor(player.y - 0.2), (int) Math.floor(player.z));
+                    sound.step(wading ? SoundEngine.Step.WATER : stepKind(under), player.x, player.y, player.z);
+                }
+            }
 
             double cp = Math.cos(cam.pitch);
             Raycast.Hit hit = Raycast.cast(world, cam.pos.x, cam.pos.y, cam.pos.z,
@@ -482,6 +518,7 @@ public final class Main {
                 byte target = world.get(hit.x(), hit.y(), hit.z());
                 miningProgress += dt / Blocks.breakSeconds(target);
                 if (miningProgress >= 1 && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
+                    sound.blockBroken(hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     inventory.add(Blocks.DROP[target & 0xFF], Blocks.DROP_COUNT[target & 0xFF]);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
@@ -494,6 +531,7 @@ public final class Main {
             }
             if (hit != null && ((creative && input.breakRequested) || (editDemo && streamer.settled()))) {
                 if (world.get(hit.x(), hit.y(), hit.z()) != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
+                    sound.blockBroken(hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                 }
@@ -507,6 +545,7 @@ public final class Main {
                 double dirX = -Math.sin(cam.yaw) * cp, dirY = Math.sin(cam.pitch), dirZ = -Math.cos(cam.yaw) * cp;
                 int[] placed = Placement.place(world, player, hit, hitHeight(hit, cam.pos.x, cam.pos.y, cam.pos.z, dirX, dirY, dirZ), input.selected);
                 if (placed != null) {
+                    sound.blockPlaced(placed[0] + 0.5, placed[1] + 0.5, placed[2] + 0.5);
                     if (!creative) inventory.takeOne(input.slot);
                     renderer.blockChanged(placed[0], placed[1], placed[2]);
                     fluids.blockChanged(placed[0], placed[1], placed[2]);
@@ -594,6 +633,7 @@ public final class Main {
                 double[] m = screenshot != null ? new double[] {hud.width() * 0.62, hud.height() * 0.42} : input.mouseInFramebuffer();
                 inventoryScreen.draw(hud, menu, inventory, input.hotbar, input.slot, m[0], m[1]);
             }
+            if (!worldMap.open) drawWaypoints(hud, renderer, cam, waypoints);
             int basins = world.generator.landscape().hydrology().computing.get();
             if (basins > 0) { // river tiles being carved (the chunks there wait for them)
                 hud.textCentered(String.format("Creusement des bassins versants : %d tuile%s de 1024 blocs en calcul...", basins,
@@ -622,8 +662,34 @@ public final class Main {
             if (minimap.ready()) {
                 minimap.draw(hud);
                 hud.begin(fbW[0], fbH[0]);
-                minimap.overlay(hud, player.x, player.z, cam.yaw);
+                minimap.overlay(hud, player.x, player.z, cam.yaw, waypoints);
                 hud.end(textures.id);
+            }
+            if (worldMap.open) {
+                worldMap.update(hud, weather, now);
+                hud.begin(fbW[0], fbH[0]);
+                hud.rect(0, 0, hud.width(), hud.height(), 0.06f, 0.07f, 0.09f, 1);
+                hud.end(textures.id);
+                worldMap.draw(hud);
+                hud.begin(fbW[0], fbH[0]);
+                worldMap.overlay(hud, input, player.x, player.z, cam.yaw);
+                hud.end(textures.id);
+            }
+            // Sound: listener at the eyes, rain (muffled under a roof), wind (stronger up high),
+            // running water nearby (looked for twice a second), thunder after each flash.
+            double[] strike = weatherRenderer.takeStrike();
+            if (strike != null) sound.lightning(strike[0], strike[1], strike[2], cam.pos.x, cam.pos.y, cam.pos.z, weatherClock);
+            if (sound.enabled()) {
+                Atmosphere.Sample here = weather.here();
+                if (weatherClock >= waterScanAt) {
+                    waterSpots = runningWater(world, cam.pos.x, cam.pos.y, cam.pos.z);
+                    waterScanAt = weatherClock + 0.5;
+                }
+                float rainLevel = here == null || here.type() == Atmosphere.Precipitation.NONE ? 0
+                    : Math.min(1, here.precipitation() / 0.03f) * (sheltered(world, cam.pos.x, cam.pos.y, cam.pos.z) ? 0.35f : 1);
+                float windSpeed = here == null ? 0 : (float) (Math.hypot(here.windX(), here.windZ()) * (1 + Math.max(0, cam.pos.y - 80) / 80));
+                sound.update(cam.pos.x, cam.pos.y, cam.pos.z, cam.yaw, cam.pitch, paused ? 0 : rainLevel, paused ? 0 : windSpeed,
+                    waterSpots, weatherClock);
             }
             if (stats != null) {
                 stats.endGpu();
@@ -652,6 +718,7 @@ public final class Main {
                 fluidDemo = false;
             }
             if (screenshot != null && streamer.settled() && renderer.idle() && fluids.pending() == 0 && !fluidDemo
+                && (!worldMap.open || worldMap.ready())
                 && (minimap.mode == Minimap.Mode.OFF || minimap.ready())) {
                 Screenshot.save(screenshot, fbW[0], fbH[0]);
                 long[] buf = renderer.bufferBytes();
@@ -685,6 +752,7 @@ public final class Main {
             playerData.selectedSlot = input.slot;
             storage.saveLevel(playerData, (long) ticks % DayCycle.DAY_TICKS);
             storage.close();
+            explored.save();
         } catch (IOException | InterruptedException e) {
             System.err.println("[storage] save failed: " + e.getMessage());
         }
@@ -695,10 +763,83 @@ public final class Main {
         skyRenderer.dispose();
         weatherRenderer.dispose();
         minimap.dispose();
+        worldMap.dispose();
+        sound.dispose();
         renderer.dispose();
         glfwDestroyWindow(window);
         glfwTerminate();
         if (restart != null) relaunch(restart);
+    }
+
+    /** Footstep sound for the block under the feet. */
+    private static SoundEngine.Step stepKind(byte b) {
+        if (b == Blocks.STONE || b == Blocks.COBBLESTONE || b == Blocks.DEEPSLATE || b == Blocks.PACKED_ICE || b == Blocks.ICE) return SoundEngine.Step.STONE;
+        if (b == Blocks.SAND || b == Blocks.GRAVEL) return SoundEngine.Step.SAND;
+        if (b == Blocks.OAK_PLANKS || b == Blocks.OAK_LOG || b == Blocks.CRAFTING_TABLE || Blocks.isSlab(b)) return SoundEngine.Step.WOOD;
+        if (b == Blocks.SNOW_BLOCK) return SoundEngine.Step.SNOW;
+        return SoundEngine.Step.GRASS;
+    }
+
+    /** True if something solid stands over this point (rain is heard muffled). */
+    private static boolean sheltered(World world, double x, double y, double z) {
+        int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
+        for (int yy = (int) Math.floor(y) + 1; yy < Math.min(Chunk.MAX_Y, y + 32); yy++) if (Blocks.isSolid(world.get(bx, yy, bz))) return true;
+        return false;
+    }
+
+    /**
+     * Up to 3 spots of running water near the listener {x, y, z, loudness}: river columns (louder
+     * with more flow) and falling or flowing water blocks (rapids, waterfalls), nearest first,
+     * kept at least 12 blocks apart.
+     */
+    private static double[][] runningWater(World world, double x, double y, double z) {
+        java.util.List<double[]> found = new java.util.ArrayList<>();
+        int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
+        var hydrology = world.generator.landscape().hydrology();
+        for (int dz = -40; dz <= 40; dz += 4)
+            for (int dx = -40; dx <= 40; dx += 4) {
+                var c = world.generator.column(bx + dx, bz + dz);
+                if (c.river() > 0) {
+                    float flow = hydrology.flow(bx + dx, bz + dz);
+                    found.add(new double[] {bx + dx + 0.5, c.water() + 0.5, bz + dz + 0.5,
+                        Math.min(1, 0.3 + Math.log10(flow / 400 + 1) * 0.35)});
+                }
+                for (int dy = -12; dy <= 12; dy += 3) { // falls and rapids: moving water blocks
+                    byte b = world.get(bx + dx, by + dy, bz + dz);
+                    if (Blocks.isFluid(b) && Blocks.LEVEL[b & 0xFF] != 0 && Blocks.FLUID[b & 0xFF] == Blocks.FLUID_WATER)
+                        found.add(new double[] {bx + dx + 0.5, by + dy + 0.5, bz + dz + 0.5, Blocks.LEVEL[b & 0xFF] == 8 ? 1 : 0.6});
+                }
+            }
+        found.sort(java.util.Comparator.comparingDouble(p -> (p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y) + (p[2] - z) * (p[2] - z)));
+        java.util.List<double[]> out = new java.util.ArrayList<>();
+        for (double[] p : found) {
+            boolean far = true;
+            for (double[] q : out) if (Math.abs(p[0] - q[0]) + Math.abs(p[2] - q[2]) < 12) far = false;
+            if (far) out.add(p);
+            if (out.size() == 3) break;
+        }
+        return out.toArray(new double[0][]);
+    }
+
+    /** Waypoints in the world: a marker and "name (distance)" over each one in front of the camera. */
+    private static void drawWaypoints(Hud hud, WorldRenderer renderer, Camera cam, Waypoints waypoints) {
+        org.joml.Matrix4f vp = renderer.viewProj();
+        org.joml.Vector4f v = new org.joml.Vector4f();
+        float s = hud.scale;
+        for (Waypoints.Waypoint w : waypoints.list) {
+            double dx = w.x + 0.5 - cam.pos.x, dy = w.y + 1.5 - cam.pos.y, dz = w.z + 0.5 - cam.pos.z;
+            v.set((float) dx, (float) dy, (float) dz, 1).mul(vp);
+            if (v.w <= 0.1f) continue; // behind the camera
+            float sx = (v.x / v.w * 0.5f + 0.5f) * hud.width(), sy = (0.5f - v.y / v.w * 0.5f) * hud.height();
+            if (sx < 0 || sy < 0 || sx > hud.width() || sy > hud.height()) continue;
+            int c = w.color;
+            float r = (c >> 16 & 255) / 255f, g = (c >> 8 & 255) / 255f, b = (c & 255) / 255f;
+            hud.rect(sx - 2 * s, sy - 2 * s, 4 * s, 4 * s, 0, 0, 0, 0.7f);
+            hud.rect(sx - 1.5f * s, sy - 1.5f * s, 3 * s, 3 * s, r, g, b, 1);
+            String label = String.format("%s (%d m)", w.name, Math.round(Math.sqrt(dx * dx + dy * dy + dz * dz)));
+            hud.rect(sx - hud.textWidth(label) / 2 - s, sy - 3 * s - hud.lineHeight(), hud.textWidth(label) + 2 * s, hud.lineHeight(), 0, 0, 0, 0.45f);
+            hud.textCentered(label, sx, sy - 3 * s - hud.lineHeight(), r, g, b);
+        }
     }
 
     /** Options naming the world or the start position: replaced or dropped when relaunching. */

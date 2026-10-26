@@ -27,7 +27,7 @@ java {
 
 dependencies {
     implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
-    for (module in listOf("lwjgl", "lwjgl-glfw", "lwjgl-opengl")) {
+    for (module in listOf("lwjgl", "lwjgl-glfw", "lwjgl-opengl", "lwjgl-openal")) {
         implementation("org.lwjgl:$module")
         runtimeOnly("org.lwjgl:$module::$lwjglNatives")
     }

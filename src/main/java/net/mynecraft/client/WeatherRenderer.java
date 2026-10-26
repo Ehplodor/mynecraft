@@ -47,6 +47,14 @@ final class WeatherRenderer {
     private int roofX = Integer.MIN_VALUE, roofZ, roofAge;
     // Lightning.
     private double boltUntil, nextBolt;
+    private double[] strike; // the last bolt's position, until taken (thunder)
+
+    /** Position of a lightning strike since the last call, or null. */
+    double[] takeStrike() {
+        double[] s = strike;
+        strike = null;
+        return s;
+    }
     private float boltX, boltZ, boltTop, boltBottom;
     private long boltSeed;
     /** 0..1 brightness of the current lightning flash (the caller brightens sky and light with it). */
@@ -287,6 +295,7 @@ final class WeatherRenderer {
             boltBottom = world.generator.height((int) boltX, (int) boltZ) + 1;
             boltTop = Math.max(boltBottom + 30, here.cloudBase());
             boltUntil = now + 0.25;
+            strike = new double[] {boltX, (boltTop + boltBottom) / 2, boltZ};
             nextBolt = now + 2 + 12 * hash((int) boltSeed, 3) / Math.max(0.2f, here.storm());
         } else if (!thunder) {
             nextBolt = Math.max(nextBolt, now + 3);
