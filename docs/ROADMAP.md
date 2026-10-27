@@ -368,9 +368,211 @@ Dix espèces vivent autour du joueur (`world/life`), chacune avec un habitat (bi
 
 Pistes ensuite : gel des lacs en hiver et couche de neige posée au sol, chaînes plus longues (loups, insectes visibles), maladies transmises entre espèces, succession végétale (prairie → forêt), influence du joueur (chasse, cultures) mesurée dans le carnet.
 
-## 🚧 M24 — Calendrier local des plantes et gel
+## ✅ M24 — Calendrier local des plantes et gel
 **Végétation** (`Vegetation`) : chaque colonne a son propre calendrier, lu dans sa température (climat de la colonne à son altitude + variation saisonnière) plutôt que dans la date seule. La saison de croissance est la partie de l'année au-dessus de 5 °C : un fond de vallée tempéré pousse du début du printemps au début de l'automne, un alpage seulement quelques jours autour du cœur de l'été. Les couleurs de l'herbe et des feuilles suivent ce calendrier local (printemps tardif et automne précoce en altitude), et une plaine chaude et sèche jaunit en plein été (sécheresse). Les touffes d'herbe et les coquelicots poussent selon la croissance locale, les fleurs s'ouvrent aussi longtemps après le réveil des plantes qu'en plaine (donc plus tard sur les hauteurs). Le carnet affiche la pousse, la floraison et la sécheresse là où l'on se tient.
 
 **Gel** (`Frost`) : indépendamment de la météo du moment, la température moyenne de la saison fait geler l'eau dormante en hiver, depuis les rives vers le large (la glace s'étend depuis la glace déjà prise), et la rouvre au printemps par les bords ; une forte gelée (sous −2 °C) tue les touffes d'herbe et les fleurs.
 
-Reste à faire : couche de neige posée au sol (bloc et texture à créer), modèle d'écologie encore réglé sur la végétation globale de la saison (pas sur le calendrier local), fleurs alpines distinctes des coquelicots, épaisseur de la glace (marcher dessus / la briser), et vérification visuelle en jeu.
+Reste à faire, repris en M25 et M26 : vérification visuelle en jeu, couche de neige posée au sol, écologie branchée sur le calendrier local, fleurs alpines, épaisseur de la glace.
+
+---
+
+# Vision : vivre en harmonie avec soi-même et avec la nature
+
+Le défi du jeu n'est ni de survivre à des monstres ni de produire le plus possible : c'est de **mener
+une vie complète (se nourrir, s'abriter, fabriquer, créer, échanger, apprendre) sans épuiser le monde
+qui la rend possible, et en y trouvant son équilibre**. Cela demande beaucoup de métiers : architecture,
+agriculture, industrie, chasse, pêche, cueillette, art, énergie et flux de matières, commerce,
+construction, fabrication, cuisine, outils, recettes, plans, biodiversité animale et végétale, rôle et
+compétences.
+
+## Ce qui est déjà là
+Le monde vit sans le joueur : eau, météo, bassins versants, saisons, calendrier local des plantes, gel,
+écologie des communautés (producteurs, consommateurs, prédation, mutualisme, cycle des nutriments).
+C'est exactement le terrain dont le défi a besoin : on peut **mesurer** l'effet du joueur sur la nature.
+
+## Le risque : vingt jeux juxtaposés
+Avec autant de métiers, le danger est d'empiler des mini-jeux qui ne se parlent pas. Les jeux qui
+réussissent cette ampleur (Dwarf Fortress, Valheim, Stardew Valley, RimWorld, Vintage Story) partagent
+quelques systèmes communs que chaque métier réutilise. Cinq règles pour tout ce qui suit :
+
+1. **Tout vient de quelque part et retourne quelque part (flux de matières).** Chaque objet a une
+   origine dans la simulation (une parcelle, une espèce, un filon, une rivière) et une fin (consommé,
+   usé, composté, jeté). La viande vient des effectifs de la parcelle, le bois de ses arbres, les
+   déchets d'une forge vont dans l'eau ou le sol. Aucun objet ne sort de nulle part.
+2. **Une boussole d'harmonie.** Deux mesures suivies en continu et affichées dans le carnet :
+   *harmonie avec la nature* (biodiversité, sol, eau, populations du territoire du joueur comparées
+   à leur état d'équilibre) et *harmonie avec soi* (besoins satisfaits, variété des repas, confort
+   de l'abri, beauté du lieu, activités variées, liens avec les autres). Chaque fonctionnalité doit
+   faire bouger au moins l'une des deux.
+3. **Une seule grammaire de fabrication.** Établi, cuisine, forge, atelier d'art et machines utilisent
+   le même modèle : recette = entrées, outil ou poste, savoir-faire requis, durée, énergie, sorties et
+   déchets. Les data packs l'étendent ; l'API de mods aussi.
+4. **Apprendre en faisant.** Chaque métier a sa compétence, qui progresse par la pratique et débloque
+   recettes, plans et gestes plus fins. Le rôle du personnage naît de ce qu'il pratique, pas d'une classe
+   choisie au départ.
+5. **Les PNJ vivent selon les mêmes règles que le joueur.** Ils ont les mêmes besoins, compétences,
+   recettes et flux de matières : un village qui chasse trop vide la forêt comme le ferait le joueur,
+   un forgeron a besoin de charbon. Leurs vies variées naissent de ces systèmes, pas de scripts.
+
+## Métiers et capacités
+Un système unique, partagé par le joueur et les PNJ, que chaque étape enrichit :
+- **Capacités** (ce que le corps et l'esprit savent faire) : force, endurance, adresse, perception,
+  patience, mémoire des lieux, sens esthétique. Elles progressent lentement par l'usage, baissent avec
+  la fatigue, la faim ou le froid, et donnent la qualité des gestes (précision du tir, vitesse de coupe,
+  finesse d'une poterie).
+- **Compétences** (savoir-faire d'un domaine, en niveaux) : chacune progresse par la pratique et
+  débloque recettes, plans, outils et gestes. Ce qu'on n'exerce plus s'émousse doucement.
+- **Métiers** (combinaisons de compétences reconnues par les autres) : paysan, jardinier, éleveur,
+  apiculteur, bûcheron, charpentier, maçon, architecte, chasseur, pêcheur, cueilleur, herboriste,
+  guérisseur, cuisinier, meunier, boulanger, forgeron, fondeur, verrier, potier, tisserand, teinturier,
+  tanneur, ingénieur, artiste, musicien, conteur, marchand. Un métier donne un rôle dans le hameau,
+  des commandes et des titres (apprenti, compagnon, maître).
+- **Transmission** : un maître enseigne plus vite qu'on n'apprend seul ; le joueur peut être l'apprenti
+  d'un PNJ ou prendre lui-même des apprentis. Livres, plans et carnets conservent les savoirs.
+- **Spécialisation sans enfermement** : on peut tout essayer, mais l'excellence dans un métier demande
+  du temps ; un personnage complet est un choix, pas une obligation.
+
+Mesure de l'expérience : à chaque étape, une partie de 20 minutes avec trois questions (qu'ai-je eu
+envie de faire ? qu'est-ce qui m'a frustré ? quel geste m'a semblé juste envers le monde ?).
+
+---
+
+# À venir
+
+## Pourquoi cet ordre
+Les étapes suivent les dépendances entre systèmes, en quatre phases :
+1. **Fondations (M25 à M28)** : ce que tous les métiers partagent. Identifiants, objets, grammaire de
+   fabrication, flux de matières, capacités et compétences, besoins et boussole. Sans elles, chaque
+   métier réinventerait ses propres règles (le risque des « vingt jeux juxtaposés »).
+2. **Vivre de la nature (M29 à M31)** : la première boucle complète (besoins → prélever dans la nature
+   → cuisiner → s'abriter → mesurer son empreinte) d'abord seul, puis avec les premiers habitants.
+   Les PNJ arrivent dès que leurs maisons peuvent être bâties, pour que chaque métier suivant soit
+   conçu d'emblée pour eux et pour le joueur.
+3. **Transformer le monde (M32 à M34)** : cultiver, produire de l'énergie, transformer les matières,
+   créer. Chaque étape ajoute ses métiers au joueur *et* aux PNJ, et ses effets à l'écologie.
+4. **Une société vivante (M35 à M37)** : vies variées, familles, commerce, rôles ; biodiversité élargie ;
+   ouverture aux mods une fois tous les registres éprouvés par les étapes précédentes.
+
+Fils continus à chaque étape : les espèces animales et végétales dont l'étape a besoin (abeilles pour
+l'élevage, plantes tinctoriales pour l'art…), les recettes du pack de données, une partie de test de
+20 minutes, et la CI au vert.
+
+## Phase 1 — Fondations
+
+### M25 — Socle technique
+- CI GitHub Actions : compilation et tests à chaque PR
+- Lever le plafond de 127 états de bloc (identifiants 16 bits ou palette par section)
+- **Registre d'objets séparé des blocs** (outils, nourriture, matériaux, objets d'art)
+- Registres pilotés par les données (blocs, objets, espèces) prêts pour les data packs puis l'API de mods
+- Captures scriptées rejouées en CI (comparaison d'images, vérification visuelle de M24)
+
+### M26 — Finir l'hiver
+- Couche de neige au sol, glace d'épaisseur variable (on marche dessus, on la brise), écologie branchée
+  sur le calendrier local, fleurs alpines, traces dans la neige
+- Clôt le travail en cours sur les saisons avant que les besoins du corps (froid) n'en dépendent
+
+### M27 — Grammaire commune : fabriquer, prélever, apprendre
+- **Grammaire de fabrication** : recette = entrées, poste, outil, compétence requise, durée, énergie,
+  sorties et déchets ; établi et fabrication actuels migrés dessus ; format data pack étendu
+- **Flux de matières** : chaque prélèvement est retiré d'une parcelle de l'écologie (plantes, animaux,
+  sol, eau, filons) et chaque déchet y retourne ; un registre des flux par parcelle alimente le carnet
+- **Outils** : objets avec matériau, qualité, usure, réparation ; le minage à la main de M12 devient
+  un cas particulier
+- **Métiers et capacités** : capacités, compétences par la pratique, niveaux, déblocages, titres ;
+  appliqués d'abord aux gestes existants (miner, bâtir, fabriquer)
+- Tout ce système est écrit pour un « acteur » (joueur ou PNJ), pas pour le joueur seul
+
+### M28 — Le corps et la boussole
+- Besoins : faim, soif, fatigue, chaleur (lit l'hiver de M26) ; repas plus nourrissants quand ils sont variés
+- Bien-être : abri, confort, beauté du lieu, repos, variété des activités
+- **Boussole d'harmonie** dans le carnet : nature (biodiversité, sol, eau, populations du territoire,
+  lus dans le registre des flux) et soi (besoins, bien-être)
+- Territoire défini autour du foyer ; rythmes de jeu réglables (besoins lents ou désactivés)
+
+## Phase 2 — Vivre de la nature
+
+### M29 — Cueillir, pêcher, chasser, cuisiner
+- Cueillette : baies, champignons, herbes, fruits, graines, selon saison et calendrier local ; ce qui
+  est cueilli manque à la parcelle et repousse
+- Pêche : canne, nasses ; poissons tirés des effectifs de la parcelle
+- Chasse : arc, pièges ; gibier tiré des effectifs, surchasse visible, respect des saisons de
+  reproduction récompensé par la boussole
+- Cuisine : feu de camp, recettes simples, conservation (séchage, fumage, sel)
+- Métiers : cueilleur, herboriste, pêcheur, chasseur, cuisinier
+- **Première boucle jouable complète** : se nourrir de la nature sans l'épuiser
+
+### M30 — Bâtir
+- Formes : escaliers, barrières, murets, portes, fenêtres, toits, poutres, `uvlock`, modèles non cubiques
+- Architecture qui compte : isolation (chaleur), lumière, toit contre la pluie, cave fraîche pour les
+  réserves, beauté du lieu dans le bien-être
+- **Plans et blueprints** : tracer un bâtiment, liste des matériaux, construction pas à pas ; un plan
+  est un objet qu'on peut copier, échanger, recevoir d'un maître ; confort en créatif (annuler,
+  remplissage, symétrie)
+- Métiers : bâtisseur, charpentier, maçon, architecte
+- Prérequis des hameaux : les PNJ bâtiront avec les mêmes plans
+
+### M31 — Premiers habitants
+- PNJ acteurs : mêmes besoins, capacités, compétences, outils, recettes et flux que le joueur
+- Déplacement dans le monde voxel (recherche de chemin, portes, escaliers, eau), maison, emploi du
+  temps selon le jour et la saison, abri de la pluie, feu l'hiver
+- Premiers métiers exercés : cueilleur, pêcheur, chasseur, cuisinier, bâtisseur ; ils construisent
+  avec les plans de M30
+- Un ermite, une famille, un petit hameau ; leur empreinte s'inscrit dans le registre des flux
+- **Transmission** : un PNJ maître enseigne un savoir-faire ou un plan au joueur, et l'inverse
+- Dialogues simples (besoins, conseils, demandes) ; harmonie avec les autres dans la boussole
+
+## Phase 3 — Transformer le monde
+
+### M32 — Cultiver et élever
+- Cultures à plusieurs âges selon sol, humidité et calendrier local ; semences sauvages domestiquées
+- Arrosage et irrigation par l'eau du simulateur ; compost et fumure (cycle des nutriments)
+- Vergers, haies, plantation d'arbres, succession végétale ; associations de cultures et jachère
+- Élevage doux (poules, chèvres, moutons, abeilles) qui puise et rend à la parcelle
+- Métiers : paysan, jardinier, éleveur, apiculteur, berger ; champs des hameaux cultivés par les PNJ
+
+### M33 — Énergie et flux de matières
+- Énergie : roue à aubes au débit réel de la rivière, moulin à vent selon le vent de l'atmosphère,
+  force animale, bois de chauffe (forêt qui recule si on abat trop)
+- Transformations : meule, four, boulangerie, scierie, forge, fonderie, tannerie, verrerie
+- Flux visibles : scories, cendres, eaux usées retournent au sol ou à la rivière et l'écologie en
+  tient compte (une tannerie en amont trouble les truites)
+- Logistique douce : canaux, rigoles, goulottes, charrettes
+- Métiers : meunier, boulanger, bûcheron, forgeron, fondeur, verrier, tanneur, ingénieur
+
+### M34 — Créer
+- Teintures tirées des plantes et des minéraux, peinture, sculpture, poterie, tissage, instruments
+  et musique jouée ; décoration qui nourrit le bien-être et la beauté du lieu
+- Métiers : potier, tisserand, teinturier, artiste, musicien ; œuvres des PNJ dans les hameaux
+
+## Phase 4 — Une société vivante
+
+### M35 — Les gens du pays (vies variées et commerce)
+- Vies variées : paysans, artisans, bergers transhumants, marchands itinérants, herboristes, ermites,
+  artistes, nomades saisonniers
+- Chacun a un âge, une famille, un caractère, des goûts, des aspirations et une histoire qui se
+  déroule : il naît, apprend un métier auprès d'un maître, se marie ou non, déménage, vieillit,
+  transmet son savoir
+- Calendrier social : semailles, moissons, foires, veillées d'hiver, fêtes du printemps
+- Relations entre eux (amitiés, rivalités, entraide) et avec le joueur (confiance, services rendus)
+- Hameaux qui naissent, grandissent ou déclinent selon les ressources de leur territoire
+- Commerce : troc puis monnaie, prix selon rareté et saison, commandes, foires
+- Rôle du joueur : sa place (paysan, artisan, marchand, ermite, guérisseur…) naît de ce qu'il
+  pratique et de ce que le hameau attend de lui
+- Métiers : marchand, conteur, guérisseur ; titres d'apprenti, compagnon, maître reconnus par le hameau
+
+### M36 — Biodiversité élargie
+- Nouvelles espèces animales (loups, insectes visibles, oiseaux, amphibiens) et végétales (arbres,
+  fleurs, champignons, plantes médicinales) ; chaînes alimentaires plus longues
+- Maladies entre espèces, espèces sensibles à la pollution, réintroduction par le joueur ou les PNJ
+
+### M37 — API de mods
+- Ouverture des registres, de la grammaire de fabrication, des métiers et des comportements de PNJ
+  aux JAR externes ; événements (récolte, prise de gibier, saison, recette apprise, PNJ qui change
+  de métier…), inspirée de Fabric API comme le prévoit l'étude de faisabilité
+- Un mod d'exemple (une espèce, une culture, un métier) et sa documentation
+
+## Pistes ensuite
+- Courant qui pousse le joueur, lave qui brûle, surfaces inclinées
+- Mode photo, lieux remarquables, musique générative
+- Multijoueur coopératif (un hameau à plusieurs)
