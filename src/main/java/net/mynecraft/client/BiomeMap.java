@@ -3,7 +3,7 @@ package net.mynecraft.client;
 import net.mynecraft.resource.Colormap;
 import net.mynecraft.world.Landscape;
 import net.mynecraft.world.TerrainGenerator;
-import net.mynecraft.world.life.Ecosystem;
+import net.mynecraft.world.life.Vegetation;
 import org.lwjgl.BufferUtils;
 
 import java.nio.ByteBuffer;
@@ -58,12 +58,11 @@ final class BiomeMap {
                 int wx = (cx << 4) + x, wz = (cz << 4) + z;
                 float t = generator.temperature(wx, wz), rain = generator.downfall(wx, wz);
                 Landscape.Column col = generator.column(wx, wz);
-                double celsius = -14 + 40 * t - 0.0065 * Math.max(0, col.height() - TerrainGenerator.SEA_LEVEL)
-                    + Ecosystem.temperatureOffset(phase);
+                double climate = Vegetation.climate(t, col.height());
                 long h = (wx * 0x9E3779B97F4A7C15L) ^ (wz * 0xC2B2AE3D27D4EB4FL);
                 double hue = ((h >>> 40) & 0xFFFF) / 65536.0;
-                grassRgb[z * 16 + x] = seasonal(grass.color(t, rain), false, celsius, col.biome(), hue, phase);
-                leafRgb[z * 16 + x] = seasonal(foliage.color(t, rain), true, celsius, col.biome(), hue, phase);
+                grassRgb[z * 16 + x] = seasonal(grass.color(t, rain), false, climate, rain, col.biome(), hue, phase);
+                leafRgb[z * 16 + x] = seasonal(foliage.color(t, rain), true, climate, rain, col.biome(), hue, phase);
             }
         }
         for (int layer = 0; layer < 2; layer++) {
@@ -84,14 +83,18 @@ final class BiomeMap {
 
     /**
      * A biome colour at this time of year. {@code hue} 0..1 varies per column (which trees turn red,
-     * orange or yellow); {@code celsius} is the air temperature with the season (snow below ~0).
+     * orange or yellow); {@code climate} is the column's temperature before the season (deg C), from
+     * which its own calendar is read ({@link Vegetation#localPhase}: late spring and early autumn on
+     * the heights) and the snow (below ~0); a hot, dry summer parches the grass.
      */
-    static int seasonal(int rgb, boolean leaves, double celsius, byte biome, double hue, double phase) {
+    static int seasonal(int rgb, boolean leaves, double climate, double rain, byte biome, double hue, double phase) {
         double r = ((rgb >> 16) & 255) / 255.0, g = ((rgb >> 8) & 255) / 255.0, b = (rgb & 255) / 255.0;
-        double spring = bump(phase, 0.08, 0.08), autumn = bump(phase, 0.62, 0.1), winter = bump(phase, 0.87, 0.1);
+        double local = Vegetation.localPhase(climate, phase), celsius = Vegetation.celsius(climate, phase);
+        double spring = bump(local, 0.08, 0.08), autumn = bump(local, 0.62, 0.1), winter = bump(local, 0.87, 0.1);
         double[] c = {r, g, b};
         if (!leaves) {
             scale(c, 1 + 0.08 * spring);
+            mix(c, 0.78, 0.7, 0.4, 0.55 * Vegetation.drought(climate, rain, phase)); // parched summer grass
             mix(c, 0.74, 0.66, 0.38, 0.45 * autumn);   // drying grass
             mix(c, 0.55, 0.53, 0.38, 0.4 * winter);    // dormant grass
         } else {

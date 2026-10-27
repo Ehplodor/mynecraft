@@ -628,7 +628,10 @@ public final class Main {
                 }
                 life.tick(dt, player.x, player.y, player.z, input.shiftDown());
                 if (streamer.settled()) lifeClock += dt;
-                for (int[] e; (e = life.edits.poll()) != null; ) renderer.blockChanged(e[0], e[1], e[2]); // grass grown, eaten
+                for (int[] e; (e = life.edits.poll()) != null; ) { // grass grown, eaten, frozen; lakes iced over or thawed
+                    renderer.blockChanged(e[0], e[1], e[2]);
+                    fluids.blockChanged(e[0], e[1], e[2]);
+                }
             }
             double cp = Math.cos(cam.pitch);
             Raycast.Hit hit = Raycast.cast(world, cam.pos.x, cam.pos.y, cam.pos.z,
