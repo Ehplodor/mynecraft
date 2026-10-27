@@ -415,6 +415,24 @@ quelques systèmes communs que chaque métier réutilise. Cinq règles pour tout
    recettes et flux de matières : un village qui chasse trop vide la forêt comme le ferait le joueur,
    un forgeron a besoin de charbon. Leurs vies variées naissent de ces systèmes, pas de scripts.
 
+## Métiers et capacités
+Un système unique, partagé par le joueur et les PNJ, que chaque étape enrichit :
+- **Capacités** (ce que le corps et l'esprit savent faire) : force, endurance, adresse, perception,
+  patience, mémoire des lieux, sens esthétique. Elles progressent lentement par l'usage, baissent avec
+  la fatigue, la faim ou le froid, et donnent la qualité des gestes (précision du tir, vitesse de coupe,
+  finesse d'une poterie).
+- **Compétences** (savoir-faire d'un domaine, en niveaux) : chacune progresse par la pratique et
+  débloque recettes, plans, outils et gestes. Ce qu'on n'exerce plus s'émousse doucement.
+- **Métiers** (combinaisons de compétences reconnues par les autres) : paysan, jardinier, éleveur,
+  apiculteur, bûcheron, charpentier, maçon, architecte, chasseur, pêcheur, cueilleur, herboriste,
+  guérisseur, cuisinier, meunier, boulanger, forgeron, fondeur, verrier, potier, tisserand, teinturier,
+  tanneur, ingénieur, artiste, musicien, conteur, marchand. Un métier donne un rôle dans le hameau,
+  des commandes et des titres (apprenti, compagnon, maître).
+- **Transmission** : un maître enseigne plus vite qu'on n'apprend seul ; le joueur peut être l'apprenti
+  d'un PNJ ou prendre lui-même des apprentis. Livres, plans et carnets conservent les savoirs.
+- **Spécialisation sans enfermement** : on peut tout essayer, mais l'excellence dans un métier demande
+  du temps ; un personnage complet est un choix, pas une obligation.
+
 Mesure de l'expérience : à chaque étape, une partie de 20 minutes avec trois questions (qu'ai-je eu
 envie de faire ? qu'est-ce qui m'a frustré ? quel geste m'a semblé juste envers le monde ?).
 
@@ -439,8 +457,9 @@ envie de faire ? qu'est-ce qui m'a frustré ? quel geste m'a semblé juste enver
 - Besoins du personnage : faim, soif, fatigue, chaleur ; repas plus nourrissants quand ils sont variés
 - Bien-être : abri, confort, beauté du lieu, repos, variété des activités
 - Boussole d'harmonie dans le carnet (nature et soi), territoire du joueur défini autour de son foyer
-- Cadre des compétences (pratique → niveaux → déblocages), d'abord pour les gestes existants (miner,
-  bâtir, fabriquer)
+- Cadre des métiers et capacités (voir plus haut) : capacités, compétences par la pratique, niveaux
+  et déblocages, d'abord pour les gestes existants (miner, bâtir, fabriquer) ; chaque étape suivante
+  ajoute ses métiers
 - Rythmes de jeu réglables (besoins lents ou désactivés) pour qui veut seulement contempler
 
 ## M28 — Cueillir, pêcher, chasser
@@ -498,7 +517,7 @@ envie de faire ? qu'est-ce qui m'a frustré ? quel geste m'a semblé juste enver
 - Commerce : troc puis monnaie, prix selon rareté et saison, commandes, foires
 - Rôle du joueur : sa place (paysan, artisan, marchand, ermite, guérisseur…) naît de ce qu'il pratique
   et de ce que le hameau attend de lui ; harmonie avec les autres comptée dans la boussole
-- Compétences : marchand, conteur, guérisseur
+- Compétences : marchand, conteur, guérisseur ; maîtres et apprentis entre PNJ et joueur
 
 ## M34 — Biodiversité élargie
 - Nouvelles espèces animales (loups, insectes visibles, oiseaux, amphibiens) et végétales (arbres,
