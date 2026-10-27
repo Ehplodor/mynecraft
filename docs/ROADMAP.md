@@ -368,9 +368,121 @@ Dix espèces vivent autour du joueur (`world/life`), chacune avec un habitat (bi
 
 Pistes ensuite : gel des lacs en hiver et couche de neige posée au sol, chaînes plus longues (loups, insectes visibles), maladies transmises entre espèces, succession végétale (prairie → forêt), influence du joueur (chasse, cultures) mesurée dans le carnet.
 
-## 🚧 M24 — Calendrier local des plantes et gel
+## ✅ M24 — Calendrier local des plantes et gel
 **Végétation** (`Vegetation`) : chaque colonne a son propre calendrier, lu dans sa température (climat de la colonne à son altitude + variation saisonnière) plutôt que dans la date seule. La saison de croissance est la partie de l'année au-dessus de 5 °C : un fond de vallée tempéré pousse du début du printemps au début de l'automne, un alpage seulement quelques jours autour du cœur de l'été. Les couleurs de l'herbe et des feuilles suivent ce calendrier local (printemps tardif et automne précoce en altitude), et une plaine chaude et sèche jaunit en plein été (sécheresse). Les touffes d'herbe et les coquelicots poussent selon la croissance locale, les fleurs s'ouvrent aussi longtemps après le réveil des plantes qu'en plaine (donc plus tard sur les hauteurs). Le carnet affiche la pousse, la floraison et la sécheresse là où l'on se tient.
 
 **Gel** (`Frost`) : indépendamment de la météo du moment, la température moyenne de la saison fait geler l'eau dormante en hiver, depuis les rives vers le large (la glace s'étend depuis la glace déjà prise), et la rouvre au printemps par les bords ; une forte gelée (sous −2 °C) tue les touffes d'herbe et les fleurs.
 
-Reste à faire : couche de neige posée au sol (bloc et texture à créer), modèle d'écologie encore réglé sur la végétation globale de la saison (pas sur le calendrier local), fleurs alpines distinctes des coquelicots, épaisseur de la glace (marcher dessus / la briser), et vérification visuelle en jeu.
+Reste à faire, repris en M25 et M26 : vérification visuelle en jeu, couche de neige posée au sol, écologie branchée sur le calendrier local, fleurs alpines, épaisseur de la glace.
+
+---
+
+# Regard de game design (après M24)
+
+Relecture de la feuille de route du point de vue des jeux contemplatifs (Proteus, Alba, A Short Hike),
+de construction (Townscaper, Valheim), de jardinage (Stardew Valley, Viridi), industriels « doux »
+(mod Create, Satisfactory, Shapez), d'exploration (Outer Wilds, Subnautica) et « chill ».
+
+## Ce qui fait déjà l'identité du jeu
+- **Un monde qui vit sans le joueur** : eau qui coule vraiment, météo physique, bassins versants,
+  saisons, écologie des communautés, sons synthétisés. Peu de jeux de ce genre vont aussi loin.
+  C'est la promesse à tenir, et ce n'est pas celle de Minecraft.
+- Les données existent déjà pour brancher du jeu dessus : débit des rivières, fertilité du sol,
+  pollinisation, calendrier local des plantes, gel.
+
+## Ce qui manque
+1. **Des verbes.** Le joueur casse, pose, fabrique, frappe. Il *regarde* la simulation mais n'agit
+   presque pas sur elle. Le carnet du naturaliste montre des jauges que rien ne lui permet de faire
+   bouger. Chaque étape à venir devrait ajouter au moins un verbe qui touche la simulation.
+2. **Des intentions douces.** Un jeu chill n'a pas besoin de menace, mais il a besoin de petites
+   envies : compléter un carnet, voir un lieu, réussir une récolte, finir une maison. Aujourd'hui
+   rien ne dit au joueur « tiens, et si… ».
+3. **Une survie à contre-emploi.** Faim, combat et monstres tirent vers Minecraft et contre le ton du
+   jeu. Ici, la vraie difficulté est déjà là : **l'hiver**. Préparer ses réserves, protéger son
+   jardin du gel, profiter du dégel. La saison est l'adversaire, pas un zombie.
+4. **Construire beau.** Sans escaliers, barrières, portes, fenêtres et petits objets décoratifs, on ne
+   construit pas une maison qu'on a envie de regarder. Les jeux de construction réussis pardonnent
+   tout (annuler, symétrie, remplissage) et récompensent l'œil.
+5. **Des choses à trouver.** Le monde est riche mais uniforme à petite échelle. L'exploration a
+   besoin de repères visibles de loin, de lieux rares, et que la découverte laisse une trace
+   (carnet, carte).
+6. **Le plafond de 127 états de bloc** (57 utilisés, le maillage réserve le bit 7 de l'identifiant).
+   Escaliers, cultures à plusieurs âges et machines orientées le feront sauter en une étape : il doit
+   être levé *avant* d'ajouter du contenu.
+7. **Aucune mesure de l'expérience.** Chaque étape mesure des millisecondes, aucune ne vérifie que le
+   jeu est agréable. Proposition : une courte partie de 20 minutes à chaque étape, avec trois
+   questions (qu'ai-je eu envie de faire ? qu'est-ce qui m'a frustré ? qu'ai-je regardé longtemps ?).
+
+## À ne pas faire (pour l'instant)
+- Monstres hostiles la nuit, combat approfondi : contraires au ton.
+- Multijoueur : coûteux, et toute la simulation suppose un seul joueur.
+- Industrie de masse façon Factorio (pollution, optimisation de débit) : bruyante. Préférer des
+  machines lentes, visibles, belles à regarder tourner.
+
+---
+
+# À venir
+
+## M25 — Socle : intégration continue et identifiants de bloc
+- GitHub Actions : compilation et tests à chaque PR (les tests existent déjà, rien ne les lance)
+- Lever le plafond de 127 états : identifiants sur 16 bits ou palette par section (cf. pistes
+  d'optimisation), drapeau du maillage déplacé hors de l'identifiant
+- Captures scriptées (`--showcase`, `--weather`, `--minimap`) rejouées en CI pour comparer les images,
+  ce qui sert aussi à la vérification visuelle de M24
+- Critère : un état de bloc n° 300 se pose, se sauve et se recharge ; aucune régression de mémoire GPU
+
+## M26 — Finir l'hiver
+- Couche de neige au sol (8 hauteurs, comme vanilla), qui s'accumule et fond selon la météo et le gel
+- Glace d'épaisseur variable : on marche dessus, on la brise, elle craque sous les pas au dégel (son)
+- Écologie branchée sur le calendrier local (`Vegetation`) au lieu de la saison globale
+- Fleurs alpines distinctes des coquelicots ; traces de pas et d'animaux dans la neige
+- Critère : une capture par saison au même endroit, en plaine et en altitude
+
+## M27 — Le carnet vivant (exploration contemplative)
+- Le carnet du naturaliste devient un recueil à compléter : chaque espèce, plante et paysage
+  observés y entrent avec un croquis, l'heure, la saison et le lieu (modèle : Alba, Pokémon Snap)
+- Mode photo (caméra libre, heure figée, profondeur de champ) ; les photos illustrent le carnet
+- Lieux remarquables générés : arbres millénaires, cascades, belvédères, sources chaudes, grottes à
+  cristaux, ruines ; visibles de loin, marqués sur la carte une fois vus
+- Espèces rares ou saisonnières qu'on ne voit qu'à certains moments (aurores, migrations, floraisons)
+- S'asseoir (banc, rocher, rive) : la caméra s'éloigne, le temps s'accélère doucement
+- Musique générative discrète par la synthèse existante, selon lieu, heure et saison
+
+## M28 — Le jardin
+- Premiers objets non blocs (houe, arrosoir, graines), donc le registre d'objets séparé des blocs
+- Cultures à plusieurs âges dont la pousse lit le sol, l'humidité et le calendrier local de la parcelle
+- Arrosage par seau ou par rigoles reliées à l'eau du simulateur ; compost qui nourrit le sol
+  (cycle des nutriments existant) ; pollinisateurs qui font mieux donner les fleurs et les vergers
+- Planter des arbres, et la succession végétale (prairie qui devient forêt si on la laisse)
+- Le carnet mesure l'effet du joueur sur sa parcelle (abondance, diversité, sol)
+
+## M29 — Construire beau
+- Escaliers, barrières, murets, portes, trappes, fenêtres, vitres, lanternes, `uvlock`
+- Modèles non cubiques du pack (plantes croisées, petits objets)
+- Confort en créatif : annuler, remplissage, lignes, symétrie, pipette ; plans réutilisables
+- Bâtiments qui comptent : un toit protège de la pluie (déjà calculé), un âtre réchauffe
+
+## M30 — Le moulin et les canaux (industrie douce)
+- Roue à aubes dont la puissance vient du débit réel de la rivière (`Hydrology`) : s'arrête quand la
+  rivière gèle ou s'assèche en été
+- Arbres de transmission, meule (farine), scierie, soufflet ; four (verre, pierre lisse)
+- Canaux, vannes et écluses pour irriguer le jardin ou alimenter un moulin
+- Machines lentes et visibles : on doit avoir envie de les regarder tourner
+
+## M31 — Intendance des saisons (la boucle de survie, repensée)
+- Trois rythmes au choix à la création du monde : *Contemplatif* (aucun danger), *Intendance*
+  (faim légère, froid), *Survie* (proche de vanilla)
+- En Intendance, la difficulté vient de l'hiver : réserves à constituer (séchage, conserves, cave),
+  froid hors abri, jardin à protéger du gel ; récompenses au printemps
+- Outils et usure légère ; inventaire conservé à la mort sauf en Survie
+
+## M32 — API de mods
+- Registres de blocs, objets, espèces, cultures et machines ouverts aux JAR externes, événements
+  (bloc posé, saison qui change, espèce observée…), inspirés de Fabric API comme le prévoit l'étude
+- Les étapes M28 à M31 utilisent déjà ces registres en interne : l'API ne fait que les ouvrir
+- Un mod d'exemple (une espèce, une culture, une machine) et sa documentation
+
+## Pistes ensuite
+- Chaînes alimentaires plus longues (loups, insectes visibles), maladies entre espèces
+- Courant qui pousse le joueur, lave qui brûle, surfaces inclinées
+- Wagonnets et rails lents ; ballons ou planeurs pour l'exploration en altitude
