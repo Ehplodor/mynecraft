@@ -24,6 +24,7 @@ public final class Life {
     /** The community model behind the animals met (populations, plants, soil, interactions). */
     public final Ecology ecology;
     private final Flora flora;
+    private final Frost frost;
     /** Blocks changed by living things (grass grown, withered or grazed), for the renderer to remesh. */
     public final java.util.ArrayDeque<int[]> edits = new java.util.ArrayDeque<>();
     private double ecologyClock;
@@ -45,6 +46,7 @@ public final class Life {
         this.columns = world.generator::column;
         this.ecology = new Ecology(seed, eco, (x, z) -> columns.apply(x, z));
         this.flora = new Flora(world, ecology, seed);
+        this.frost = new Frost(world, (x, z) -> columns.apply(x, z), seed);
     }
 
     // ------------------------------------------------------------------------------- spawning
@@ -67,7 +69,10 @@ public final class Life {
             for (int dz = -2; dz <= 2; dz++)
                 for (int dx = -2; dx <= 2; dx++) ecology.patch(cx + dx, cz + dz);
         }
-        if (spawning) flora.tick(dt, px, pz, eco.season(), edits::add);
+        if (spawning) {
+            flora.tick(dt, px, pz, eco.season(), edits::add);
+            frost.tick(dt, px, pz, eco.season(), edits::add);
+        }
         boolean first = creatures.isEmpty();
         for (int i = 0; spawning && spawnClock >= 0.2 && i < (first ? 40 : 1); i++) trySpawn(px, pz, first ? 8 : SPAWN_MIN);
         if (spawnClock >= 0.2) spawnClock = 0;

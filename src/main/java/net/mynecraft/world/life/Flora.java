@@ -9,8 +9,10 @@ import java.util.SplittableRandom;
 /**
  * The plant cover one sees, kept in step with the {@link Ecology}: a few random columns near the
  * player are visited every second; tufts of grass sprout where the patch's plants are thriving and
- * the season grows, poppies open where it is in flower, and both wither in autumn and winter or
- * where the grazers have eaten the patch down.
+ * the place is in its growing season, poppies open where it is in flower, and both wither in autumn
+ * and winter or where the grazers have eaten the patch down. The calendar is the column's own
+ * ({@link Vegetation}): the mountain pastures green up and flower weeks after the valleys, and a
+ * hot, dry plain browns in high summer.
  */
 final class Flora {
     /** Columns looked at per second, and how far from the player. */
@@ -40,13 +42,14 @@ final class Flora {
             int y = surface(x, z);
             if (y == Integer.MIN_VALUE) continue;
             byte ground = world.get(x, y, z), above = world.get(x, y + 1, z);
-            boolean growing = season.vegetation() > 0.5 && Ecology.temperature(p, season) > 3;
-            if (ground == Blocks.GRASS && above == Blocks.AIR && growing) {
-                if (rng.nextDouble() < p.flowers * 0.25) set(x, y + 1, z, Blocks.POPPY, changed);
-                else if (rng.nextDouble() < p.plants * 0.3) set(x, y + 1, z, Blocks.SHORT_GRASS, changed);
+            double climate = Vegetation.climate(ecology.columns.apply(x, z).temperature(), y);
+            double growth = Vegetation.growth(climate, p.rain, season.phase()), bloom = Vegetation.bloom(climate, season.phase());
+            if (ground == Blocks.GRASS && above == Blocks.AIR && growth > 0.5) {
+                if (rng.nextDouble() < p.flowers * bloom * 0.35) set(x, y + 1, z, Blocks.POPPY, changed);
+                else if (rng.nextDouble() < p.plants * 0.3 * growth) set(x, y + 1, z, Blocks.SHORT_GRASS, changed);
             } else if (above == Blocks.SHORT_GRASS || above == Blocks.POPPY) {
-                double wither = above == Blocks.POPPY ? (season.phase() > 0.55 ? 0.5 : 0.25 * (1 - p.flowers))
-                    : (season.vegetation() < 0.4 ? 0.3 : 0.4 * Math.max(0, 0.35 - p.plants));
+                double wither = above == Blocks.POPPY ? (bloom < 0.2 ? 0.5 : 0.25 * (1 - p.flowers))
+                    : (growth < 0.35 ? 0.3 : 0.4 * Math.max(0, 0.35 - p.plants));
                 if (rng.nextDouble() < wither) {
                     set(x, y + 1, z, Blocks.AIR, changed);
                     withered++;

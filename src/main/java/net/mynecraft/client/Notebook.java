@@ -5,6 +5,7 @@ import net.mynecraft.world.life.Ecology;
 import net.mynecraft.world.life.Ecosystem;
 import net.mynecraft.world.life.Life;
 import net.mynecraft.world.life.Species;
+import net.mynecraft.world.life.Vegetation;
 
 /**
  * The naturalist's notebook (N): the season and the calendar, then the patch of land the player
@@ -27,7 +28,7 @@ final class Notebook {
         int listed = 0;
         for (Species sp : Species.values())
             if (p.pop[sp.ordinal()] >= 0.05 || p.dormant[sp.ordinal()] >= 0.05 || life.ecology.suitable(p, sp)) listed++;
-        int rows = 9 + listed + Math.min(6, links.size());
+        int rows = 10 + listed + Math.min(6, links.size());
         hud.rect(left - 3 * s, top - 3 * s, w + 6 * s, rows * line + 8 * s, 0.05f, 0.06f, 0.04f, 0.78f);
         float y = top;
         int day = (int) Math.floor(life.eco.day());
@@ -37,6 +38,13 @@ final class Notebook {
         y += line;
         hud.text(String.format("Parcelle %d, %d : %s, %.0f degres", p.px, p.pz, Landscape.BIOME_NAMES[p.biome & 0xFF],
             Ecology.temperature(p, season)), left, y, 0.85f, 0.85f, 0.85f);
+        y += line;
+        // The plants' own calendar where the player stands (late on the heights, parched in a dry summer).
+        Landscape.Column here = life.columns.apply((int) Math.floor(x), (int) Math.floor(z));
+        double climate = Vegetation.climate(here.temperature(), here.height());
+        hud.text(String.format("Ici : pousse %.0f %%, floraison %.0f %%, sécheresse %.0f %%",
+            100 * Vegetation.growth(climate, p.rain, season.phase()), 100 * Vegetation.bloom(climate, season.phase()),
+            100 * Vegetation.drought(climate, p.rain, season.phase())), left, y, 0.75f, 0.85f, 0.7f);
         y += line * 1.3f;
         y = gauge(hud, "Végétation", p.plants, 0.35f, 0.75f, 0.3f, left, y, w);
         y = gauge(hud, "Fleurs", p.flowers, 0.95f, 0.45f, 0.5f, left, y, w);

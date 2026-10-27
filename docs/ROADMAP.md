@@ -367,3 +367,10 @@ Dix espèces vivent autour du joueur (`world/life`), chacune avec un habitat (bi
 - Tests : coexistence proies-prédateurs bornée sur 10 ans, contrôle descendant par les prédateurs (et cascade sur les plantes), saisons des plantes, migration et hibernation, bénéfice mutuel lanternes-fleurs, cadavres → sol, épidémie dans une harde trop dense, sauvegarde.
 
 Pistes ensuite : gel des lacs en hiver et couche de neige posée au sol, chaînes plus longues (loups, insectes visibles), maladies transmises entre espèces, succession végétale (prairie → forêt), influence du joueur (chasse, cultures) mesurée dans le carnet.
+
+## 🚧 M24 — Calendrier local des plantes et gel
+**Végétation** (`Vegetation`) : chaque colonne a son propre calendrier, lu dans sa température (climat de la colonne à son altitude + variation saisonnière) plutôt que dans la date seule. La saison de croissance est la partie de l'année au-dessus de 5 °C : un fond de vallée tempéré pousse du début du printemps au début de l'automne, un alpage seulement quelques jours autour du cœur de l'été. Les couleurs de l'herbe et des feuilles suivent ce calendrier local (printemps tardif et automne précoce en altitude), et une plaine chaude et sèche jaunit en plein été (sécheresse). Les touffes d'herbe et les coquelicots poussent selon la croissance locale, les fleurs s'ouvrent aussi longtemps après le réveil des plantes qu'en plaine (donc plus tard sur les hauteurs). Le carnet affiche la pousse, la floraison et la sécheresse là où l'on se tient.
+
+**Gel** (`Frost`) : indépendamment de la météo du moment, la température moyenne de la saison fait geler l'eau dormante en hiver, depuis les rives vers le large (la glace s'étend depuis la glace déjà prise), et la rouvre au printemps par les bords ; une forte gelée (sous −2 °C) tue les touffes d'herbe et les fleurs.
+
+Reste à faire : couche de neige posée au sol (bloc et texture à créer), modèle d'écologie encore réglé sur la végétation globale de la saison (pas sur le calendrier local), fleurs alpines distinctes des coquelicots, épaisseur de la glace (marcher dessus / la briser), et vérification visuelle en jeu.
