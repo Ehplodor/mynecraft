@@ -377,112 +377,140 @@ Reste à faire, repris en M25 et M26 : vérification visuelle en jeu, couche de 
 
 ---
 
-# Regard de game design (après M24)
+# Vision : vivre en harmonie avec soi-même et avec la nature
 
-Relecture de la feuille de route du point de vue des jeux contemplatifs (Proteus, Alba, A Short Hike),
-de construction (Townscaper, Valheim), de jardinage (Stardew Valley, Viridi), industriels « doux »
-(mod Create, Satisfactory, Shapez), d'exploration (Outer Wilds, Subnautica) et « chill ».
+Le défi du jeu n'est ni de survivre à des monstres ni de produire le plus possible : c'est de **mener
+une vie complète (se nourrir, s'abriter, fabriquer, créer, échanger, apprendre) sans épuiser le monde
+qui la rend possible, et en y trouvant son équilibre**. Cela demande beaucoup de métiers : architecture,
+agriculture, industrie, chasse, pêche, cueillette, art, énergie et flux de matières, commerce,
+construction, fabrication, cuisine, outils, recettes, plans, biodiversité animale et végétale, rôle et
+compétences.
 
-## Ce qui fait déjà l'identité du jeu
-- **Un monde qui vit sans le joueur** : eau qui coule vraiment, météo physique, bassins versants,
-  saisons, écologie des communautés, sons synthétisés. Peu de jeux de ce genre vont aussi loin.
-  C'est la promesse à tenir, et ce n'est pas celle de Minecraft.
-- Les données existent déjà pour brancher du jeu dessus : débit des rivières, fertilité du sol,
-  pollinisation, calendrier local des plantes, gel.
+## Ce qui est déjà là
+Le monde vit sans le joueur : eau, météo, bassins versants, saisons, calendrier local des plantes, gel,
+écologie des communautés (producteurs, consommateurs, prédation, mutualisme, cycle des nutriments).
+C'est exactement le terrain dont le défi a besoin : on peut **mesurer** l'effet du joueur sur la nature.
 
-## Ce qui manque
-1. **Des verbes.** Le joueur casse, pose, fabrique, frappe. Il *regarde* la simulation mais n'agit
-   presque pas sur elle. Le carnet du naturaliste montre des jauges que rien ne lui permet de faire
-   bouger. Chaque étape à venir devrait ajouter au moins un verbe qui touche la simulation.
-2. **Des intentions douces.** Un jeu chill n'a pas besoin de menace, mais il a besoin de petites
-   envies : compléter un carnet, voir un lieu, réussir une récolte, finir une maison. Aujourd'hui
-   rien ne dit au joueur « tiens, et si… ».
-3. **Une survie à contre-emploi.** Faim, combat et monstres tirent vers Minecraft et contre le ton du
-   jeu. Ici, la vraie difficulté est déjà là : **l'hiver**. Préparer ses réserves, protéger son
-   jardin du gel, profiter du dégel. La saison est l'adversaire, pas un zombie.
-4. **Construire beau.** Sans escaliers, barrières, portes, fenêtres et petits objets décoratifs, on ne
-   construit pas une maison qu'on a envie de regarder. Les jeux de construction réussis pardonnent
-   tout (annuler, symétrie, remplissage) et récompensent l'œil.
-5. **Des choses à trouver.** Le monde est riche mais uniforme à petite échelle. L'exploration a
-   besoin de repères visibles de loin, de lieux rares, et que la découverte laisse une trace
-   (carnet, carte).
-6. **Le plafond de 127 états de bloc** (57 utilisés, le maillage réserve le bit 7 de l'identifiant).
-   Escaliers, cultures à plusieurs âges et machines orientées le feront sauter en une étape : il doit
-   être levé *avant* d'ajouter du contenu.
-7. **Aucune mesure de l'expérience.** Chaque étape mesure des millisecondes, aucune ne vérifie que le
-   jeu est agréable. Proposition : une courte partie de 20 minutes à chaque étape, avec trois
-   questions (qu'ai-je eu envie de faire ? qu'est-ce qui m'a frustré ? qu'ai-je regardé longtemps ?).
+## Le risque : vingt jeux juxtaposés
+Avec autant de métiers, le danger est d'empiler des mini-jeux qui ne se parlent pas. Les jeux qui
+réussissent cette ampleur (Dwarf Fortress, Valheim, Stardew Valley, RimWorld, Vintage Story) partagent
+quelques systèmes communs que chaque métier réutilise. Cinq règles pour tout ce qui suit :
 
-## À ne pas faire (pour l'instant)
-- Monstres hostiles la nuit, combat approfondi : contraires au ton.
-- Multijoueur : coûteux, et toute la simulation suppose un seul joueur.
-- Industrie de masse façon Factorio (pollution, optimisation de débit) : bruyante. Préférer des
-  machines lentes, visibles, belles à regarder tourner.
+1. **Tout vient de quelque part et retourne quelque part (flux de matières).** Chaque objet a une
+   origine dans la simulation (une parcelle, une espèce, un filon, une rivière) et une fin (consommé,
+   usé, composté, jeté). La viande vient des effectifs de la parcelle, le bois de ses arbres, les
+   déchets d'une forge vont dans l'eau ou le sol. Aucun objet ne sort de nulle part.
+2. **Une boussole d'harmonie.** Deux mesures suivies en continu et affichées dans le carnet :
+   *harmonie avec la nature* (biodiversité, sol, eau, populations du territoire du joueur comparées
+   à leur état d'équilibre) et *harmonie avec soi* (besoins satisfaits, variété des repas, confort
+   de l'abri, beauté du lieu, activités variées, liens avec les autres). Chaque fonctionnalité doit
+   faire bouger au moins l'une des deux.
+3. **Une seule grammaire de fabrication.** Établi, cuisine, forge, atelier d'art et machines utilisent
+   le même modèle : recette = entrées, outil ou poste, savoir-faire requis, durée, énergie, sorties et
+   déchets. Les data packs l'étendent ; l'API de mods aussi.
+4. **Apprendre en faisant.** Chaque métier a sa compétence, qui progresse par la pratique et débloque
+   recettes, plans et gestes plus fins. Le rôle du personnage naît de ce qu'il pratique, pas d'une classe
+   choisie au départ.
+5. **Les PNJ vivent selon les mêmes règles que le joueur.** Ils ont les mêmes besoins, compétences,
+   recettes et flux de matières : un village qui chasse trop vide la forêt comme le ferait le joueur,
+   un forgeron a besoin de charbon. Leurs vies variées naissent de ces systèmes, pas de scripts.
+
+Mesure de l'expérience : à chaque étape, une partie de 20 minutes avec trois questions (qu'ai-je eu
+envie de faire ? qu'est-ce qui m'a frustré ? quel geste m'a semblé juste envers le monde ?).
 
 ---
 
 # À venir
 
-## M25 — Socle : intégration continue et identifiants de bloc
-- GitHub Actions : compilation et tests à chaque PR (les tests existent déjà, rien ne les lance)
-- Lever le plafond de 127 états : identifiants sur 16 bits ou palette par section (cf. pistes
-  d'optimisation), drapeau du maillage déplacé hors de l'identifiant
-- Captures scriptées (`--showcase`, `--weather`, `--minimap`) rejouées en CI pour comparer les images,
-  ce qui sert aussi à la vérification visuelle de M24
-- Critère : un état de bloc n° 300 se pose, se sauve et se recharge ; aucune régression de mémoire GPU
+## M25 — Socle
+- CI GitHub Actions : compilation et tests à chaque PR
+- Lever le plafond de 127 états de bloc (identifiants 16 bits ou palette par section)
+- **Registre d'objets séparé des blocs** (outils, nourriture, matériaux, objets d'art) : prérequis de
+  presque tous les métiers
+- Registres pilotés par les données (blocs, objets, recettes, espèces) prêts pour les data packs puis
+  l'API de mods
+- Captures scriptées rejouées en CI (comparaison d'images, vérification visuelle de M24)
 
 ## M26 — Finir l'hiver
-- Couche de neige au sol (8 hauteurs, comme vanilla), qui s'accumule et fond selon la météo et le gel
-- Glace d'épaisseur variable : on marche dessus, on la brise, elle craque sous les pas au dégel (son)
-- Écologie branchée sur le calendrier local (`Vegetation`) au lieu de la saison globale
-- Fleurs alpines distinctes des coquelicots ; traces de pas et d'animaux dans la neige
-- Critère : une capture par saison au même endroit, en plaine et en altitude
+- Couche de neige au sol, glace d'épaisseur variable, écologie branchée sur le calendrier local,
+  fleurs alpines, traces dans la neige
 
-## M27 — Le carnet vivant (exploration contemplative)
-- Le carnet du naturaliste devient un recueil à compléter : chaque espèce, plante et paysage
-  observés y entrent avec un croquis, l'heure, la saison et le lieu (modèle : Alba, Pokémon Snap)
-- Mode photo (caméra libre, heure figée, profondeur de champ) ; les photos illustrent le carnet
-- Lieux remarquables générés : arbres millénaires, cascades, belvédères, sources chaudes, grottes à
-  cristaux, ruines ; visibles de loin, marqués sur la carte une fois vus
-- Espèces rares ou saisonnières qu'on ne voit qu'à certains moments (aurores, migrations, floraisons)
-- S'asseoir (banc, rocher, rive) : la caméra s'éloigne, le temps s'accélère doucement
-- Musique générative discrète par la synthèse existante, selon lieu, heure et saison
+## M27 — Le corps et la boussole
+- Besoins du personnage : faim, soif, fatigue, chaleur ; repas plus nourrissants quand ils sont variés
+- Bien-être : abri, confort, beauté du lieu, repos, variété des activités
+- Boussole d'harmonie dans le carnet (nature et soi), territoire du joueur défini autour de son foyer
+- Cadre des compétences (pratique → niveaux → déblocages), d'abord pour les gestes existants (miner,
+  bâtir, fabriquer)
+- Rythmes de jeu réglables (besoins lents ou désactivés) pour qui veut seulement contempler
 
-## M28 — Le jardin
-- Premiers objets non blocs (houe, arrosoir, graines), donc le registre d'objets séparé des blocs
-- Cultures à plusieurs âges dont la pousse lit le sol, l'humidité et le calendrier local de la parcelle
-- Arrosage par seau ou par rigoles reliées à l'eau du simulateur ; compost qui nourrit le sol
-  (cycle des nutriments existant) ; pollinisateurs qui font mieux donner les fleurs et les vergers
-- Planter des arbres, et la succession végétale (prairie qui devient forêt si on la laisse)
-- Le carnet mesure l'effet du joueur sur sa parcelle (abondance, diversité, sol)
+## M28 — Cueillir, pêcher, chasser
+- Cueillette : baies, champignons, herbes, fruits, graines, selon saison et calendrier local ; ce qui
+  est cueilli manque à la parcelle (et repousse)
+- Pêche : canne, nasses ; poissons tirés des effectifs de truites de la parcelle
+- Chasse : arc, pièges ; gibier tiré des effectifs, surchasse visible dans le carnet et sur les
+  populations, respect des saisons de reproduction récompensé par la boussole
+- Outils de base (couteau, hache, pioche, canne, arc), usure et réparation
+- Cuisine : feu de camp, recettes simples, conservation (séchage, fumage, sel)
+- Compétences : cueilleur, pêcheur, chasseur, cuisinier
 
-## M29 — Construire beau
-- Escaliers, barrières, murets, portes, trappes, fenêtres, vitres, lanternes, `uvlock`
-- Modèles non cubiques du pack (plantes croisées, petits objets)
-- Confort en créatif : annuler, remplissage, lignes, symétrie, pipette ; plans réutilisables
-- Bâtiments qui comptent : un toit protège de la pluie (déjà calculé), un âtre réchauffe
+## M29 — Cultiver et élever
+- Cultures à plusieurs âges selon sol, humidité et calendrier local ; semences sauvages domestiquées
+- Arrosage et irrigation par l'eau du simulateur ; compost et fumure (cycle des nutriments existant)
+- Vergers, haies, plantation d'arbres, succession végétale (prairie → forêt si on la laisse)
+- Pollinisateurs ; associations de cultures et jachère qui reposent le sol
+- Élevage doux (poules, chèvres, abeilles) qui puise et rend à la parcelle
+- Compétences : jardinier, éleveur
 
-## M30 — Le moulin et les canaux (industrie douce)
-- Roue à aubes dont la puissance vient du débit réel de la rivière (`Hydrology`) : s'arrête quand la
-  rivière gèle ou s'assèche en été
-- Arbres de transmission, meule (farine), scierie, soufflet ; four (verre, pierre lisse)
-- Canaux, vannes et écluses pour irriguer le jardin ou alimenter un moulin
-- Machines lentes et visibles : on doit avoir envie de les regarder tourner
+## M30 — Bâtir
+- Formes : escaliers, barrières, murets, portes, fenêtres, toits, poutres, `uvlock`, modèles non cubiques
+- Architecture qui compte : isolation (chaleur), lumière, toit contre la pluie, cave fraîche pour les
+  réserves, beauté du lieu dans le bien-être
+- **Plans et blueprints** : tracer un bâtiment, voir la liste des matériaux, le construire pas à pas
+  (seul ou plus tard avec de l'aide) ; confort en créatif (annuler, remplissage, symétrie)
+- Compétences : bâtisseur, charpentier, maçon
 
-## M31 — Intendance des saisons (la boucle de survie, repensée)
-- Trois rythmes au choix à la création du monde : *Contemplatif* (aucun danger), *Intendance*
-  (faim légère, froid), *Survie* (proche de vanilla)
-- En Intendance, la difficulté vient de l'hiver : réserves à constituer (séchage, conserves, cave),
-  froid hors abri, jardin à protéger du gel ; récompenses au printemps
-- Outils et usure légère ; inventaire conservé à la mort sauf en Survie
+## M31 — Énergie et flux de matières
+- Énergie : roue à aubes au débit réel de la rivière, moulin à vent selon le vent de l'atmosphère,
+  force animale, bois de chauffe (forêt qui recule si on abat trop)
+- Transformations : meule, scierie, four, forge, fonderie, tannerie, verrerie ; recettes avec déchets
+- Flux visibles : chaque machine a des entrées et des sorties ; scories, cendres, eaux usées retournent
+  dans le sol ou la rivière et l'écologie en tient compte (une tannerie en amont trouble les truites)
+- Logistique douce : canaux, rigoles, goulottes, charrettes
+- Compétences : meunier, forgeron, ingénieur
 
-## M32 — API de mods
-- Registres de blocs, objets, espèces, cultures et machines ouverts aux JAR externes, événements
-  (bloc posé, saison qui change, espèce observée…), inspirés de Fabric API comme le prévoit l'étude
-- Les étapes M28 à M31 utilisent déjà ces registres en interne : l'API ne fait que les ouvrir
-- Un mod d'exemple (une espèce, une culture, une machine) et sa documentation
+## M32 — Créer
+- Teintures tirées des plantes et des minéraux, peinture (tableaux sur toile, pixel par pixel),
+  sculpture, poterie, tissage, instruments et musique jouée
+- Décoration qui nourrit le bien-être et la beauté du lieu
+- Compétences : artisan, artiste
+
+## M33 — Les gens du pays (PNJ et leurs vies)
+- Habitants aux vies variées : paysans, bûcherons, pêcheurs, chasseurs, meuniers, forgerons, potiers,
+  bergers transhumants, marchands itinérants, herboristes, ermites, artistes, nomades saisonniers
+- Chacun a un âge, une famille, un caractère, des goûts, des aspirations et une histoire qui se
+  déroule : il naît, apprend un métier, se marie ou non, déménage, vieillit, transmet son savoir
+- Emplois du temps rythmés par le jour et les saisons : semailles, moissons, foires, veillées d'hiver,
+  fêtes du printemps ; ils s'abritent de la pluie, se chauffent l'hiver, vont aux champs, au marché
+- Relations entre eux (amitiés, rivalités, entraide) et avec le joueur (confiance, services rendus,
+  savoir-faire qu'ils lui enseignent ou qu'il leur apprend)
+- Hameaux qui naissent, grandissent ou déclinent selon les ressources de leur territoire, et
+  dont l'empreinte sur l'écologie se voit dans le carnet
+- Commerce : troc puis monnaie, prix selon rareté et saison, commandes, foires
+- Rôle du joueur : sa place (paysan, artisan, marchand, ermite, guérisseur…) naît de ce qu'il pratique
+  et de ce que le hameau attend de lui ; harmonie avec les autres comptée dans la boussole
+- Compétences : marchand, conteur, guérisseur
+
+## M34 — Biodiversité élargie
+- Nouvelles espèces animales (loups, insectes visibles, oiseaux, amphibiens) et végétales (arbres,
+  fleurs, champignons, plantes médicinales) ; chaînes alimentaires plus longues
+- Maladies entre espèces, espèces sensibles à la pollution, réintroduction par le joueur
+
+## M35 — API de mods
+- Ouverture des registres et de la grammaire de fabrication aux JAR externes, événements (récolte,
+  prise de gibier, changement de saison, recette apprise…), inspirée de Fabric API comme le prévoit
+  l'étude de faisabilité ; un mod d'exemple et sa documentation
 
 ## Pistes ensuite
-- Chaînes alimentaires plus longues (loups, insectes visibles), maladies entre espèces
 - Courant qui pousse le joueur, lave qui brûle, surfaces inclinées
-- Wagonnets et rails lents ; ballons ou planeurs pour l'exploration en altitude
+- Mode photo, lieux remarquables, musique générative
+- Multijoueur coopératif (un hameau à plusieurs)
