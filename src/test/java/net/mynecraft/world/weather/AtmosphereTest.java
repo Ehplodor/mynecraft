@@ -99,4 +99,30 @@ class AtmosphereTest {
         float low = a.sample(0, 0, SEA, SEA).temperature(), high = a.sample(0, 0, SEA + 1000, SEA).temperature();
         assertEquals(6.5f, low - high, 0.1f);
     }
+
+    @Test
+    void theSkyIsNotOvercastEverywhere() {
+        // Hills and seas in a temperate, rather humid climate, over one game day with its sun.
+        net.mynecraft.world.Noise relief = new net.mynecraft.world.Noise(7);
+        Atmosphere a = new Atmosphere(world((x, z) -> {
+            float h = relief.noise(x / 700f, z / 700f) * 90 + 10;
+            return new float[] {h, h < 0 ? 1 : 0, h > 0 && h < 50 ? 0.5f : 0, 15, 0.7f};
+        }), 3);
+        a.recenter(0, 0);
+        int n = Atmosphere.SIZE;
+        float cloudy = 0, wet = 0, samples = 0;
+        for (int s = 0; s < 1200; s++) {
+            a.step(1, (float) Math.max(0, Math.sin(s / 1200.0 * 2 * Math.PI)));
+            if (s % 30 != 0) continue;
+            for (int j = 4; j < n - 4; j++)
+                for (int i = 4; i < n - 4; i++) {
+                    if (a.cloudAt(i, j) > 0.3f) cloudy++;
+                    if (a.precipitationAt(i, j) > 0.004f) wet++;
+                    samples++;
+                }
+        }
+        assertTrue(cloudy / samples > 0.05f, "some clouds: " + cloudy / samples);
+        assertTrue(cloudy / samples < 0.5f, "mostly clear sky: " + cloudy / samples);
+        assertTrue(wet / samples < 0.3f, "mostly dry: " + wet / samples);
+    }
 }
