@@ -28,6 +28,11 @@ public final class Atmosphere {
     public static final int CELL = 32, SIZE = 48;
     private static final float LAPSE = 0.0065f;      // deg C per block (6.5 per km)
     private static final float RAIN_THRESHOLD = 0.6f; // cloud water (g/kg) above which warm clouds precipitate
+    // Tuning (M27): these keep the sky from clouding over everywhere. Measured on a mixed land/sea
+    // test world over two game days, temperate climate: ~25-35% of the sky cloudy, 10-20% with rain.
+    private static final float LIFT_GAIN = 7;        // deg C of cooling per block/s of upslope wind
+    private static final float LIFT_MAX = 6;         // ... capped: hills raise air a little, not to saturation
+    private static final float SEA_HUMIDITY = 0.8f;  // relative humidity evaporation drives the air towards
 
     /** What the model needs from the world for one cell (sampled once when the cell appears). */
     public interface Terrain {
@@ -178,12 +183,12 @@ public final class Atmosphere {
                 // Evaporation: water surfaces, warmer, drier and windier = faster; forests transpire a little.
                 float qs = saturation(temp[i]);
                 float wind = (float) Math.hypot(windX[i], windZ[i]);
-                float deficit = Math.max(0, qs - vapour[i]);
+                float deficit = Math.max(0, qs * SEA_HUMIDITY - vapour[i]); // sea air is moist, not saturated
                 vapour[i] += deficit * (water[i] * 0.06f * (1 + wind * 0.08f) + forest[i] * 0.015f) * rate;
                 // Lift: wind blowing up the terrain slope, plus afternoon convection over warm land.
                 float slope = (windX[i] * gradX(elevation, x, z) + windZ[i] * gradZ(elevation, x, z)) / CELL;
-                float lift = Math.max(0, slope) * 60;                                   // deg C of cooling
-                float convection = Math.max(0, temp[i] - 14) * Math.max(0, sun - 0.6f) * (1 - water[i]) * 1.5f;
+                float lift = Math.min(LIFT_MAX, Math.max(0, slope) * LIFT_GAIN);       // deg C of cooling
+                float convection = smooth(0.55f, 0.8f, vapour[i] / qs) * Math.max(0, temp[i] - 14) * Math.max(0, sun - 0.6f) * (1 - water[i]) * 1.5f; // needs moist air
                 storm[i] = Math.max(0, Math.min(1, convection / 6));
                 // Large-scale ascent in lows cools the air; subsidence in highs warms and dries it.
                 float synoptic = pressure[i] < 0 ? -pressure[i] * 7 : -pressure[i] * 3;
@@ -199,8 +204,9 @@ public final class Atmosphere {
                     vapour[i] += e;
                 }
                 // Precipitation from loaded clouds, faster in storms.
-                // Cold clouds precipitate with less water (ice crystals grow at the droplets' expense).
-                float threshold = RAIN_THRESHOLD * (0.25f + 0.75f * smooth(-10, 12, tEff));
+                // Cold clouds precipitate with less water (ice crystals grow at the droplets' expense),
+                // but never from clouds too thin to be seen (no snow out of a clear sky).
+                float threshold = RAIN_THRESHOLD * (0.6f + 0.4f * smooth(-10, 12, tEff));
                 float p = Math.max(0, cloud[i] - threshold) * (0.25f + storm[i]) * rate * 4;
                 cloud[i] -= p;
                 precip[i] = p / Math.max(rate, 1e-3f);
