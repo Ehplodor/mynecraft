@@ -9,7 +9,7 @@ import static org.lwjgl.glfw.GLFW.*;
  * Keyboard/mouse controls. Movement keys use physical positions (WASD on QWERTY = ZQSD on AZERTY).
  * Space jump (fly: up), Shift fly down, Ctrl sprint, F toggle flying, 1-9 pick a hotbar slot, mouse
  * wheel changes the block in the current slot (cycling through every placeable block),
- * left click break, right click place, Esc pause menu (clicked with the mouse), F3 debug screen.
+ * left click break, right click place, Esc pause menu (clicked with the mouse), F1 help screen, F3 debug screen.
  */
 final class Input {
     private static final float SENSITIVITY = 0.0025f;

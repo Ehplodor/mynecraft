@@ -236,6 +236,8 @@ public final class Main {
         }
         Notebook notebook = new Notebook();
         notebook.open = argv.contains("--notebook");
+        HelpScreen helpScreen = new HelpScreen();
+        helpScreen.open = argv.contains("--help-screen");
         CreatureRenderer creatureRenderer = new CreatureRenderer();
         renderer.creatures = creatureRenderer;
         boolean showcase = argv.contains("--showcase");
@@ -438,6 +440,11 @@ public final class Main {
                     viewer.type(input.takeTyped(), input.pressed(GLFW_KEY_BACKSPACE));
                     if (escape || input.pressed(GLFW_KEY_ENTER)) viewer.typing = false;
                     escape = inventoryKey = false;
+                }
+                if (input.pressed(GLFW_KEY_F1)) helpScreen.open = !helpScreen.open;
+                if (helpScreen.open && escape) { // the help closes first, over any screen
+                    helpScreen.open = false;
+                    escape = false;
                 }
                 if (worldMap.open && escape) {
                     worldMap.open = false;
@@ -822,6 +829,7 @@ public final class Main {
                 hud.textCentered(help, hud.width() / 2f, hud.height() - hud.lineHeight() - 2 * hud.scale, 0.85f, 0.85f, 0.85f);
             }
             if (!worldMap.open) drawWaypoints(hud, renderer, cam, waypoints);
+            if (helpScreen.open) helpScreen.draw(hud);
             int basins = world.generator.landscape().hydrology().computing.get();
             if (basins > 0) { // river tiles being carved (the chunks there wait for them)
                 hud.textCentered(String.format("Creusement des bassins versants : %d tuile%s de 1024 blocs en calcul...", basins,
