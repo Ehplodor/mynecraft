@@ -776,6 +776,7 @@ public final class Main {
             renderer.skyColor[2] = Math.min(1, sky[2] * 1.02f);
             waterView.update(world, cam.pos.x, cam.pos.y, cam.pos.z, renderer.daylight, dt);
             renderer.underwater = waterView.sceneUnder();
+            weatherRenderer.underwater = waterView.sceneUnder();
             renderer.hideWater = waterView.lift() > 0;
             glClearColor(sky[0], sky[1], sky[2], 1); // under water too: the sky shows through the surface
 
