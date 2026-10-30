@@ -1,0 +1,2 @@
+# F1 help screen over the world.
+help --seed 7 --time 6000 --view 30,-15 --help-screen
