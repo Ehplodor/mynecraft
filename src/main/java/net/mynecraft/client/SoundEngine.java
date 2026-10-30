@@ -262,7 +262,7 @@ final class SoundEngine {
         float night = 1 - smooth(0.2f, 0.6f, a.daylight);
         float dry = 1 - Math.min(1, a.rain * 2), alive = smooth(0.15f, 0.5f, a.warmth), summer = smooth(0.55f, 0.9f, a.warmth);
         target("crickets", night * a.grass * outside * dry * alive * 0.5f * out, dt);
-        target("insects", (1 - night) * summer * Math.max(a.grass, a.forest * 0.6f) * outside * dry * 0.45f * out, dt);
+        target("insects", (1 - night) * summer * Math.max(a.grass, a.forest * 0.6f) * outside * dry * 0.25f * out, dt);
         boolean wetland = a.water.length > 0 || a.coast != null;
         target("frogs", wetland ? night * alive * outside * (1 - Math.min(1, a.rain)) * 0.4f * out : 0, dt);
         target("cave", a.underground * 0.7f, dt);
@@ -344,6 +344,11 @@ final class SoundEngine {
 
     void step(Synth.Material m, double x, double y, double z) {
         play("step_" + name(m), x, y, z, m == Synth.Material.WATER ? 0.35f : 0.4f, 0.93f + random.nextFloat() * 0.14f, 16);
+    }
+
+    /** Pushing off the ground for a jump: a light scuff of the ground. */
+    void jump(Synth.Material m, double x, double y, double z) {
+        play("step_" + name(m), x, y, z, 0.25f, 1.1f + random.nextFloat() * 0.08f, 16);
     }
 
     /** Landing after a fall: the step of the ground, heavier and lower the harder the landing (speed in blocks/s). */

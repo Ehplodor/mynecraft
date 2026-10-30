@@ -144,8 +144,8 @@ public final class Synth {
     public static float[] brook(double seconds, long seed) {
         SplittableRandom r = new SplittableRandom(seed);
         int len = samples(seconds), fade = samples(0.4), n = len + fade;
-        float[] s = scale(lowpass(rumble(n, r, 80, 700), 500), 0.5);
-        bubbles(s, r, len, seconds * 260, 400, 2000, 0.25);
+        float[] s = flow(n, len, r, 300, 1400, 1);
+        bubbles(s, r, len, seconds * 90, 450, 1800, 0.15);
         lowpass(s, 3000);
         return level(loop(clean(s), len), AMBIENT_QUIET + 2);
     }
@@ -154,14 +154,39 @@ public final class Synth {
     public static float[] river(double seconds, long seed) {
         SplittableRandom r = new SplittableRandom(seed);
         int len = samples(seconds), fade = samples(0.5), n = len + fade;
-        float[] s = rumble(n, r, 60, 600);
-        lowpass(s, 600);
+        float[] s = flow(n, len, r, 150, 900, 1);
+        mix(s, rumble(n, r, 60, 300), 0, 0.5);
         float[] cloud = new float[n];
-        bubbles(cloud, r, len, seconds * 500, 250, 1100, 0.12);
+        bubbles(cloud, r, len, seconds * 120, 250, 1000, 0.08);
         mix(s, lowpass(cloud, 1500), 0, 1);
         double p = r.nextDouble() * 6.28;
         for (int i = 0; i < n; i++) s[i] *= (float) (0.85 + 0.15 * Math.sin(2 * Math.PI * 2 * (i % len) / len + p));
         return level(loop(clean(s), len), AMBIENT);
+    }
+
+    /**
+     * The rush of a current: pink noise through three broad, slowly wandering bands between lo
+     * and hi Hz (the water's surface sliding and swirling), each band swelling on its own.
+     */
+    private static float[] flow(int n, int len, SplittableRandom r, double lo, double hi, double gain) {
+        float[] noise = pink(n, r), s = new float[n];
+        Biquad[] f = new Biquad[3];
+        double[] p = new double[3], c = new double[3];
+        for (int b = 0; b < 3; b++) {
+            p[b] = r.nextDouble() * 6.28;
+            c[b] = 1 + r.nextInt(3); // whole cycles per loop: seamless
+            f[b] = Biquad.bandpass(lo, 1.2);
+        }
+        for (int i = 0; i < n; i++) {
+            double u = (i % len) / (double) len, v = 0;
+            for (int b = 0; b < 3; b++) {
+                double w = 0.5 + 0.5 * Math.sin(2 * Math.PI * c[b] * u + p[b]);
+                if (i % 64 == 0) f[b].set(2, lo * Math.pow(hi / lo, (b + w) / 3), 1.2);
+                v += f[b].process(noise[i]) * (0.6 + 0.4 * w);
+            }
+            s[i] = (float) (v * gain);
+        }
+        return s;
     }
 
     /** Scatters {@code count} rising bubbles over a loop, in bursts (water tumbles in little gulps). */
@@ -281,7 +306,7 @@ public final class Synth {
             }
         }
         lowpass(s, 6500);
-        return level(loop(clean(s), len), AMBIENT_QUIET - 4);
+        return level(loop(clean(s), len), AMBIENT_QUIET - 10);
     }
 
     /**
@@ -539,7 +564,7 @@ public final class Synth {
                 case GLASS -> knock(s, r, at, new double[][] {{1600, 0.008, 0.25}, {3100, 0.006, 0.12}, {700, 0.006, 0.3}}, 0.5, g);
             }
         }
-        return level(space(lowpass(lowpass(oneShot(s, 0.8), 2600), 2600), 0.5), STEP - 3); // heard from head height: soft, a little distant
+        return level(space(lowpass(lowpass(oneShot(s, 0.8), 2600), 2600), 0.5), STEP - 6); // heard from head height: soft, a little distant
     }
 
     /** A block broken: how it gives way and what falls tell what it was made of. */
