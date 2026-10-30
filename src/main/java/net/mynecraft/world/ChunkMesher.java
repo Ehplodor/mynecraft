@@ -240,7 +240,7 @@ public final class ChunkMesher {
                     int idx = pIndex(pos[0], pos[1], pos[2]);
                     short b = padded[idx];
                     long key = 0;
-                    if (Blocks.SHAPE[b & 0xFFFF] == Blocks.SHAPE_CUBE && !(step == up && underCover(b, padded[idx + up]))
+                    if (Blocks.SHAPE[b & 0xFFFF] == Blocks.SHAPE_CUBE && !underCover(b, padded[idx + step])
                         && (Blocks.faceVisible(b, padded[idx + step]) || fluidStep(b, idx, idx + step, d, up))) {
                         int f = idx + step;
                         // Corners in quad order (u0,v0), (u1,v0), (u1,v1), (u0,v1).
@@ -364,7 +364,10 @@ public final class ChunkMesher {
             ? 16 : Blocks.fluidHeight(b);
     }
 
-    /** A fluid under a full solid block (ice on a pond) fills its cell and has no surface of its own. */
+    /**
+     * A fluid against a full solid block (ice) shows no face there: only the block's own face is
+     * drawn (two faces in one plane would flicker). Under it, the fluid fills its cell.
+     */
     private static boolean underCover(short b, short above) {
         return Blocks.isFluid(b) && Blocks.SHAPE[above & 0xFFFF] == Blocks.SHAPE_CUBE && Blocks.isSolid(above);
     }
