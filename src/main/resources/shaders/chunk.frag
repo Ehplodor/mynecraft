@@ -117,7 +117,8 @@ void main() {
             // beyond the critical angle the surface is a mirror of the dim water (total reflection),
             // and approaching it more and more light is reflected (Fresnel).
             vec3 mirror = vTint * 0.3 * lit;
-            vec3 t = refract(-v, -n, 1.333);
+            vec3 nb = normalize(vec3(n.x * 0.3, n.y, n.z * 0.3)); // seen from below, ripples bend gently
+            vec3 t = refract(-v, -nb, 1.333);
             if (dot(t, t) < 1e-4) {
                 rgb = mirror;
             } else {
