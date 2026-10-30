@@ -111,26 +111,13 @@ void main() {
             float glint = pow(max(dot(r, uSunDir), 0.0), 220.0) * 4.0 * sun * uShadowStrength;
             rgb = mix(body, skyRef, clamp(fresnel * 0.9, 0.0, 0.9)) + vec3(glint);
         } else {
-            // From below: what lies above the water shows, blurred, through a round window up to
-            // the critical angle (Snell, water 1.33 to air), reflecting more toward its rim
-            // (Fresnel); beyond it the surface mirrors the dim water (total reflection). No
-            // ripples, no bending.
-            vec3 mirror = vTint * 0.3 * lit;
-            float cosi = clamp(-v.y, 0.0, 1.0);
-            float sint2 = 1.333 * 1.333 * (1.0 - cosi * cosi);
-            if (sint2 >= 1.0) {
-                rgb = mirror;
-            } else {
-                vec3 above = vec3(0.0);
-                for (int k = 0; k < 8; k++) {
-                    float a = float(k) * 0.785;
-                    above += texture(uSceneColor, suv + vec2(cos(a), sin(a)) * vec2(uScreen.y / uScreen.x, 1.0) * 0.008).rgb;
-                }
-                above = (above + texture(uSceneColor, suv).rgb * 2.0) / 10.0;
-                float cost = sqrt(1.0 - sint2);
-                float rs = (1.333 * cosi - cost) / (1.333 * cosi + cost), rp = (cosi - 1.333 * cost) / (cosi + 1.333 * cost);
-                rgb = mix(above, mirror, clamp(0.5 * (rs * rs + rp * rp), 0.0, 1.0));
+            // From below: what lies above the water shows through it, blurred.
+            vec3 above = texture(uSceneColor, suv).rgb * 2.0;
+            for (int k = 0; k < 8; k++) {
+                float a = float(k) * 0.785;
+                above += texture(uSceneColor, suv + vec2(cos(a), sin(a)) * vec2(uScreen.y / uScreen.x, 1.0) * 0.008).rgb;
             }
+            rgb = above / 10.0;
         }
         alpha = 1.0;
     }
