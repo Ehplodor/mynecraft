@@ -267,6 +267,66 @@ public final class Synth {
         return level(loop(clean(s), len), AMBIENT_QUIET);
     }
 
+    /**
+     * Cicadas and grasshoppers on a summer day: a few distant buzzing choirs (5-7 kHz noise
+     * pulsed 40-90 times a second) that swell and fade slowly, each at its own pace.
+     */
+    public static float[] insects(double seconds, long seed) {
+        SplittableRandom r = new SplittableRandom(seed);
+        int len = samples(seconds), fade = samples(0.5), n = len + fade;
+        float[] s = new float[n];
+        for (int c = 0; c < 4; c++) {
+            float[] buzz = bandpass(white(n, r), 5000 + r.nextDouble() * 2000, 3);
+            double rate = 40 + r.nextDouble() * 50, swells = 1 + r.nextInt(3), p = r.nextDouble() * 6.28;
+            double gain = 0.3 + 0.7 * r.nextDouble();
+            for (int i = 0; i < n; i++) {
+                double t = (i % len) / (double) RATE, u = (i % len) / (double) len;
+                double swell = Math.max(0, Math.sin(2 * Math.PI * swells * u + p)); // whole cycles: seamless
+                double pulse = 0.5 + 0.5 * Math.sin(2 * Math.PI * Math.round(rate * seconds) / seconds * t);
+                s[i] += (float) (buzz[i] * swell * swell * pulse * gain);
+            }
+        }
+        return level(loop(clean(s), len), AMBIENT_QUIET);
+    }
+
+    /**
+     * Frogs by the water at night: a few voices croaking in short bursts of glottal pulses
+     * (a nasal 300-700 Hz resonance), each repeating at its own unsteady rhythm.
+     */
+    public static float[] frogs(double seconds, long seed) {
+        SplittableRandom r = new SplittableRandom(seed);
+        int len = samples(seconds), fade = samples(0.3), n = len + fade;
+        float[] s = new float[n];
+        for (int c = 0; c < 5; c++) {
+            double f = 300 + r.nextDouble() * 400, period = 0.6 + r.nextDouble() * 1.4, rate = 25 + r.nextDouble() * 35;
+            double gain = 0.2 + 0.8 * Math.pow(r.nextDouble(), 2);
+            for (double t = r.nextDouble() * period; t < seconds; t += period * (0.8 + r.nextDouble() * 0.5)) {
+                double length = 0.12 + r.nextDouble() * 0.2;
+                float[] croak = new float[samples(length)];
+                for (int k = 0; k < length * rate; k++) mix(croak, mode(f * (1 + 0.1 * k / (length * rate)), 0.006, 0.03), samples(k / rate), 1);
+                shape(croak, x -> Math.sin(Math.PI * Math.min(1, x / length)));
+                mixWrapped(s, croak, samples(t), gain);
+            }
+        }
+        return level(loop(clean(s), len), AMBIENT_QUIET);
+    }
+
+    /** An owl at night: two or three soft, breathy hoots around 350-450 Hz, the last one longer. */
+    public static float[] owl(long seed) {
+        SplittableRandom r = new SplittableRandom(seed);
+        double f = 350 + r.nextDouble() * 100;
+        int hoots = 2 + r.nextInt(2);
+        float[] s = new float[samples(hoots * 0.55 + 0.9)];
+        for (int k = 0; k < hoots; k++) {
+            double len = k == hoots - 1 ? 0.7 : 0.3, at = k * 0.5 + (k == hoots - 1 ? 0.15 : 0);
+            float[] h = note(r, t -> f * (1 + 0.05 * Math.sin(Math.PI * t / len)), len, 0.15);
+            float[] breath = scale(bandpass(white(h.length, r), f * 2, 2), 0.25);
+            for (int i = 0; i < h.length; i++) h[i] += breath[i] * (float) Math.pow(Math.sin(Math.PI * i / h.length), 2);
+            mix(s, h, samples(at), 0.9);
+        }
+        return level(space(lowpass(s, 1800), 0.5), BIRD);
+    }
+
     /** One bird call; {@code kind} 0..5 picks a song type, the seed varies it. */
     public static float[] bird(int kind, long seed) {
         SplittableRandom r = new SplittableRandom(seed);

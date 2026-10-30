@@ -35,6 +35,8 @@ class SynthTest {
         seamless("surf", Synth.surf(8, 10));
         seamless("cave", Synth.cave(4, 11));
         seamless("crickets", Synth.crickets(3, 12));
+        seamless("insects", Synth.insects(3, 13));
+        seamless("frogs", Synth.frogs(3, 14));
     }
 
     @Test
@@ -49,5 +51,6 @@ class SynthTest {
         sane("thunder", Synth.thunder(true, 1));
         sane("far thunder", Synth.thunder(false, 1));
         for (int k = 0; k < 6; k++) sane("bird " + k, Synth.bird(k, k));
+        sane("owl", Synth.owl(1));
     }
 }

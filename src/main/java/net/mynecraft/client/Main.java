@@ -873,6 +873,7 @@ public final class Main {
                 ambience.sheltered = sheltered(world, cam.pos.x, cam.pos.y, cam.pos.z);
                 ambience.wind = here == null || paused ? 0 : (float) (Math.hypot(here.windX(), here.windZ()) * (1 + Math.max(0, cam.pos.y - 80) / 80));
                 ambience.daylight = (DayCycle.daylight(ticks) - 0.15f) / 0.85f;
+                ambience.warmth = (float) ((net.mynecraft.world.life.Ecosystem.temperatureOffset(life.eco.season().phase()) + 11) / 18);
                 sound.update(cam.pos.x, cam.pos.y, cam.pos.z, cam.yaw, cam.pitch, ambience, weatherClock);
             }
             if (stats != null) {
