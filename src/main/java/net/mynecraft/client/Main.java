@@ -102,7 +102,7 @@ public final class Main {
         int quarter = Math.floorMod((int) Math.round(-yawDeg / 90.0) + 2, 4);
         String target = "rien";
         if (hit != null) {
-            byte b = world.get(hit.x(), hit.y(), hit.z());
+            short b = world.get(hit.x(), hit.y(), hit.z());
             target = Blocks.NAMES[b] + (Blocks.STATE[b].isEmpty() ? "" : "[" + Blocks.STATE[b] + "]")
                 + String.format(" @ %d %d %d", hit.x(), hit.y(), hit.z());
         }
@@ -143,7 +143,7 @@ public final class Main {
         }
     }
 
-    private static void demoSet(World world, WorldRenderer renderer, int x, int y, int z, byte b) {
+    private static void demoSet(World world, WorldRenderer renderer, int x, int y, int z, short b) {
         if (world.set(x, y, z, b)) renderer.blockChanged(x, y, z);
     }
 
@@ -247,7 +247,7 @@ public final class Main {
         Hud hud = new Hud(appearance.faceInfo, font, resources);
         GpuTimer gpuTimer = new GpuTimer();
         boolean paused = argv.contains("--paused"), debug = argv.contains("--f3"); // also for scripted shots
-        byte shownBlock = -1;
+        short shownBlock = -1;
         long blockShownAt = 0;
         int fps = 0;
         double frameMillis = 0;
@@ -402,7 +402,7 @@ public final class Main {
         double stepDistance = 0, lastStepX = player.x, lastStepZ = player.z, waterScanAt = -1;
         SoundEngine.Ambience ambience = new SoundEngine.Ambience();
         double nextHitSound = 0;
-        byte lastFluid = Blocks.FLUID_NONE;
+        short lastFluid = Blocks.FLUID_NONE;
         String mapMode = option(args, "--minimap", null); // scripted shots: relief, biomes, waters, clouds, weather
         if (mapMode != null) minimap.mode = Minimap.Mode.valueOf(mapMode.toUpperCase());
         if (argv.contains("--worldmap")) worldMap.open(player.x, player.z); // scripted shots
@@ -488,7 +488,7 @@ public final class Main {
                     }
                     if (!viewer.typing) {
                         // R / U over any item: its recipes / what it is used for (JEI keys).
-                        byte under = hover >= 0 ? inventoryScreen.idAt(menu, hover, input.hotbar) : viewer.hovered(hud, m[0], m[1]);
+                        short under = hover >= 0 ? inventoryScreen.idAt(menu, hover, input.hotbar) : viewer.hovered(hud, m[0], m[1]);
                         if (under != Blocks.AIR && input.pressedChar('r')) viewer.show(under, false);
                         if (under != Blocks.AIR && input.pressedChar('u')) viewer.show(under, true);
                         if (menu != null && input.pressedChar('t')) menu.sort();
@@ -613,7 +613,7 @@ public final class Main {
                 boolean wading = player.fluid == Blocks.FLUID_WATER;
                 if (stepDistance > (wading ? 2.2 : 1.7)) {
                     stepDistance = 0;
-                    byte under = world.get((int) Math.floor(player.x), (int) Math.floor(player.y - 0.2), (int) Math.floor(player.z));
+                    short under = world.get((int) Math.floor(player.x), (int) Math.floor(player.y - 0.2), (int) Math.floor(player.z));
                     sound.step(wading ? Synth.Material.WATER : material(under), player.x, player.y, player.z);
                 }
             }
@@ -653,7 +653,7 @@ public final class Main {
                     mining = new int[] {hit.x(), hit.y(), hit.z()};
                     miningProgress = 0;
                 }
-                byte target = world.get(hit.x(), hit.y(), hit.z());
+                short target = world.get(hit.x(), hit.y(), hit.z());
                 miningProgress += dt / Blocks.breakSeconds(target);
                 if (weatherClock >= nextHitSound && dt > 0) { // the tool striking, four times a second
                     sound.hit(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
@@ -661,7 +661,7 @@ public final class Main {
                 }
                 if (miningProgress >= 1 && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
                     sound.blockBroken(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
-                    inventory.add(Blocks.DROP[target & 0xFF], Blocks.DROP_COUNT[target & 0xFF]);
+                    inventory.add(Blocks.DROP[target & 0xFFFF], Blocks.DROP_COUNT[target & 0xFFFF]);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                     mining = null;
@@ -672,7 +672,7 @@ public final class Main {
                 miningProgress = 0;
             }
             if (hit != null && ((creative && input.breakRequested) || (editDemo && streamer.settled()))) {
-                byte broken = world.get(hit.x(), hit.y(), hit.z());
+                short broken = world.get(hit.x(), hit.y(), hit.z());
                 if (broken != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
                     sound.blockBroken(material(broken), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
@@ -684,7 +684,7 @@ public final class Main {
                 menu = new CraftingMenu(inventory, recipes, 3); // like vanilla: sneak to place against it instead
                 screenOpen = true;
                 input.capture(false);
-            } else if (hit != null && input.placeRequested && input.selected != Blocks.AIR) {
+            } else if (hit != null && input.placeRequested && net.mynecraft.world.Items.isBlock(input.selected)) {
                 double dirX = -Math.sin(cam.yaw) * cp, dirY = Math.sin(cam.pitch), dirZ = -Math.cos(cam.yaw) * cp;
                 int[] placed = Placement.place(world, player, hit, hitHeight(hit, cam.pos.x, cam.pos.y, cam.pos.z, dirX, dirY, dirZ), input.selected);
                 if (placed != null) {
@@ -759,9 +759,9 @@ public final class Main {
             weatherRenderer.draw(skyViewProj, weather, world, cam.pos.x, cam.pos.y, cam.pos.z, weatherClock,
                 renderer.daylight, far, timeFrozen);
             if (hit != null) {
-                byte target = world.get(hit.x(), hit.y(), hit.z());
-                float lo = Blocks.isSlab(target) ? Blocks.BOX_MIN[target & 0xFF] / 16f : 0;
-                float hi = Blocks.isSlab(target) ? Blocks.BOX_MAX[target & 0xFF] / 16f : 1;
+                short target = world.get(hit.x(), hit.y(), hit.z());
+                float lo = Blocks.isSlab(target) ? Blocks.BOX_MIN[target & 0xFFFF] / 16f : 0;
+                float hi = Blocks.isSlab(target) ? Blocks.BOX_MAX[target & 0xFFFF] / 16f : 1;
                 overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y),
                     (float) (hit.z() - cam.pos.z), lo, hi);
             }
@@ -915,7 +915,7 @@ public final class Main {
                 frameMillis = (now - fpsTimer) / 1e6 / Math.max(1, frames);
                 glfwSetWindowTitle(window, String.format("Mynecraft | %d FPS | %d/%d sections | %d quads | chargement %d | %s%s | %.1f %.1f %.1f",
                     frames, renderer.drawnSections, renderer.meshCount(), renderer.totalQuads, streamer.loadingCount(),
-                    Blocks.NAMES[input.selected], player.flying ? " | vol" : "", player.x, player.y, player.z));
+                    net.mynecraft.world.Items.name(input.selected), player.flying ? " | vol" : "", player.x, player.y, player.z));
                 frames = 0;
                 fpsTimer = now;
             }
@@ -952,14 +952,14 @@ public final class Main {
     }
 
     /** What a block sounds like (steps, breaking, placing). */
-    private static Synth.Material material(byte b) {
+    private static Synth.Material material(short b) {
         if (b == Blocks.GRASS) return Synth.Material.GRASS;
         if (b == Blocks.DIRT) return Synth.Material.DIRT;
         if (b == Blocks.SAND) return Synth.Material.SAND;
         if (b == Blocks.GRAVEL) return Synth.Material.GRAVEL;
         if (b == Blocks.SNOW_BLOCK) return Synth.Material.SNOW;
         if (b == Blocks.GLASS || b == Blocks.ICE || b == Blocks.PACKED_ICE || b == Blocks.GLOWSTONE) return Synth.Material.GLASS;
-        if (b == Blocks.OAK_LEAVES || Blocks.SHAPE[b & 0xFF] == Blocks.SHAPE_CROSS) return Synth.Material.LEAVES;
+        if (b == Blocks.OAK_LEAVES || Blocks.SHAPE[b & 0xFFFF] == Blocks.SHAPE_CROSS) return Synth.Material.LEAVES;
         if (b == Blocks.OAK_PLANKS || b == Blocks.OAK_LOG || b == Blocks.OAK_LOG_X || b == Blocks.OAK_LOG_Z
             || b == Blocks.CRAFTING_TABLE || Blocks.isSlab(b)) return Synth.Material.WOOD;
         if (Blocks.isFluid(b)) return Synth.Material.WATER;
@@ -990,7 +990,7 @@ public final class Main {
             for (int dx = -44; dx <= 44; dx += 4) {
                 var c = world.generator.column(bx + dx, bz + dz);
                 columns++;
-                byte biome = c.biome();
+                short biome = c.biome();
                 if (biome == Landscape.FOREST || biome == Landscape.BIRCH_FOREST || biome == Landscape.DARK_FOREST
                     || biome == Landscape.TAIGA || biome == Landscape.SNOWY_TAIGA) trees++;
                 if (biome == Landscape.PLAINS || biome == Landscape.DRY_PLAINS || biome == Landscape.FOREST || biome == Landscape.BIRCH_FOREST) grass++;
@@ -1008,10 +1008,10 @@ public final class Main {
                 }
                 if (Math.abs(dx) <= 24 && Math.abs(dz) <= 24)
                     for (int dy = -12; dy <= 12; dy += 3) { // falls and rapids: moving water blocks
-                        byte b = world.get(bx + dx, by + dy, bz + dz);
-                        if (Blocks.FLUID[b & 0xFF] == Blocks.FLUID_WATER && Blocks.LEVEL[b & 0xFF] != 0)
-                            found.add(new double[] {bx + dx + 0.5, by + dy + 0.5, bz + dz + 0.5, Blocks.LEVEL[b & 0xFF] == 8 ? 1 : 0.6,
-                                Blocks.LEVEL[b & 0xFF] == 8 ? 2 : 0});
+                        short b = world.get(bx + dx, by + dy, bz + dz);
+                        if (Blocks.FLUID[b & 0xFFFF] == Blocks.FLUID_WATER && Blocks.LEVEL[b & 0xFFFF] != 0)
+                            found.add(new double[] {bx + dx + 0.5, by + dy + 0.5, bz + dz + 0.5, Blocks.LEVEL[b & 0xFFFF] == 8 ? 1 : 0.6,
+                                Blocks.LEVEL[b & 0xFFFF] == 8 ? 2 : 0});
                     }
             }
         a.forest = Math.min(1, trees * 2f / columns);

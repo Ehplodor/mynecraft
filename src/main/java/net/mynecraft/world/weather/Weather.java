@@ -96,10 +96,10 @@ public final class Weather {
         if (world.chunk(x >> 4, z >> 4) == null) return;
         int y = top(x, z);
         if (y == Integer.MIN_VALUE) return;
-        byte b = world.get(x, y, z);
+        short b = world.get(x, y, z);
         Atmosphere.Sample s = at(x + 0.5, z + 0.5, y);
         boolean snowing = s.type() == Atmosphere.Precipitation.SNOW;
-        byte to = b;
+        short to = b;
         if (b == Blocks.GRASS && snowing && s.temperature() < 0) to = Blocks.SNOW_BLOCK;
         else if (b == Blocks.WATER && s.temperature() < -3 && world.get(x, y + 1, z) == Blocks.AIR) to = Blocks.ICE;
         else if (b == Blocks.ICE && s.temperature() > 2) to = Blocks.WATER;
@@ -111,7 +111,7 @@ public final class Weather {
     private int top(int x, int z) {
         int from = Math.min(Chunk.MAX_Y - 1, world.generator.height(x, z) + 40);
         for (int y = from; y > Chunk.MIN_Y; y--) {
-            byte b = world.get(x, y, z);
+            short b = world.get(x, y, z);
             if (Blocks.isSolid(b) || Blocks.isFluid(b)) return y; // plants let snow through
         }
         return Integer.MIN_VALUE;

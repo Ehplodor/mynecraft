@@ -27,7 +27,7 @@ public final class ChunkCodec {
 
     private ChunkCodec() {}
 
-    public static byte blockFromName(String id) {
+    public static short blockFromName(String id) {
         return blockFromState(id, Map.of());
     }
 
@@ -35,7 +35,7 @@ public final class ChunkCodec {
      * Maps a Java block state to ours: exact name (and properties) first, then the closest family
      * keeping its properties (any log keeps its axis, any slab its type), then stone.
      */
-    public static byte blockFromState(String id, Map<String, String> properties) {
+    public static short blockFromState(String id, Map<String, String> properties) {
         String n = id.startsWith("minecraft:") ? id.substring(10) : id;
         if (n.equals("water") || n.equals("lava")) {
             // Vanilla levels: 0 source, 1..7 flowing, 8..15 falling; lava rounds to our even levels.
@@ -43,7 +43,7 @@ public final class ChunkCodec {
             try { level = Integer.parseInt(properties.getOrDefault("level", "0")); } catch (NumberFormatException ignored) {}
             return Blocks.fluidState(n.equals("water") ? Blocks.FLUID_WATER : Blocks.FLUID_LAVA, level);
         }
-        byte exact = Blocks.fromState(n, properties);
+        short exact = Blocks.fromState(n, properties);
         if (exact >= 0) return exact;
         if (n.endsWith("_slab")) return Blocks.fromState("oak_slab", properties);
         if (NON_SOLID.contains(n) || n.endsWith("torch") || n.endsWith("_button") || n.endsWith("_sign")
@@ -95,7 +95,7 @@ public final class ChunkCodec {
                 states = bs.get("data") instanceof long[] a ? a : null;
             }
             if (palette.isEmpty()) continue;
-            byte[] ids = new byte[palette.size()];
+            short[] ids = new short[palette.size()];
             for (int i = 0; i < ids.length; i++) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> entry = (Map<String, Object>) palette.get(i);
@@ -112,10 +112,10 @@ public final class ChunkCodec {
         return chunk;
     }
 
-    private static void fill(Chunk chunk, int sy, byte[] ids, long[] states) {
+    private static void fill(Chunk chunk, int sy, short[] ids, long[] states) {
         int base = Chunk.sectionMinY(sy);
         if (ids.length == 1 || states == null) {
-            byte b = ids[0];
+            short b = ids[0];
             if (b == Blocks.AIR) return;
             for (int i = 0; i < Section.VOLUME; i++) chunk.set(i & 15, base + (i >> 8), (i >> 4) & 15, b);
             return;
@@ -126,7 +126,7 @@ public final class ChunkCodec {
         if (states.length < (Section.VOLUME + perLong - 1) / perLong) return; // corrupt: skip section
         for (int i = 0; i < Section.VOLUME; i++) {
             int p = (int) ((states[i / perLong] >>> ((i % perLong) * bits)) & mask);
-            byte b = p < ids.length ? ids[p] : Blocks.STONE;
+            short b = p < ids.length ? ids[p] : Blocks.STONE;
             if (b != Blocks.AIR) chunk.set(i & 15, base + (i >> 8), (i >> 4) & 15, b);
         }
     }
@@ -187,7 +187,7 @@ public final class ChunkCodec {
             int perLong = 64 / bits;
             long[] data = new long[(Section.VOLUME + perLong - 1) / perLong];
             for (int i = 0; i < Section.VOLUME; i++) {
-                long p = toPalette[s.get(i & 15, i >> 8, (i >> 4) & 15) & 0xFF];
+                long p = toPalette[s.get(i & 15, i >> 8, (i >> 4) & 15) & 0xFFFF];
                 data[i / perLong] |= p << ((i % perLong) * bits);
             }
             bs.put("data", data);

@@ -11,7 +11,7 @@ class LifeTest {
     private static final int FLOOR = 63, POND = 8; // pond: x, z in [-POND, POND), 3 deep
 
     /** Written straight into the chunks: no light needed here, and lighting 200 000 edits is slow. */
-    private static void put(World w, int x, int y, int z, byte b) {
+    private static void put(World w, int x, int y, int z, short b) {
         w.chunk(x >> 4, z >> 4).set(x & 15, y, z & 15, b);
     }
 

@@ -20,7 +20,7 @@ class FluidSimulatorTest {
         for (int i = 0; i < ticks; i++) f.tick();
     }
 
-    private static FluidSimulator place(World w, int x, int y, int z, byte b, Set<Long> changed) {
+    private static FluidSimulator place(World w, int x, int y, int z, short b, Set<Long> changed) {
         FluidSimulator f = new FluidSimulator(w, (cx, cy, cz) -> changed.add(LightEngine.pack(cx, cy, cz)));
         w.set(x, y, z, b);
         f.blockChanged(x, y, z);

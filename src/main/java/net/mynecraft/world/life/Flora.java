@@ -41,7 +41,7 @@ final class Flora {
             if (p == null) continue;
             int y = surface(x, z);
             if (y == Integer.MIN_VALUE) continue;
-            byte ground = world.get(x, y, z), above = world.get(x, y + 1, z);
+            short ground = world.get(x, y, z), above = world.get(x, y + 1, z);
             double climate = Vegetation.climate(ecology.columns.apply(x, z).temperature(), y);
             double growth = Vegetation.growth(climate, p.rain, season.phase()), bloom = Vegetation.bloom(climate, season.phase());
             if (ground == Blocks.GRASS && above == Blocks.AIR && growth > 0.5) {
@@ -59,7 +59,7 @@ final class Flora {
         }
     }
 
-    private void set(int x, int y, int z, byte b, java.util.function.Consumer<int[]> changed) {
+    private void set(int x, int y, int z, short b, java.util.function.Consumer<int[]> changed) {
         if (world.set(x, y, z, b)) {
             if (b != Blocks.AIR) grown++;
             changed.accept(new int[] {x, y, z});
@@ -70,7 +70,7 @@ final class Flora {
     private int surface(int x, int z) {
         int h = ecology.columns.apply(x, z).height();
         for (int y = Math.min(Chunk.MAX_Y - 2, h + 12); y > h - 12; y--) {
-            byte b = world.get(x, y, z);
+            short b = world.get(x, y, z);
             if (b == Blocks.AIR || b == Blocks.SHORT_GRASS || b == Blocks.POPPY) continue;
             return Blocks.isSolid(b) ? y : Integer.MIN_VALUE; // leaves, water...: not a meadow
         }

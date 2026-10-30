@@ -9,3 +9,4 @@ data/minecraft/tags/item/oak_logs.json
 data/minecraft/tags/item/planks.json
 data/minecraft/tags/item/spruce_logs.json
 pack.mcmeta
+data/minecraft/recipe/stick.json

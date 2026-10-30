@@ -222,11 +222,11 @@ class ChunkMesherTest {
                 Chunk c = w.generator.generate(cx, cz);
                 for (int y = Chunk.MIN_Y; y < Chunk.MAX_Y; y++)
                     for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) counts[c.get(x, y, z)]++;
-                byte deep = c.get(3, -20, 3);
+                short deep = c.get(3, -20, 3);
                 assertTrue(deep == Blocks.DEEPSLATE || deep == Blocks.AIR || Blocks.NAMES[deep].endsWith("_ore"),
                     "below y=0: deepslate, ore or cave");
             }
-        for (byte b : new byte[] {Blocks.COAL_ORE, Blocks.IRON_ORE, Blocks.GOLD_ORE, Blocks.DIAMOND_ORE, Blocks.GRANITE,
+        for (short b : new short[] {Blocks.COAL_ORE, Blocks.IRON_ORE, Blocks.GOLD_ORE, Blocks.DIAMOND_ORE, Blocks.GRANITE,
             Blocks.DIORITE, Blocks.ANDESITE, Blocks.OAK_LOG, Blocks.BIRCH_LOG, Blocks.SPRUCE_LOG}) {
             assertTrue(counts[b] > 0, "no " + Blocks.NAMES[b] + " generated");
         }

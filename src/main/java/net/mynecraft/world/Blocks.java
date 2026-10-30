@@ -1,11 +1,11 @@
 package net.mynecraft.world;
 
 /**
- * Block registry. Ids are bytes (0 = air); properties live in flat arrays indexed by id so hot
+ * Block registry. Ids are shorts (0 = air); properties live in flat arrays indexed by id so hot
  * loops (meshing, light, collisions) stay branch-light and allocation-free.
  */
 public final class Blocks {
-    public static final byte AIR = 0, STONE = 1, DIRT = 2, GRASS = 3, SAND = 4, BEDROCK = 5, WATER = 6,
+    public static final short AIR = 0, STONE = 1, DIRT = 2, GRASS = 3, SAND = 4, BEDROCK = 5, WATER = 6,
         OAK_LOG = 7, OAK_LEAVES = 8, OAK_PLANKS = 9, COBBLESTONE = 10, GLASS = 11, SHORT_GRASS = 12,
         POPPY = 13, GLOWSTONE = 14, GRAVEL = 15, OAK_LOG_X = 16, OAK_LOG_Z = 17, OAK_SLAB = 18,
         OAK_SLAB_TOP = 19, OAK_SLAB_DOUBLE = 20, GRANITE = 21, DIORITE = 22, ANDESITE = 23, DEEPSLATE = 24,
@@ -15,7 +15,7 @@ public final class Blocks {
         WATER_FLOW_1 = 39, /* ... WATER_FLOW_7 = 45 */ WATER_FALLING = 46,
         LAVA = 47, LAVA_FLOW_2 = 48, LAVA_FLOW_4 = 49, LAVA_FLOW_6 = 50, LAVA_FALLING = 51, OBSIDIAN = 52,
         CRAFTING_TABLE = 53, SNOW_BLOCK = 54, ICE = 55, PACKED_ICE = 56;
-    public static final int COUNT = 57; // must stay below 128: the mesher uses bit 7 of the id as a flag
+    public static final int COUNT = 57; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -52,11 +52,11 @@ public final class Blocks {
     /** Vanilla hardness (seconds by hand = hardness x 1.5); negative = unbreakable. */
     public static final float[] HARDNESS = new float[COUNT];
     /** Item dropped when broken (a block id; AIR = nothing) and how many. */
-    public static final byte[] DROP = new byte[COUNT];
+    public static final short[] DROP = new short[COUNT];
     public static final byte[] DROP_COUNT = new byte[COUNT];
 
     /** Families whose members hide faces between each other (each fluid, glass, each leaves). */
-    private static final byte[] FAMILY = new byte[COUNT];
+    private static final short[] FAMILY = new short[COUNT];
 
     public static final byte[] LAYER = new byte[COUNT];
     public static final byte[] SHAPE = new byte[COUNT];
@@ -79,7 +79,7 @@ public final class Blocks {
             SOLID[i] = true;
         }
         TINT[GRASS] = TINT_GRASS;
-        for (byte leaves : new byte[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES}) {
+        for (short leaves : new short[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES}) {
             cutout(leaves, 1, true);
             TINT[leaves] = TINT_FOLIAGE; // vanilla gives birch and spruce fixed colours; biome foliage here
         }
@@ -87,14 +87,14 @@ public final class Blocks {
         plant(SHORT_GRASS);
         TINT[SHORT_GRASS] = TINT_GRASS;
         plant(POPPY);
-        for (int i = 0; i < COUNT; i++) FAMILY[i] = (byte) i;
+        for (int i = 0; i < COUNT; i++) FAMILY[i] = (short) i;
         for (int i = WATER_FLOW_1 - 1; i <= WATER_FALLING; i++) {
-            byte w = (byte) (i == WATER_FLOW_1 - 1 ? WATER : i);
+            short w = (short) (i == WATER_FLOW_1 - 1 ? WATER : i);
             fluid(w, FLUID_WATER, LAYER_TRANSLUCENT, 1, w == WATER ? 0 : w == WATER_FALLING ? 8 : w - WATER_FLOW_1 + 1);
             TINT[w] = TINT_WATER;
             FAMILY[w] = WATER;
         }
-        byte[] lava = {LAVA, LAVA_FLOW_2, LAVA_FLOW_4, LAVA_FLOW_6, LAVA_FALLING};
+        short[] lava = {LAVA, LAVA_FLOW_2, LAVA_FLOW_4, LAVA_FLOW_6, LAVA_FALLING};
         for (int i = 0; i < lava.length; i++) {
             fluid(lava[i], FLUID_LAVA, LAYER_OPAQUE, 15, i == 4 ? 8 : i * 2);
             EMISSION[lava[i]] = 15;
@@ -116,7 +116,7 @@ public final class Blocks {
         for (int i = 1; i < COUNT; i++) FULL_OPAQUE[i] = LAYER[i] == LAYER_OPAQUE && SHAPE[i] == SHAPE_CUBE && FLUID[i] == FLUID_NONE;
     }
 
-    private static void cutout(byte id, int opacity, boolean cullsSelf) {
+    private static void cutout(short id, int opacity, boolean cullsSelf) {
         LAYER[id] = LAYER_CUTOUT;
         OPACITY[id] = (byte) opacity;
         CULLS_SELF[id] = cullsSelf;
@@ -146,23 +146,23 @@ public final class Blocks {
         DROP[STONE] = COBBLESTONE;
         DROP[GRASS] = DIRT;
         DROP_COUNT[OAK_SLAB_DOUBLE] = 2;
-        for (byte none : new byte[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES, GLASS, SHORT_GRASS, BEDROCK}) DROP[none] = AIR;
+        for (short none : new short[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES, GLASS, SHORT_GRASS, BEDROCK}) DROP[none] = AIR;
         for (int i = 1; i < COUNT; i++) {
             if (FLUID[i] != FLUID_NONE) { DROP[i] = AIR; HARDNESS[i] = -1; }
         }
     }
 
-    private static void hardness(float h, byte... ids) {
-        for (byte id : ids) HARDNESS[id] = h;
+    private static void hardness(float h, short... ids) {
+        for (short id : ids) HARDNESS[id] = h;
     }
 
     /** Seconds to break a block by hand (vanilla: hardness x 1.5); infinite if unbreakable. */
-    public static double breakSeconds(byte id) {
-        float h = HARDNESS[id & 0xFF];
+    public static double breakSeconds(short id) {
+        float h = HARDNESS[id & 0xFFFF];
         return h < 0 ? Double.POSITIVE_INFINITY : h * 1.5;
     }
 
-    private static void fluid(byte id, byte type, byte layer, int opacity, int level) {
+    private static void fluid(short id, byte type, byte layer, int opacity, int level) {
         FLUID[id] = type;
         LEVEL[id] = (byte) level;
         LAYER[id] = layer;
@@ -172,25 +172,25 @@ public final class Blocks {
     }
 
     /** Surface height of a fluid in sixteenths when nothing of the same fluid sits above it. */
-    public static int fluidHeight(byte id) {
-        int level = LEVEL[id & 0xFF];
+    public static int fluidHeight(short id) {
+        int level = LEVEL[id & 0xFFFF];
         if (level == 0 || level == 8) return 14;
         return Math.max(2, 14 - level * 12 / 8); // shallower further from the source
     }
 
-    public static boolean isFluid(byte id) {
-        return FLUID[id & 0xFF] != FLUID_NONE;
+    public static boolean isFluid(short id) {
+        return FLUID[id & 0xFFFF] != FLUID_NONE;
     }
 
     /** The state of a fluid type at a level (0 source, 1..7 flowing, 8 falling); lava levels round up to even. */
-    public static byte fluidState(byte type, int level) {
-        if (type == FLUID_WATER) return level == 0 ? WATER : level >= 8 ? WATER_FALLING : (byte) (WATER_FLOW_1 + level - 1);
+    public static short fluidState(int type, int level) {
+        if (type == FLUID_WATER) return level == 0 ? WATER : level >= 8 ? WATER_FALLING : (short) (WATER_FLOW_1 + level - 1);
         if (level == 0) return LAVA;
         if (level >= 8) return LAVA_FALLING;
         return level <= 2 ? LAVA_FLOW_2 : level <= 4 ? LAVA_FLOW_4 : LAVA_FLOW_6;
     }
 
-    private static void plant(byte id) {
+    private static void plant(short id) {
         LAYER[id] = LAYER_CUTOUT;
         SHAPE[id] = SHAPE_CROSS;
         OPACITY[id] = 0;
@@ -203,12 +203,12 @@ public final class Blocks {
      * Id of the state of {@code name} whose properties all appear in {@code properties}, else the
      * block's default state (its first id), else -1 for an unknown name.
      */
-    public static byte fromState(String name, java.util.Map<String, String> properties) {
-        byte first = -1;
+    public static short fromState(String name, java.util.Map<String, String> properties) {
+        short first = -1;
         for (int i = 0; i < COUNT; i++) {
             if (!NAMES[i].equals(name)) continue;
-            if (first < 0) first = (byte) i;
-            if (matches(STATE[i], properties)) return (byte) i;
+            if (first < 0) first = (short) i;
+            if (matches(STATE[i], properties)) return (short) i;
         }
         return first;
     }
@@ -224,36 +224,36 @@ public final class Blocks {
     }
 
     /** The three axis states of a log family, in y, x, z order, or null. */
-    public static byte[] logStates(byte id) {
-        String n = NAMES[id & 0xFF];
+    public static short[] logStates(short id) {
+        String n = NAMES[id & 0xFFFF];
         if (!n.endsWith("_log")) return null;
-        byte y = fromState(n, java.util.Map.of("axis", "y")), x = fromState(n, java.util.Map.of("axis", "x"));
-        return new byte[] {y, x, fromState(n, java.util.Map.of("axis", "z"))};
+        short y = fromState(n, java.util.Map.of("axis", "y")), x = fromState(n, java.util.Map.of("axis", "x"));
+        return new short[] {y, x, fromState(n, java.util.Map.of("axis", "z"))};
     }
 
-    public static boolean isSlab(byte id) {
-        byte s = SHAPE[id & 0xFF];
+    public static boolean isSlab(short id) {
+        byte s = SHAPE[id & 0xFFFF];
         return s == SHAPE_SLAB_BOTTOM || s == SHAPE_SLAB_TOP;
     }
 
     /** Hides neighbouring faces and casts ambient occlusion. */
-    public static boolean isOpaque(byte id) {
-        return FULL_OPAQUE[id & 0xFF];
+    public static boolean isOpaque(short id) {
+        return FULL_OPAQUE[id & 0xFFFF];
     }
 
     /** Blocks movement. */
-    public static boolean isSolid(byte id) {
-        return SOLID[id & 0xFF];
+    public static boolean isSolid(short id) {
+        return SOLID[id & 0xFFFF];
     }
 
     /** Can be aimed at (everything but air and fluids). */
-    public static boolean isTargetable(byte id) {
+    public static boolean isTargetable(short id) {
         return id != AIR && !isFluid(id);
     }
 
     /** Whether the face of {@code self} against {@code neighbour} must be drawn. */
-    public static boolean faceVisible(byte self, byte neighbour) {
-        return !FULL_OPAQUE[neighbour & 0xFF]
-            && !(FAMILY[neighbour & 0xFF] == FAMILY[self & 0xFF] && CULLS_SELF[self & 0xFF]);
+    public static boolean faceVisible(short self, short neighbour) {
+        return !FULL_OPAQUE[neighbour & 0xFFFF]
+            && !(FAMILY[neighbour & 0xFFFF] == FAMILY[self & 0xFFFF] && CULLS_SELF[self & 0xFFFF]);
     }
 }

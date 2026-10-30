@@ -44,8 +44,8 @@ public final class Survival {
             hurtCooldown = LAVA_INTERVAL;
         }
         // Drowning: air runs out while the head is under water.
-        byte atEyes = w.get((int) Math.floor(p.x), (int) Math.floor(p.y + Player.EYE_HEIGHT), (int) Math.floor(p.z));
-        if (Blocks.FLUID[atEyes & 0xFF] == Blocks.FLUID_WATER) {
+        short atEyes = w.get((int) Math.floor(p.x), (int) Math.floor(p.y + Player.EYE_HEIGHT), (int) Math.floor(p.z));
+        if (Blocks.FLUID[atEyes & 0xFFFF] == Blocks.FLUID_WATER) {
             if (air > 0) air--;
             else if (++drownTimer >= DROWN_INTERVAL) { drownTimer = 0; hurt(DROWN_DAMAGE); }
         } else {

@@ -77,12 +77,12 @@ public final class World {
         if (y < Chunk.MIN_Y) return 16 << 8;
         Chunk c = chunk(x >> 4, z >> 4);
         if (c == null) return 16 << 8;
-        byte b = c.get(x & 15, y, z & 15);
-        return Blocks.isSolid(b) ? Blocks.BOX_MIN[b & 0xFF] | Blocks.BOX_MAX[b & 0xFF] << 8 : -1;
+        short b = c.get(x & 15, y, z & 15);
+        return Blocks.isSolid(b) ? Blocks.BOX_MIN[b & 0xFFFF] | Blocks.BOX_MAX[b & 0xFFFF] << 8 : -1;
     }
 
     /** Sets a block in a loaded chunk; returns false if out of range or unchanged. */
-    public boolean set(int x, int y, int z, byte id) {
+    public boolean set(int x, int y, int z, short id) {
         if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return false;
         Chunk c = chunk(x >> 4, z >> 4);
         if (c == null || c.get(x & 15, y, z & 15) == id) return false;
@@ -100,7 +100,7 @@ public final class World {
         return c == null ? Chunk.DEFAULT_LIGHT : c.getLight(x & 15, y, z & 15);
     }
 
-    public byte get(int x, int y, int z) {
+    public short get(int x, int y, int z) {
         if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return Blocks.AIR;
         Chunk c = chunk(x >> 4, z >> 4);
         return c == null ? Blocks.AIR : c.get(x & 15, y, z & 15);

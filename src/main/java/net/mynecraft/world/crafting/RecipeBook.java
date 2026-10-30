@@ -26,19 +26,19 @@ import java.util.Set;
  */
 public final class RecipeBook {
     /** A grid cell requirement: the set of block ids it accepts. */
-    public record Ingredient(Set<Byte> accepts) {
-        boolean test(byte b) { return accepts.contains(b); }
+    public record Ingredient(Set<Short> accepts) {
+        boolean test(short b) { return accepts.contains(b); }
     }
 
     /** Shaped when {@code width > 0} (cells row by row, null = empty), shapeless otherwise. */
-    public record Recipe(String id, int width, int height, Ingredient[] cells, byte result, int count) {}
+    public record Recipe(String id, int width, int height, Ingredient[] cells, short result, int count) {}
 
     /** What a grid crafts right now. */
-    public record Result(byte block, int count) {}
+    public record Result(short block, int count) {}
 
     public final List<Recipe> recipes = new ArrayList<>();
     public final List<String> warnings = new ArrayList<>();
-    private final Map<String, Set<Byte>> tags = new LinkedHashMap<>();
+    private final Map<String, Set<Short>> tags = new LinkedHashMap<>();
 
     public static RecipeBook load(List<PackSource> packs) {
         RecipeBook book = new RecipeBook();
@@ -80,17 +80,17 @@ public final class RecipeBook {
 
     // ---- tags ----
 
-    private Set<Byte> resolveTag(String tag, Map<String, JsonObject> files, Set<String> visiting) {
-        Set<Byte> done = tags.get(tag);
+    private Set<Short> resolveTag(String tag, Map<String, JsonObject> files, Set<String> visiting) {
+        Set<Short> done = tags.get(tag);
         if (done != null) return done;
-        Set<Byte> out = new HashSet<>();
+        Set<Short> out = new HashSet<>();
         JsonObject f = files.get(tag);
         if (f != null && visiting.add(tag)) {
             for (JsonElement v : f.getAsJsonArray("values")) {
                 String s = v.isJsonObject() ? v.getAsJsonObject().get("id").getAsString() : v.getAsString();
                 if (s.startsWith("#")) out.addAll(resolveTag(normalize(s.substring(1)), files, visiting));
                 else {
-                    byte b = block(s);
+                    short b = block(s);
                     if (b > 0) out.add(b);
                 }
             }
@@ -103,11 +103,9 @@ public final class RecipeBook {
         return id.indexOf(':') < 0 ? "minecraft:" + id : id;
     }
 
-    /** Block for an item id, or -1 if the item is not a block here. */
-    private static byte block(String id) {
-        String n = normalize(id);
-        if (!n.startsWith("minecraft:")) return -1;
-        return Blocks.fromState(n.substring(10), Map.of());
+    /** Item for an item id, or -1 if the item is unknown here. */
+    private static short block(String id) {
+        return net.mynecraft.world.Items.fromName(normalize(id));
     }
 
     // ---- recipes ----
@@ -121,8 +119,8 @@ public final class RecipeBook {
             String resultId = result == null ? res.getAsString()
                 : (result.has("id") ? result.get("id") : result.get("item")).getAsString();
             int count = result != null && result.has("count") ? result.get("count").getAsInt() : 1;
-            byte out = block(resultId);
-            if (out <= 0) { warnings.add(id + ": result " + resultId + " is not a block"); return; }
+            short out = block(resultId);
+            if (out <= 0) { warnings.add(id + ": result " + resultId + " is not a known item"); return; }
             if (type.endsWith("shaped")) {
                 JsonArray pattern = r.getAsJsonArray("pattern");
                 int h = pattern.size(), w = 0;
@@ -157,7 +155,7 @@ public final class RecipeBook {
     /** "minecraft:x", "#minecraft:tag", {"item": ...}, {"tag": ...} or a list of those. */
     private Ingredient ingredient(JsonElement e) {
         if (e == null) return null;
-        Set<Byte> accepts = new HashSet<>();
+        Set<Short> accepts = new HashSet<>();
         if (e.isJsonArray()) {
             for (JsonElement a : e.getAsJsonArray()) {
                 Ingredient i = ingredient(a);
@@ -166,11 +164,11 @@ public final class RecipeBook {
         } else if (e.isJsonObject()) {
             JsonObject o = e.getAsJsonObject();
             if (o.has("tag")) accepts.addAll(tags.getOrDefault(normalize(o.get("tag").getAsString()), Set.of()));
-            else if (o.has("item")) { byte b = block(o.get("item").getAsString()); if (b > 0) accepts.add(b); }
+            else if (o.has("item")) { short b = block(o.get("item").getAsString()); if (b > 0) accepts.add(b); }
         } else {
             String s = e.getAsString();
             if (s.startsWith("#")) accepts.addAll(tags.getOrDefault(normalize(s.substring(1)), Set.of()));
-            else { byte b = block(s); if (b > 0) accepts.add(b); }
+            else { short b = block(s); if (b > 0) accepts.add(b); }
         }
         return accepts.isEmpty() ? null : new Ingredient(accepts);
     }
@@ -178,7 +176,7 @@ public final class RecipeBook {
     // ---- matching ----
 
     /** What a size x size grid (row by row, AIR = empty) crafts, or null. */
-    public Result match(byte[] grid, int size) {
+    public Result match(short[] grid, int size) {
         int minX = size, minY = size, maxX = -1, maxY = -1, filled = 0;
         for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
@@ -198,17 +196,17 @@ public final class RecipeBook {
         return null;
     }
 
-    private static boolean shaped(Recipe r, byte[] grid, int size, int ox, int oy, boolean mirror) {
+    private static boolean shaped(Recipe r, short[] grid, int size, int ox, int oy, boolean mirror) {
         for (int y = 0; y < r.height(); y++)
             for (int x = 0; x < r.width(); x++) {
                 Ingredient ing = r.cells()[y * r.width() + (mirror ? r.width() - 1 - x : x)];
-                byte b = grid[(oy + y) * size + ox + x];
+                short b = grid[(oy + y) * size + ox + x];
                 if (ing == null ? b != Blocks.AIR : !ing.test(b)) return false;
             }
         return true;
     }
 
-    private static boolean shapeless(Recipe r, byte[] grid, int filled) {
+    private static boolean shapeless(Recipe r, short[] grid, int filled) {
         if (r.cells().length != filled) return false;
         boolean[] used = new boolean[grid.length];
         for (Ingredient ing : r.cells()) {

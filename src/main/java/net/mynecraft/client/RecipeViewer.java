@@ -23,24 +23,24 @@ final class RecipeViewer {
 
     private final RecipeIndex index;
     private final ItemNames names;
-    private final byte[] all;
+    private final short[] all;
     final StringBuilder search = new StringBuilder();
     boolean typing;
     private int page;
-    private byte shown = Blocks.AIR;    // item whose recipes are shown, AIR = none
+    private short shown = Blocks.AIR;    // item whose recipes are shown, AIR = none
     private boolean usages;             // showing what it is used for rather than how it is made
     private int recipe;                 // which of its recipes
 
-    RecipeViewer(RecipeIndex index, ItemNames names, byte[] items) {
+    RecipeViewer(RecipeIndex index, ItemNames names, short[] items) {
         this.index = index;
         this.names = names;
         this.all = items;
     }
 
-    private List<Byte> filtered() {
-        List<Byte> out = new ArrayList<>();
+    private List<Short> filtered() {
+        List<Short> out = new ArrayList<>();
         String q = search.toString();
-        for (byte b : all) if (names.matches(b, q)) out.add(b);
+        for (short b : all) if (names.matches(b, q)) out.add(b);
         return out;
     }
 
@@ -50,7 +50,7 @@ final class RecipeViewer {
     }
 
     /** Shows the recipes of an item (or its uses). */
-    void show(byte item, boolean uses) {
+    void show(short item, boolean uses) {
         shown = item;
         usages = uses;
         recipe = 0;
@@ -67,7 +67,7 @@ final class RecipeViewer {
     private static float panelX(Hud hud) { return invX(hud) - 142 * hud.scale; }
 
     /** Index in the filtered list of the item under the mouse, or -1. */
-    private int itemAt(Hud hud, double mx, double my, List<Byte> items) {
+    private int itemAt(Hud hud, double mx, double my, List<Short> items) {
         float s = hud.scale, x0 = listX(hud) + 4 * s, y0 = invY(hud) + 22 * s;
         int col = (int) Math.floor((mx - x0) / (SLOT * s)), row = (int) Math.floor((my - y0) / (SLOT * s));
         if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return -1;
@@ -76,8 +76,8 @@ final class RecipeViewer {
     }
 
     /** The item under the mouse in the list (for R / U), or AIR. */
-    byte hovered(Hud hud, double mx, double my) {
-        List<Byte> items = filtered();
+    short hovered(Hud hud, double mx, double my) {
+        List<Short> items = filtered();
         int i = itemAt(hud, mx, my, items);
         return i < 0 ? Blocks.AIR : items.get(i);
     }
@@ -90,9 +90,9 @@ final class RecipeViewer {
      * A click; returns true if the viewer took it. {@code menu} is null in creative mode, where a
      * click on an item puts it in {@code hotbar[slot]}.
      */
-    boolean click(Hud hud, double mx, double my, boolean right, boolean shift, CraftingMenu menu, byte[] hotbar, int slot) {
+    boolean click(Hud hud, double mx, double my, boolean right, boolean shift, CraftingMenu menu, short[] hotbar, int slot) {
         float s = hud.scale, lx = listX(hud), y0 = invY(hud);
-        List<Byte> items = filtered();
+        List<Short> items = filtered();
         int pages = Math.max(1, (items.size() + COLS * ROWS - 1) / (COLS * ROWS));
         typing = inside(mx, my, lx, y0, 170 * s, 16 * s);
         if (typing) return true;
@@ -116,7 +116,7 @@ final class RecipeViewer {
             if (menu != null && inside(mx, my, px + 100 * s, y0 + 118 * s, 30 * s, 16 * s))
                 RecipeIndex.fill(menu, r, shift ? 64 : 1);
             // A click on an ingredient or the result: follow it.
-            byte under = ingredientAt(hud, mx, my, r);
+            short under = ingredientAt(hud, mx, my, r);
             if (under != Blocks.AIR) show(under, right);
         }
         return true;
@@ -153,7 +153,7 @@ final class RecipeViewer {
         return new float[] {gx + (c % size) * SLOT * s, gy + (c / size) * SLOT * s};
     }
 
-    private byte ingredientAt(Hud hud, double mx, double my, RecipeBook.Recipe r) {
+    private short ingredientAt(Hud hud, double mx, double my, RecipeBook.Recipe r) {
         int size = gridSize(r);
         RecipeBook.Ingredient[] cells = RecipeIndex.layout(r, size);
         float s = hud.scale;
@@ -171,12 +171,12 @@ final class RecipeViewer {
     }
 
     /** An ingredient accepting several items shows them in turn, one per second. */
-    private static byte cycle(RecipeBook.Ingredient ing) {
-        Byte[] options = ing.accepts().stream().sorted().toArray(Byte[]::new);
+    private static short cycle(RecipeBook.Ingredient ing) {
+        Short[] options = ing.accepts().stream().sorted().toArray(Short[]::new);
         return options[(int) ((System.currentTimeMillis() / 1000) % options.length)];
     }
 
-    private void slot(Hud hud, float x, float y, byte id, int count) {
+    private void slot(Hud hud, float x, float y, short id, int count) {
         float s = hud.scale, size = SLOT * s;
         hud.rect(x - s, y - s, size, size, 0.22f, 0.22f, 0.24f, 1);
         hud.rect(x, y, size - 2 * s, size - 2 * s, 0.52f, 0.52f, 0.55f, 1);
@@ -194,7 +194,7 @@ final class RecipeViewer {
         hud.rect(lx + 3 * s, y0 + 3 * s, 164 * s, 13 * s, typing ? 0.1f : 0.2f, typing ? 0.1f : 0.2f, typing ? 0.12f : 0.22f, 1);
         String q = search.length() == 0 && !typing ? "Rechercher..." : search + (typing && System.currentTimeMillis() / 500 % 2 == 0 ? "_" : "");
         hud.text(q, lx + 5 * s, y0 + 5 * s, search.length() == 0 && !typing ? 0.6f : 1, 1, 1);
-        List<Byte> items = filtered();
+        List<Short> items = filtered();
         int pages = Math.max(1, (items.size() + COLS * ROWS - 1) / (COLS * ROWS));
         page = Math.min(page, pages - 1);
         int hover = itemAt(hud, mx, my, items);
@@ -248,7 +248,7 @@ final class RecipeViewer {
         // Can it be made here and now?
         int times = 0;
         if (inventory != null) {
-            byte[] ids = inventory.ids.clone();
+            short[] ids = inventory.ids.clone();
             int[] counts = inventory.counts.clone();
             if (menu != null) { // what lies in the grid counts too
                 Inventory pool = new Inventory();

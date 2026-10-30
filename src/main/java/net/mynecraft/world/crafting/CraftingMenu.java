@@ -18,17 +18,17 @@ public final class CraftingMenu {
     public final Inventory inventory;
     public final RecipeBook recipes;
     public final int gridSize;
-    public final byte[] gridIds;
+    public final short[] gridIds;
     public final int[] gridCounts;
     /** The stack held by the mouse. */
-    public byte cursorId = Blocks.AIR;
+    public short cursorId = Blocks.AIR;
     public int cursorCount;
 
     public CraftingMenu(Inventory inventory, RecipeBook recipes, int gridSize) {
         this.inventory = inventory;
         this.recipes = recipes;
         this.gridSize = gridSize;
-        this.gridIds = new byte[gridSize * gridSize];
+        this.gridIds = new short[gridSize * gridSize];
         this.gridCounts = new int[gridSize * gridSize];
     }
 
@@ -42,7 +42,7 @@ public final class CraftingMenu {
         return recipes.match(gridIds, gridSize);
     }
 
-    public byte id(int slot) {
+    public short id(int slot) {
         if (slot < Inventory.SIZE) return inventory.id(slot);
         if (slot < resultSlot()) return gridCounts[slot - Inventory.SIZE] > 0 ? gridIds[slot - Inventory.SIZE] : Blocks.AIR;
         RecipeBook.Result r = result();
@@ -56,7 +56,7 @@ public final class CraftingMenu {
         return r == null ? 0 : r.count();
     }
 
-    private void set(int slot, byte id, int count) {
+    private void set(int slot, short id, int count) {
         if (count <= 0) { id = Blocks.AIR; count = 0; }
         if (slot < Inventory.SIZE) {
             inventory.ids[slot] = id;
@@ -74,7 +74,7 @@ public final class CraftingMenu {
             return;
         }
         if (shift) { quickMove(slot); return; }
-        byte id = id(slot);
+        short id = id(slot);
         int n = count(slot);
         if (cursorCount == 0) {
             if (n == 0) return;
@@ -91,7 +91,7 @@ public final class CraftingMenu {
             if (cursorCount == 0) cursorId = Blocks.AIR;
         } else {
             // Different items: swap the held stack with the slot.
-            byte heldId = cursorId;
+            short heldId = cursorId;
             int held = cursorCount;
             cursorId = id;
             cursorCount = n;
@@ -127,7 +127,7 @@ public final class CraftingMenu {
 
     /** Shift click: hotbar to main inventory and back; grid to inventory. */
     private void quickMove(int slot) {
-        byte id = id(slot);
+        short id = id(slot);
         int n = count(slot);
         if (n == 0) return;
         int from, to;
@@ -153,7 +153,7 @@ public final class CraftingMenu {
      * full stacks, ordered by block, empty slots at the end.
      */
     public void sort() {
-        java.util.TreeMap<Byte, Integer> total = new java.util.TreeMap<>();
+        java.util.TreeMap<Short, Integer> total = new java.util.TreeMap<>();
         for (int i = Inventory.HOTBAR; i < Inventory.SIZE; i++)
             if (inventory.counts[i] > 0) total.merge(inventory.ids[i], inventory.counts[i], Integer::sum);
         int slot = Inventory.HOTBAR;
@@ -186,7 +186,7 @@ public final class CraftingMenu {
     /** Number key over a slot: swaps it with that hotbar slot (0..8). */
     public void swapWithHotbar(int slot, int hotbar) {
         if (slot < 0 || slot >= resultSlot() || hotbar < 0 || hotbar >= Inventory.HOTBAR || slot == hotbar) return;
-        byte a = id(slot), b = id(hotbar);
+        short a = id(slot), b = id(hotbar);
         int na = count(slot), nb = count(hotbar);
         set(slot, b, nb);
         set(hotbar, a, na);

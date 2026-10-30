@@ -13,7 +13,7 @@ class RecipeViewerLogicTest {
     private static final RecipeBook BOOK = RecipeBook.load(List.of(PackSource.classpath("defaultdata")));
     private static final RecipeIndex INDEX = new RecipeIndex(BOOK);
 
-    private static RecipeBook.Recipe first(byte result) {
+    private static RecipeBook.Recipe first(short result) {
         return INDEX.recipesFor(result).get(0);
     }
 
