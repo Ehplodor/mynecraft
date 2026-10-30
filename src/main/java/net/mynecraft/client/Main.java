@@ -246,6 +246,7 @@ public final class Main {
         Creature aimed = null;
         Overlay overlay = new Overlay();
         WaterView waterView = new WaterView();
+        waterView.heldSplash = Float.parseFloat(option(args, "--splash", "-1")); // scripted shots: just dived in
         FontLoader font = FontLoader.load(resources);
         if (font == null) System.err.println("[resources] no bitmap font in font/default.json: text disabled");
         Hud hud = new Hud(appearance.faceInfo, font, resources);
@@ -807,7 +808,7 @@ public final class Main {
             if (debug) gpuTimer.end();
             if (waterView.active()) {
                 renderer.scene.unbind();
-                waterView.draw(renderer.scene, renderer.viewProj(), cam, far, renderer.daylight, weatherClock);
+                waterView.draw(renderer.scene, renderer.viewProj(), cam, renderer.sunDir, renderer.daylight, weatherClock);
             } else renderer.scene.present();
             hud.begin(fbW[0], fbH[0]);
             float hotbarTop = creative ? hud.hotbar(input.hotbar, null, input.slot)

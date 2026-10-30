@@ -9,13 +9,13 @@ import static org.lwjgl.opengl.GL33.*;
 /**
  * The view from in or at the water: when the eye is near or under the surface, the finished
  * world picture goes to the window through a pass that splits it at the waterline, colours and
- * swallows what is under water with distance, and adds caustics, drops (coming out) and bubbles
- * (going in). Elsewhere the picture is copied as it is.
+ * swallows what is under water with distance, and adds caustics, light shafts, drifting specks,
+ * a blur clearing after a dive and drops on the lens after coming out. Elsewhere the picture is copied as it is.
  */
 final class WaterView {
     private final Shader shader = new Shader("/shaders/post.vert", "/shaders/water_view.frag");
     private final int vao = glGenVertexArrays();
-    private final int uInvViewProj, uCamWorld, uDepthRange, uAspect, uSurface, uLens, uWaterColor, uDaylight,
+    private final int uInvViewProj, uCamWorld, uSunDir, uAspect, uSurface, uLens, uWaterColor, uDaylight,
         uTime, uWet, uSplash;
     private final Matrix4f inv = new Matrix4f();
     private final float[] buf = new float[16];
@@ -23,6 +23,7 @@ final class WaterView {
     /** Water surface over the eye in blocks (negative: the eye is above it); NO_WATER when none is near. */
     double surface = NO_WATER;
     float wet, splash;
+    float heldSplash = -1; // scripted shots: the splash held at this value
     final float[] waterColor = new float[3];
     static final double NO_WATER = -100;
 
@@ -33,7 +34,7 @@ final class WaterView {
         glUniform1i(glGetUniformLocation(p, "uDepth"), 1);
         uInvViewProj = shader.uniform("uInvViewProj");
         uCamWorld = shader.uniform("uCamWorld");
-        uDepthRange = shader.uniform("uDepthRange");
+        uSunDir = shader.uniform("uSunDir");
         uAspect = shader.uniform("uAspect");
         uSurface = shader.uniform("uSurface");
         uLens = shader.uniform("uLens");
@@ -69,14 +70,14 @@ final class WaterView {
         surface = surfaceOver(world, x, y, z);
         if (under() && !was) splash = 1;
         if (!under() && was) wet = 1;
-        splash = Math.max(0, splash - (float) dt / 0.8f);
+        splash = heldSplash >= 0 ? heldSplash : Math.max(0, splash - (float) dt / 1.2f);
         wet = Math.max(0, wet - (float) dt / 3.5f);
         int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
         float sky = (world.getLight(bx, by, bz) >> 4) / 15f;
-        float lit = 0.04f + 0.96f * daylight * sky * sky;
+        float lit = 0.03f + 0.97f * daylight * sky * sky;
         waterColor[0] = 0.05f * lit;
-        waterColor[1] = 0.25f * lit;
-        waterColor[2] = 0.33f * lit;
+        waterColor[1] = 0.27f * lit;
+        waterColor[2] = 0.36f * lit;
     }
 
     /** Height of the top of the water column at the eye over the eye, or NO_WATER. */
@@ -98,7 +99,7 @@ final class WaterView {
     boolean active() { return surface > -0.6 || wet > 0; }
 
     /** Draws the scene's picture to the window (bound) through the water. */
-    void draw(SceneTarget scene, Matrix4f viewProj, Camera cam, float far, float daylight, double time) {
+    void draw(SceneTarget scene, Matrix4f viewProj, Camera cam, org.joml.Vector3d sun, float daylight, double time) {
         glDisable(GL_DEPTH_TEST);
         glUseProgram(shader.program);
         glActiveTexture(GL_TEXTURE1);
@@ -107,7 +108,7 @@ final class WaterView {
         glBindTexture(GL_TEXTURE_2D, scene.color());
         glUniformMatrix4fv(uInvViewProj, false, viewProj.invert(inv).get(buf));
         glUniform3f(uCamWorld, (float) (cam.pos.x % 1024.0), (float) cam.pos.y, (float) (cam.pos.z % 1024.0));
-        glUniform2f(uDepthRange, 0.05f, far);
+        glUniform3f(uSunDir, (float) sun.x, (float) sun.y, (float) sun.z);
         glUniform1f(uAspect, scene.width() / (float) Math.max(1, scene.height()));
         glUniform1f(uSurface, (float) Math.max(-50, Math.min(50, surface)));
         float lens = 0.3f; // the eye seen as a small window this far in front of it
