@@ -26,6 +26,7 @@ uniform sampler2D uSceneColor; // the opaque world, for refraction under water
 uniform sampler2D uSceneDepth;
 uniform vec2 uScreen;
 uniform vec2 uDepthRange;      // near, far of the camera projection
+uniform float uHideWater;      // 1: the eye is at the waterline, the water view draws the water
 
 out vec4 fragColor;
 
@@ -85,6 +86,7 @@ void main() {
     float alpha = tex.a;
 #ifdef TRANSLUCENT
     if (vWater > 0.5) {
+        if (uHideWater > 0.5) discard;
         // Water: what is under it (bent by the ripples, darker and bluer with depth), the sky
         // mirrored at grazing angles (Fresnel), and the sun glinting on the ripples.
         vec2 suv = gl_FragCoord.xy / uScreen;
@@ -105,7 +107,11 @@ void main() {
             float glint = pow(max(dot(r, uSunDir), 0.0), 220.0) * 4.0 * sun * uShadowStrength;
             rgb = mix(body, skyRef, clamp(fresnel * 0.9, 0.0, 0.9)) + vec3(glint);
         } else {
-            rgb = body;
+            // From below: the world above shows through a round window (refraction up to the
+            // critical angle); outside it the surface mirrors the dim water (total reflection).
+            float window = smoothstep(0.6, 0.7, -v.y + (n.x + n.z) * 0.5);
+            vec3 sky = texture(uSceneColor, suv + n.xz * 0.06).rgb;
+            rgb = mix(vTint * 0.3 * lit, sky * 0.9 + vTint * 0.1, window);
         }
         alpha = 1.0;
     }
