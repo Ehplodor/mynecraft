@@ -268,44 +268,58 @@ public final class Synth {
     }
 
     /**
-     * Cicadas and grasshoppers on a summer day: a few distant buzzing choirs (5-7 kHz noise
-     * pulsed 40-90 times a second) that swell and fade slowly, each at its own pace.
+     * Cicadas on a summer day, as their body makes them: a tymbal clicking 150-250 times a second,
+     * each click ringing the hollow abdomen (a resonance around 4-5 kHz, damped fast). A few
+     * insects in the trees, each singing phrases that swell and fade over seconds; all are far,
+     * so their highs are softened.
      */
     public static float[] insects(double seconds, long seed) {
         SplittableRandom r = new SplittableRandom(seed);
         int len = samples(seconds), fade = samples(0.5), n = len + fade;
         float[] s = new float[n];
-        for (int c = 0; c < 4; c++) {
-            float[] buzz = bandpass(white(n, r), 5000 + r.nextDouble() * 2000, 3);
-            double rate = 40 + r.nextDouble() * 50, swells = 1 + r.nextInt(3), p = r.nextDouble() * 6.28;
-            double gain = 0.3 + 0.7 * r.nextDouble();
-            for (int i = 0; i < n; i++) {
-                double t = (i % len) / (double) RATE, u = (i % len) / (double) len;
-                double swell = Math.max(0, Math.sin(2 * Math.PI * swells * u + p)); // whole cycles: seamless
-                double pulse = 0.5 + 0.5 * Math.sin(2 * Math.PI * Math.round(rate * seconds) / seconds * t);
-                s[i] += (float) (buzz[i] * swell * swell * pulse * gain);
+        for (int c = 0; c < 3; c++) {
+            double f = 4000 + r.nextDouble() * 1200, rate = 150 + r.nextDouble() * 100, gain = 0.35 + 0.65 * r.nextDouble();
+            float[] click = mode(f, 0.0012, 0.006);
+            shape(click, t -> Math.min(1, t / 0.0003));
+            for (double start = r.nextDouble() * 2; start < seconds; ) {
+                double phrase = 2 + r.nextDouble() * 3;
+                for (double t = 0; t < phrase; t += (1 + 0.04 * white(r)) / rate) {
+                    double env = Math.pow(Math.sin(Math.PI * t / phrase), 1.5);
+                    mixWrapped(s, click, samples(start + t), gain * env * (0.8 + 0.2 * r.nextDouble()));
+                }
+                start += phrase + 1 + r.nextDouble() * 3;
             }
         }
-        return level(loop(clean(s), len), AMBIENT_QUIET);
+        lowpass(s, 6500);
+        return level(loop(clean(s), len), AMBIENT_QUIET - 4);
     }
 
     /**
-     * Frogs by the water at night: a few voices croaking in short bursts of glottal pulses
-     * (a nasal 300-700 Hz resonance), each repeating at its own unsteady rhythm.
+     * Frogs by the water at night: a few voices, each croak a short "rrr-ek" of glottal pulses
+     * (70-110 a second) through two throat resonances, falling a little in pitch; each frog calls
+     * again at its own unsteady pace, and the far ones are dull.
      */
     public static float[] frogs(double seconds, long seed) {
         SplittableRandom r = new SplittableRandom(seed);
         int len = samples(seconds), fade = samples(0.3), n = len + fade;
         float[] s = new float[n];
-        for (int c = 0; c < 5; c++) {
-            double f = 300 + r.nextDouble() * 400, period = 0.6 + r.nextDouble() * 1.4, rate = 25 + r.nextDouble() * 35;
-            double gain = 0.2 + 0.8 * Math.pow(r.nextDouble(), 2);
-            for (double t = r.nextDouble() * period; t < seconds; t += period * (0.8 + r.nextDouble() * 0.5)) {
-                double length = 0.12 + r.nextDouble() * 0.2;
-                float[] croak = new float[samples(length)];
-                for (int k = 0; k < length * rate; k++) mix(croak, mode(f * (1 + 0.1 * k / (length * rate)), 0.006, 0.03), samples(k / rate), 1);
-                shape(croak, x -> Math.sin(Math.PI * Math.min(1, x / length)));
-                mixWrapped(s, croak, samples(t), gain);
+        for (int c = 0; c < 4; c++) {
+            double f = 380 + r.nextDouble() * 250, period = 1.2 + r.nextDouble() * 1.8, rate = 70 + r.nextDouble() * 40;
+            double gain = 0.25 + 0.75 * Math.pow(r.nextDouble(), 2);
+            for (double t = r.nextDouble() * period; t < seconds; t += period * (0.7 + r.nextDouble() * 0.6)) {
+                int syllables = 1 + r.nextInt(2);
+                for (int y = 0; y < syllables; y++) {
+                    double length = y == 0 ? 0.09 + r.nextDouble() * 0.05 : 0.05;
+                    float[] croak = new float[samples(length + 0.02)];
+                    for (int k = 0; k < length * rate; k++) {
+                        double drop = 1 - 0.12 * k / (length * rate);
+                        mix(croak, mode(f * drop, 0.004, 0.02), samples(k / rate), 1);
+                        mix(croak, mode(f * 2.7 * drop, 0.002, 0.012), samples(k / rate), 0.5);
+                    }
+                    shape(croak, x -> Math.sin(Math.PI * Math.min(1, x / (length + 0.02))));
+                    float[] voice = gain < 0.5 ? lowpass(croak, 1200) : croak;
+                    mixWrapped(s, voice, samples(t + y * 0.16), gain);
+                }
             }
         }
         return level(loop(clean(s), len), AMBIENT_QUIET);

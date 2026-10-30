@@ -346,6 +346,12 @@ final class SoundEngine {
         play("step_" + name(m), x, y, z, m == Synth.Material.WATER ? 0.35f : 0.4f, 0.93f + random.nextFloat() * 0.14f, 16);
     }
 
+    /** Landing after a fall: the step of the ground, heavier and lower the harder the landing (speed in blocks/s). */
+    void land(Synth.Material m, double x, double y, double z, double speed) {
+        float k = (float) Math.min(1, (speed - 4) / 10);
+        play("step_" + name(m), x, y, z, 0.5f + 0.4f * k, 0.8f - 0.15f * k + random.nextFloat() * 0.05f, 20);
+    }
+
     void hit(Synth.Material m, double x, double y, double z) {
         play("hit_" + name(m), x, y, z, 0.5f, 0.9f + random.nextFloat() * 0.2f, 20);
     }

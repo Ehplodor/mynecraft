@@ -402,7 +402,7 @@ public final class Main {
         }
         pauseMenu.volume = Math.max(0, Math.min(100, Integer.parseInt(options.getProperty("volume", "60").trim())));
         sound.setVolume(pauseMenu.volume / 100f);
-        double stepDistance = 0, lastStepX = player.x, lastStepZ = player.z, waterScanAt = -1;
+        double stepDistance = 0, lastStepX = player.x, lastStepZ = player.z, waterScanAt = -1, fallSpeed = 0;
         SoundEngine.Ambience ambience = new SoundEngine.Ambience();
         double nextHitSound = 0;
         short lastFluid = Blocks.FLUID_NONE;
@@ -607,6 +607,15 @@ public final class Main {
                 accumulator -= PHYSICS_STEP;
             }
             cam.pos.set(player.x, player.y + Player.EYE_HEIGHT, player.z);
+            // Landing: a heavier step when the ground stops a fall.
+            if (!player.onGround) fallSpeed = Math.max(fallSpeed, -player.vy);
+            else {
+                if (fallSpeed > 5 && player.fluid == Blocks.FLUID_NONE && !player.flying) {
+                    short ground = world.get((int) Math.floor(player.x), (int) Math.floor(player.y - 0.2), (int) Math.floor(player.z));
+                    sound.land(material(ground), player.x, player.y, player.z, fallSpeed);
+                }
+                fallSpeed = 0;
+            }
             // Footsteps: one every 1.7 blocks walked on the ground (a splash in water), by material.
             double walked = Math.hypot(player.x - lastStepX, player.z - lastStepZ);
             lastStepX = player.x;
