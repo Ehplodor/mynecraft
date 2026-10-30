@@ -14,6 +14,7 @@ in vec3 vPos;
 flat in float vWater;
 
 uniform sampler2DArray uTextures;
+uniform mat4 uViewProj;        // camera at the origin: where a direction falls on the screen
 uniform vec3 uFogColor;
 uniform float uFogEnd;
 uniform sampler2DShadow uShadowMap;
@@ -110,11 +111,26 @@ void main() {
             float glint = pow(max(dot(r, uSunDir), 0.0), 220.0) * 4.0 * sun * uShadowStrength;
             rgb = mix(body, skyRef, clamp(fresnel * 0.9, 0.0, 0.9)) + vec3(glint);
         } else {
-            // From below: the world above shows through a round window (refraction up to the
-            // critical angle); outside it the surface mirrors the dim water (total reflection).
-            float window = smoothstep(0.6, 0.7, -v.y + (n.x + n.z) * 0.5);
-            vec3 sky = texture(uSceneColor, suv + n.xz * 0.06).rgb;
-            rgb = mix(vTint * 0.3 * lit, sky * 0.9 + vTint * 0.1, window);
+            // From below (Snell's law, water 1.33 to air): the ray bends away from the normal, so
+            // the whole sky and shore are squeezed into a cone of ~97°. What the bent ray meets is
+            // looked up in the picture drawn so far (sky colour where it leaves the screen);
+            // beyond the critical angle the surface is a mirror of the dim water (total reflection),
+            // and approaching it more and more light is reflected (Fresnel).
+            vec3 mirror = vTint * 0.3 * lit;
+            vec3 t = refract(-v, -n, 1.333);
+            if (dot(t, t) < 1e-4) {
+                rgb = mirror;
+            } else {
+                vec4 c = uViewProj * vec4(t * 64.0, 1.0);
+                vec2 s = c.xy / max(c.w, 1e-4) * 0.5 + 0.5;
+                vec3 skyCol = mix(uFogColor, uSkyColor, clamp(t.y * 2.0, 0.0, 1.0));
+                float onScreen = c.w > 0.0 ? smoothstep(0.0, 0.04, min(min(s.x, 1.0 - s.x), min(s.y, 1.0 - s.y))) : 0.0;
+                vec3 above = mix(skyCol, texture(uSceneColor, clamp(s, vec2(0.001), vec2(0.999))).rgb, onScreen);
+                float cosi = clamp(v.y * -1.0, 0.0, 1.0), cost = clamp(t.y, 0.0, 1.0);
+                float rs = (1.333 * cosi - cost) / (1.333 * cosi + cost), rp = (cosi - 1.333 * cost) / (cosi + 1.333 * cost);
+                float reflectance = clamp(0.5 * (rs * rs + rp * rp), 0.0, 1.0);
+                rgb = mix(above, mirror, reflectance);
+            }
         }
         alpha = 1.0;
     }

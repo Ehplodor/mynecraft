@@ -378,6 +378,8 @@ final class WorldRenderer {
 
     /** Animals, drawn with the opaque world (before the water samples it) and into the shadow map. */
     CreatureRenderer creatures;
+    /** Drawn after the opaque world and before the water (the weather, when the eye is under water). */
+    Runnable beforeWater;
 
     void render(Camera cam, float aspect, float far, float[] fog) {
         drainUploads(4_000_000L);
@@ -438,6 +440,10 @@ final class WorldRenderer {
         pass(cutoutProgram, false, 1, fog, far, camCx, camCz, offX, offY, offZ);
         if (creatures != null) {
             creatures.draw(this, matrixBuf, false, fog);
+            glBindVertexArray(vao);
+        }
+        if (beforeWater != null) { // under water, the sky (clouds) must be in what the water samples
+            beforeWater.run();
             glBindVertexArray(vao);
         }
         // The water samples the opaque world drawn so far (refraction, depth under the surface).
