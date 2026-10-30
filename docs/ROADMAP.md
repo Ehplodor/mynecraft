@@ -461,6 +461,7 @@ l'élevage, plantes tinctoriales pour l'art…), les recettes du pack de donnée
 ## Phase 1 — Fondations
 
 ### M25 — Socle technique
+Fait : CI (tests + captures sous Xvfb, galerie en artefact), ids de bloc 16 bits (palette locale dans le mailleur), `Registry`, registre d'objets (objets-blocs + bâton, silex, charbon, pomme ; recette du bâton). Reste : migration des blocs vers `Registry` avec constructeur, objets en JSON, comparaison d'images automatique, sprites d'objets.
 - CI GitHub Actions : compilation et tests à chaque PR
 - Lever le plafond de 127 états de bloc (identifiants 16 bits ou palette par section)
 - **Registre d'objets séparé des blocs** (outils, nourriture, matériaux, objets d'art)

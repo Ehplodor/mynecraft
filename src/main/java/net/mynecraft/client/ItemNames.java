@@ -14,13 +14,14 @@ import java.text.Normalizer;
  * ("oak_planks" gives "Oak planks"). Also a folded form for searching (no case, no accents).
  */
 final class ItemNames {
-    private final String[] names = new String[Blocks.COUNT];
-    private final String[] folded = new String[Blocks.COUNT];
+    private final String[] names = new String[net.mynecraft.world.Items.COUNT];
+    private final String[] folded = new String[net.mynecraft.world.Items.COUNT];
 
     ItemNames(ResourceManager resources) {
         JsonObject lang = load(resources, "fr_fr"), english = load(resources, "en_us");
-        for (int i = 0; i < Blocks.COUNT; i++) {
-            String id = Blocks.NAMES[i], key = "block.minecraft." + id, name = null;
+        for (int i = 0; i < names.length; i++) {
+            String id = net.mynecraft.world.Items.name((short) i);
+            String key = (i < Blocks.COUNT ? "block.minecraft." : "item.minecraft.") + id, name = null;
             if (lang != null && lang.has(key)) name = lang.get(key).getAsString();
             else if (english != null && english.has(key)) name = english.get(key).getAsString();
             if (name == null) {

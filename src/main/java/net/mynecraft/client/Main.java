@@ -684,7 +684,7 @@ public final class Main {
                 menu = new CraftingMenu(inventory, recipes, 3); // like vanilla: sneak to place against it instead
                 screenOpen = true;
                 input.capture(false);
-            } else if (hit != null && input.placeRequested && input.selected != Blocks.AIR) {
+            } else if (hit != null && input.placeRequested && net.mynecraft.world.Items.isBlock(input.selected)) {
                 double dirX = -Math.sin(cam.yaw) * cp, dirY = Math.sin(cam.pitch), dirZ = -Math.cos(cam.yaw) * cp;
                 int[] placed = Placement.place(world, player, hit, hitHeight(hit, cam.pos.x, cam.pos.y, cam.pos.z, dirX, dirY, dirZ), input.selected);
                 if (placed != null) {
@@ -915,7 +915,7 @@ public final class Main {
                 frameMillis = (now - fpsTimer) / 1e6 / Math.max(1, frames);
                 glfwSetWindowTitle(window, String.format("Mynecraft | %d FPS | %d/%d sections | %d quads | chargement %d | %s%s | %.1f %.1f %.1f",
                     frames, renderer.drawnSections, renderer.meshCount(), renderer.totalQuads, streamer.loadingCount(),
-                    Blocks.NAMES[input.selected], player.flying ? " | vol" : "", player.x, player.y, player.z));
+                    net.mynecraft.world.Items.name(input.selected), player.flying ? " | vol" : "", player.x, player.y, player.z));
                 frames = 0;
                 fpsTimer = now;
             }

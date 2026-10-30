@@ -119,7 +119,7 @@ final class InventoryScreen {
             short id = menu != null ? menu.id(hover) : hover >= Inventory.SIZE ? palette[hover - Inventory.SIZE]
                 : hover < Inventory.HOTBAR ? creativeHotbar[hover] : Blocks.AIR;
             if (id != Blocks.AIR && (menu == null || menu.cursorCount == 0)) {
-                hud.text(names != null ? names.name(id) : Blocks.NAMES[id], (float) mx + 10 * s, (float) my - 12 * s, 1, 1, 0.6f);
+                hud.text(names != null ? names.name(id) : net.mynecraft.world.Items.name(id), (float) mx + 10 * s, (float) my - 12 * s, 1, 1, 0.6f);
             }
         }
     }

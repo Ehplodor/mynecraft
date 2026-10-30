@@ -342,7 +342,7 @@ public final class ChunkMesher {
             nib[c] = corner[ox + 2 * oz] - 1;
         }
         int l0 = (int) light & 0xFFF, l1 = (int) (light >> 12) & 0xFFF, l2 = (int) (light >> 24) & 0xFFF, l3 = (int) (light >>> 36) & 0xFFF;
-        int info = faceInfo[(b & 0xFF) * 6 + face];
+        int info = faceInfo[(b & 0xFFFF) * 6 + face];
         put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], face, 0, 0, SPECIAL_FLUID_CORNERS, false, info,
             l0 | l1 << 12 | (nib[2] | nib[3] << 4) << 24, l2 | l3 << 12 | (nib[0] | nib[1] << 4) << 24);
     }
@@ -417,7 +417,7 @@ public final class ChunkMesher {
                     short b = padded[idx];
                     if (Blocks.SHAPE[b & 0xFFFF] != Blocks.SHAPE_CROSS) continue;
                     int[] light = flatLight(paddedLight[idx] & 0xFF);
-                    int info = faceInfo[(b & 0xFF) * 6 + 4];
+                    int info = faceInfo[(b & 0xFFFF) * 6 + 4];
                     for (int diagonal = 0; diagonal < 2; diagonal++)
                         for (int back = 0; back < 2; back++)
                             put(Blocks.LAYER[b], x, y, z, CROSS_FACE, diagonal, back, SPECIAL_NONE, false, info, light[0], light[1]);
@@ -448,7 +448,7 @@ public final class ChunkMesher {
                         int[] p = {x, y, z};
                         if (positive) p[d]++;
                         put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], f, 0, 0, top ? SPECIAL_SLAB_TOP : SPECIAL_SLAB_BOTTOM,
-                            false, faceInfo[(b & 0xFF) * 6 + f], light[0], light[1]);
+                            false, faceInfo[(b & 0xFFFF) * 6 + f], light[0], light[1]);
                     }
                 }
     }

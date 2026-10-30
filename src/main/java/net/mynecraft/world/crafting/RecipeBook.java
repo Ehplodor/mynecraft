@@ -103,11 +103,9 @@ public final class RecipeBook {
         return id.indexOf(':') < 0 ? "minecraft:" + id : id;
     }
 
-    /** Block for an item id, or -1 if the item is not a block here. */
+    /** Item for an item id, or -1 if the item is unknown here. */
     private static short block(String id) {
-        String n = normalize(id);
-        if (!n.startsWith("minecraft:")) return -1;
-        return Blocks.fromState(n.substring(10), Map.of());
+        return net.mynecraft.world.Items.fromName(normalize(id));
     }
 
     // ---- recipes ----
@@ -122,7 +120,7 @@ public final class RecipeBook {
                 : (result.has("id") ? result.get("id") : result.get("item")).getAsString();
             int count = result != null && result.has("count") ? result.get("count").getAsInt() : 1;
             short out = block(resultId);
-            if (out <= 0) { warnings.add(id + ": result " + resultId + " is not a block"); return; }
+            if (out <= 0) { warnings.add(id + ": result " + resultId + " is not a known item"); return; }
             if (type.endsWith("shaped")) {
                 JsonArray pattern = r.getAsJsonArray("pattern");
                 int h = pattern.size(), w = 0;

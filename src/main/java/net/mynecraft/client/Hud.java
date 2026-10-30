@@ -191,7 +191,7 @@ final class Hud {
             float x = x0 + i * (slot + gap);
             if (i == selected) rect(x - scale, y0 - scale, slot + 2 * scale, slot + 2 * scale, 1, 1, 1, 0.9f);
             rect(x, y0, slot, slot, 0, 0, 0, 0.55f);
-            if (slots[i] != Blocks.AIR) icon(slots[i], x + slot / 2, y0 + slot / 2, slot * 0.8f);
+            if (slots[i] != Blocks.AIR) item(slots[i], x + slot / 2, y0 + slot / 2, slot * 0.8f);
             if (counts != null && counts[i] > 1) {
                 String n = Integer.toString(counts[i]);
                 text(n, x + slot - textWidth(n) - scale, y0 + slot - 8 * scale, 1, 1, 1);
@@ -258,7 +258,12 @@ final class Hud {
 
     /** Block icon centred on (cx, cy), {@code size} pixels wide. */
     void item(short block, float cx, float cy, float size) {
-        if (block != Blocks.AIR) icon(block, cx, cy, size);
+        if (net.mynecraft.world.Items.isBlock(block)) icon(block, cx, cy, size);
+        else if (block != Blocks.AIR) { // pure item: a flat token with its initial until item sprites land
+            rect(cx - size * 0.35f, cy - size * 0.35f, size * 0.7f, size * 0.7f, 0.55f, 0.42f, 0.25f, 1);
+            String t = net.mynecraft.world.Items.name(block).substring(0, 1).toUpperCase();
+            text(t, cx - textWidth(t) / 2, cy - 4 * scale, 1, 1, 1);
+        }
     }
 
     /** Stack count in the bottom-right corner of a slot (hidden for single items). */
@@ -287,7 +292,7 @@ final class Hud {
      */
     private void face(short block, int f, float shade, float ax, float ay, float bx, float by, float cx, float cy,
                       float dx, float dy, float v0) {
-        int info = faceInfo[(block & 0xFF) * 6 + f];
+        int info = faceInfo[(block & 0xFFFF) * 6 + f];
         float layer = info & BlockAppearance.LAYER_MASK;
         float[] tint = TINT[(info >> BlockAppearance.TINT_SHIFT) & 3];
         if ((info & BlockAppearance.OVERLAY_BIT) != 0) tint = TINT[0]; // base of an overlay face is untinted
