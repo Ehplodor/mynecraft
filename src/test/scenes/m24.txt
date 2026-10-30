@@ -1,0 +1,6 @@
+# One scripted shot per line: name, then game options (a fresh world per shot, same seed).
+spring  --seed 7 --season printemps --time 6000 --view 30,-15
+summer  --seed 7 --season ete --time 6000 --view 30,-15
+autumn  --seed 7 --season automne --time 6000 --view 30,-15
+winter  --seed 7 --season hiver --time 6000 --view 30,-15
+notebook-summer --seed 7 --season ete --time 6000 --view 30,-15 --notebook
