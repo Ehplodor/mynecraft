@@ -240,7 +240,7 @@ public final class ChunkMesher {
                     int idx = pIndex(pos[0], pos[1], pos[2]);
                     short b = padded[idx];
                     long key = 0;
-                    if (Blocks.SHAPE[b & 0xFFFF] == Blocks.SHAPE_CUBE
+                    if (Blocks.SHAPE[b & 0xFFFF] == Blocks.SHAPE_CUBE && !(step == up && underCover(b, padded[idx + up]))
                         && (Blocks.faceVisible(b, padded[idx + step]) || fluidStep(b, idx, idx + step, d, up))) {
                         int f = idx + step;
                         // Corners in quad order (u0,v0), (u1,v0), (u1,v1), (u0,v1).
@@ -357,10 +357,16 @@ public final class ChunkMesher {
         return surface(idx, up) > surface(n, up);
     }
 
-    /** Height of a fluid cell's surface in sixteenths: full when the same fluid continues above. */
+    /** Height of a fluid cell's surface in sixteenths: full when the same fluid or a cover (ice) is above. */
     private int surface(int i, int up) {
         short b = padded[i];
-        return Blocks.FLUID[padded[i + up] & 0xFF] == Blocks.FLUID[b & 0xFFFF] ? 16 : Blocks.fluidHeight(b);
+        return Blocks.FLUID[padded[i + up] & 0xFF] == Blocks.FLUID[b & 0xFFFF] || underCover(b, padded[i + up])
+            ? 16 : Blocks.fluidHeight(b);
+    }
+
+    /** A fluid under a full solid block (ice on a pond) fills its cell and has no surface of its own. */
+    private static boolean underCover(short b, short above) {
+        return Blocks.isFluid(b) && Blocks.SHAPE[above & 0xFFFF] == Blocks.SHAPE_CUBE && Blocks.isSolid(above);
     }
 
     private void emitQuad(int d, int u, int v, int plane, int i, int j, int w, int h,
