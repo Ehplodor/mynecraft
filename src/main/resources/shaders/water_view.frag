@@ -64,9 +64,7 @@ void main() {
     float edge = uLens.x + uLens.y * ndc.y - (uSurface + wave); // < 0: this part of the view is under water
     bool under = edge < 0.0;
     vec2 uv = vUv;
-    if (under) {
-        uv += vec2(noise(vUv * 6.0 + uTime * 0.4) - 0.5, noise(vUv * 6.0 - uTime * 0.35 + 7.0) - 0.5) * 0.004;
-    } else if (uWet > 0.0) {
+    if (!under && uWet > 0.0) {
         vec3 d = drop(vUv);
         if (d.z > 0.0) uv -= d.xy * 0.06 * uWet * (1.0 - length(d.xy) / d.z); // a drop is a small lens
     }

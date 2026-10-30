@@ -455,11 +455,11 @@ final class WorldRenderer {
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        // From under water the surface is seen from below: both sides drawn. No depth written (ice
-        // and water faces meet in the same planes and would fight): the water view finds the
-        // surface's distance itself.
+        // From under water the surface is seen from below: both sides drawn (the shader keeps only
+        // the water's backs). Depth is written there, so that a far surface drawn after nearer ice
+        // does not cover it (nothing coplanar is left: water under ice has no surface).
         if (underwater) glDisable(GL_CULL_FACE);
-        glDepthMask(false);
+        glDepthMask(underwater);
         pass(translucentProgram, true, 2, fog, far, camCx, camCz, offX, offY, offZ);
         glDepthMask(true);
         glEnable(GL_CULL_FACE);
