@@ -65,7 +65,7 @@ final class WorldRenderer {
     private static final class Program {
         final Shader shader;
         final int uViewProj, uCamChunk, uCamOffset, uFogColor, uFogEnd, uDaylight, uMinLight, uTime,
-            uShadowVP, uSunDir, uShadowStrength, uSkyColor, uCamWorld, uScreen, uDepthRange;
+            uShadowVP, uSunDir, uShadowStrength, uSkyColor, uCamWorld, uScreen, uDepthRange, uHideWater;
         Program(String defines) {
             shader = new Shader("/shaders/chunk.vert", "/shaders/chunk.frag", defines);
             uViewProj = shader.uniform("uViewProj");
@@ -85,6 +85,7 @@ final class WorldRenderer {
             uCamWorld = shader.uniform("uCamWorld");
             uScreen = shader.uniform("uScreen");
             uDepthRange = shader.uniform("uDepthRange");
+            uHideWater = shader.uniform("uHideWater");
             glUseProgram(shader.program);
             glUniform1i(shader.uniform("uTextures"), 0);
             glUniform1i(shader.uniform("uBiome"), 1);
@@ -108,6 +109,8 @@ final class WorldRenderer {
     /** Sun shadows on (the shadow pass costs a second drawing of the nearby terrain). */
     boolean shadows = true;
     float far = 200;
+    boolean underwater; // the eye is under the water surface
+    boolean hideWater;  // the eye at the waterline: the water view draws the water itself
     private final int quadTexture; // GL_TEXTURE_BUFFER view (RGBA32UI) of the shared buffer
     private final int ebo;
     private final HashMap<Long, Mesh> meshes = new HashMap<>();
@@ -446,9 +449,13 @@ final class WorldRenderer {
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(false);
+        // From under water the surface is seen from below (both sides drawn) and keeps its depth,
+        // so that the water view swallows it with its distance like the rest.
+        if (underwater) glDisable(GL_CULL_FACE);
+        glDepthMask(underwater);
         pass(translucentProgram, true, 2, fog, far, camCx, camCz, offX, offY, offZ);
         glDepthMask(true);
+        glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
         glBindVertexArray(0);
     }
@@ -548,6 +555,7 @@ final class WorldRenderer {
         glUniform2f(p.uCamWorld, (float) (camWorldX % 1024.0), (float) (camWorldZ % 1024.0));
         glUniform2f(p.uScreen, scene.width(), scene.height());
         glUniform2f(p.uDepthRange, 0.05f, this.far);
+        glUniform1f(p.uHideWater, hideWater ? 1 : 0);
         glMultiDrawElementsBaseVertex(GL_TRIANGLES, drawCounts, GL_UNSIGNED_INT, drawOffsets, drawBase);
     }
 

@@ -242,6 +242,7 @@ public final class Main {
         double lifeWait = Double.parseDouble(option(argv.toArray(new String[0]), "--life-seconds", showcase ? "2" : "0")), lifeClock = 0;
         Creature aimed = null;
         Overlay overlay = new Overlay();
+        WaterView waterView = new WaterView();
         FontLoader font = FontLoader.load(resources);
         if (font == null) System.err.println("[resources] no bitmap font in font/default.json: text disabled");
         Hud hud = new Hud(appearance.faceInfo, font, resources);
@@ -331,9 +332,9 @@ public final class Main {
             String[] xyz = pos.split(",");
             player.x = Double.parseDouble(xyz[0]);
             player.z = Double.parseDouble(xyz[2]);
-            if (xyz[1].equals("~")) { // on the ground (or the water) there
+            if (xyz[1].startsWith("~")) { // on the ground (or the water) there, or "~-3": that far under its top
                 var col = world.generator.column((int) Math.floor(player.x), (int) Math.floor(player.z));
-                player.y = Math.max(col.height(), col.water()) + 1.2;
+                player.y = Math.max(col.height(), col.water()) + (xyz[1].length() > 1 ? Double.parseDouble(xyz[1].substring(1)) : 1.2);
             } else player.y = Double.parseDouble(xyz[1]);
             player.flying = true;
         }
@@ -749,7 +750,10 @@ public final class Main {
             renderer.skyColor[0] = sky[0] * 0.7f;
             renderer.skyColor[1] = sky[1] * 0.82f;
             renderer.skyColor[2] = Math.min(1, sky[2] * 1.02f);
-            glClearColor(sky[0], sky[1], sky[2], 1);
+            waterView.update(world, cam.pos.x, cam.pos.y, cam.pos.z, renderer.daylight, dt);
+            renderer.underwater = waterView.sceneUnder();
+            renderer.hideWater = waterView.lift() > 0;
+            glClearColor(sky[0], sky[1], sky[2], 1); // under water too: the sky shows through the surface
 
             glfwGetFramebufferSize(window, fbW, fbH);
             if (stats != null) stats.beginGpu();
@@ -758,6 +762,8 @@ public final class Main {
             glViewport(0, 0, fbW[0], fbH[0]);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             float aspect = fbW[0] / (float) Math.max(1, fbH[0]);
+            double lift = waterView.lift(); // at the waterline the world is drawn from just over it
+            cam.pos.y += lift;
             cam.viewProj(skyViewProj, aspect, far);
             skyRenderer.drawCelestial(skyViewProj, ticks);
             if (debug) gpuTimer.begin();
@@ -765,6 +771,7 @@ public final class Main {
             renderer.render(cam, aspect, far, sky);
             weatherRenderer.draw(skyViewProj, weather, world, cam.pos.x, cam.pos.y, cam.pos.z, weatherClock,
                 renderer.daylight, far, timeFrozen);
+            cam.pos.y -= lift;
             if (hit != null) {
                 short target = world.get(hit.x(), hit.y(), hit.z());
                 float lo = Blocks.isSlab(target) ? Blocks.BOX_MIN[target & 0xFFFF] / 16f : 0;
@@ -775,7 +782,10 @@ public final class Main {
             }
             overlay.crosshair(fbW[0], fbH[0]);
             if (debug) gpuTimer.end();
-            renderer.scene.present();
+            if (waterView.active()) {
+                renderer.scene.unbind();
+                waterView.draw(renderer.scene, renderer.viewProj(), cam, far, renderer.daylight, weatherClock);
+            } else renderer.scene.present();
             hud.begin(fbW[0], fbH[0]);
             float hotbarTop = creative ? hud.hotbar(input.hotbar, null, input.slot)
                 : hud.hotbar(java.util.Arrays.copyOf(inventory.ids, Inventory.HOTBAR),
@@ -945,6 +955,7 @@ public final class Main {
         }
         streamer.close();
         overlay.dispose();
+        waterView.dispose();
         hud.dispose();
         gpuTimer.dispose();
         skyRenderer.dispose();

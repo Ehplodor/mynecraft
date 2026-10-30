@@ -59,6 +59,10 @@ final class SceneTarget {
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     }
 
+    int color() { return color; }
+
+    int depth() { return depth; }
+
     int copyColor() { return copyColor; }
 
     int copyDepth() { return copyDepth; }
@@ -72,6 +76,11 @@ final class SceneTarget {
         glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    /** Draws from now on in the window, where a pass sampling color() and depth() puts the picture. */
+    void unbind() {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
