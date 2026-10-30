@@ -46,33 +46,74 @@ final class HelpScreen {
             {"F4", "créatif / survie"}},
     };
 
+    /**
+     * Fits any window: tries every column count, keeps the one that allows the largest text, and
+     * shrinks the GUI scale below its usual value when even that does not fit (whole pixels when it can).
+     */
     void draw(Hud hud) {
-        float s = hud.scale, line = hud.lineHeight() + s;
-        float keyW = 0, actW = 0;
-        int rows = 0;
-        for (String[][] sec : SECTIONS)
-            for (int i = 1; i < sec.length; i++) {
-                keyW = Math.max(keyW, hud.textWidth(sec[i][0]));
-                actW = Math.max(actW, hud.textWidth(sec[i][1]));
+        float saved = hud.scale;
+        try {
+            hud.scale = 1; // measure in font pixels
+            float line = hud.lineHeight() + 1, keyW = 0, actW = 0, total = 0;
+            float[] secH = new float[SECTIONS.length];
+            for (int k = 0; k < SECTIONS.length; k++) {
+                for (int i = 1; i < SECTIONS[k].length; i++) {
+                    keyW = Math.max(keyW, hud.textWidth(SECTIONS[k][i][0]));
+                    actW = Math.max(actW, hud.textWidth(SECTIONS[k][i][1]));
+                }
+                total += secH[k] = (SECTIONS[k].length + 0.5f) * line;
             }
-        // Two columns when they fit, else one long one.
-        float colW = keyW + 8 * s + actW;
-        int cols = 2 * colW + 24 * s <= hud.width() ? 2 : 1;
-        int[] colRows = new int[cols];
-        int[] colOf = new int[SECTIONS.length];
-        int total = 0;
-        for (String[][] sec : SECTIONS) total += sec.length + 1;
-        for (int k = 0, c = 0; k < SECTIONS.length; k++) { // fill the first column up to about half
-            if (cols == 2 && c == 0 && colRows[0] > 0 && colRows[0] + SECTIONS[k].length > (total + 1) / 2) c = 1;
-            colOf[k] = c;
-            colRows[c] += SECTIONS[k].length + 1;
+            float colW = keyW + 8 + actW, titleW = hud.textWidth(TITLE);
+            int bestCols = 1;
+            float best = -1;
+            int[] colOf = new int[SECTIONS.length], bestOf = null;
+            for (int n = 1; n <= SECTIONS.length; n++) {
+                float colH = columns(secH, total / n, n, colOf);
+                float w = Math.max(titleW, n * colW + (n - 1) * 16) + 16, h = colH + 2.5f * line + 12;
+                float fit = Math.min(hud.width() / w, hud.height() / h);
+                if (fit > best * 1.001f) {
+                    best = fit;
+                    bestCols = n;
+                    bestOf = colOf.clone();
+                }
+            }
+            float s = Math.min(saved, best);
+            hud.scale = s >= 1 ? (float) Math.floor(s) : s;
+            draw(hud, bestCols, bestOf, keyW, colW);
+        } finally {
+            hud.scale = saved;
         }
-        for (int r : colRows) rows = Math.max(rows, r);
-        float w = cols * colW + (cols - 1) * 16 * s, h = (rows + 2) * line;
-        float x0 = (hud.width() - w) / 2, y0 = Math.max(4 * s, (hud.height() - h) / 2);
-        hud.rect(x0 - 8 * s, y0 - 6 * s, w + 16 * s, h + 12 * s, 0.04f, 0.05f, 0.07f, 0.85f);
-        hud.textCentered("Aide - touches et raccourcis", hud.width() / 2f, y0, 1, 0.95f, 0.7f);
+    }
+
+    /** Puts the sections in order into at most {@code n} columns of about {@code target} high; returns the tallest. */
+    private static float columns(float[] secH, float target, int n, int[] colOf) {
+        float tallest = 0, h = 0;
+        for (int k = 0, c = 0; k < secH.length; k++) {
+            if (h > 0 && c < n - 1 && h + secH[k] / 2 > target) {
+                c++;
+                h = 0;
+            }
+            colOf[k] = c;
+            tallest = Math.max(tallest, h += secH[k]);
+        }
+        return tallest;
+    }
+
+    private static final String TITLE = "Aide - touches et raccourcis";
+
+    private void draw(Hud hud, int cols, int[] colOf, float keyW, float colW) {
+        float s = hud.scale, line = hud.lineHeight() + s;
+        keyW *= s;
+        colW *= s;
         float[] y = new float[cols];
+        float rows = 0;
+        for (int k = 0; k < SECTIONS.length; k++) y[colOf[k]] += (SECTIONS[k].length + 0.5f) * line;
+        for (float v : y) rows = Math.max(rows, v);
+        float w = cols * colW + (cols - 1) * 16 * s, h = rows + 2.5f * line;
+        float x0 = (hud.width() - w) / 2, y0 = (hud.height() - h) / 2;
+        float bw = Math.max(w, hud.textWidth(TITLE));
+        hud.rect((hud.width() - bw) / 2 - 8 * s, y0 - 6 * s, bw + 16 * s, h + 12 * s, 0.04f, 0.05f, 0.07f, 0.85f);
+        hud.textCentered(TITLE, hud.width() / 2f, y0, 1, 0.95f, 0.7f);
         java.util.Arrays.fill(y, y0 + line * 1.5f);
         for (int k = 0; k < SECTIONS.length; k++) {
             int c = colOf[k];
