@@ -74,7 +74,7 @@ void main() {
     vec3 col = texture(uColor, uv).rgb;
     if (under) {
         if (uSplash > 0.0) { // just in: out of focus, clearing
-            float r = 0.012 * uSplash;
+            float r = 0.005 * uSplash;
             vec3 sum = col;
             for (int i = 0; i < 8; i++) {
                 float a = float(i) * 0.785 + 0.4;
@@ -86,6 +86,7 @@ void main() {
         vec3 pos = viewRay(uv, depth);
         vec3 dir = normalize(viewRay(uv, 1.0));
         float dist = depth >= 1.0 ? 1e4 : length(pos);
+        if (dir.y > 0.0) dist = min(dist, max(0.0, uSurface) / dir.y); // light only crosses water up to the surface
         if (depth < 1.0) { // caustics on what faces the light, fading with depth under the surface
             vec3 n = normalize(cross(dFdx(pos), dFdy(pos)));
             if (dot(n, dir) > 0.0) n = -n; // facing the eye
@@ -105,16 +106,20 @@ void main() {
         if (uDaylight > 0.05) {
             vec3 l = normalize(vec3(uSunDir.x * 0.6, max(uSunDir.y, 0.2) + 0.6, uSunDir.z * 0.6));
             vec3 bu = normalize(cross(l, vec3(0.0, 0.0, 1.0))), bv = cross(l, bu);
-            float reach = min(dist, 14.0);
-            for (int i = 0; i < 6; i++) {
-                vec3 p = dir * reach * (float(i) + 0.5) / 6.0;
+            // Broad columns (a few blocks across) sampled finely enough that moving does not make
+            // them swim; none right at the eye, where a single column would flood the view.
+            float reach = min(dist, 16.0);
+            for (int i = 0; i < 10; i++) {
+                float z = 1.5 + (reach - 1.5) * (float(i) + 0.5) / 10.0;
+                if (z > reach) break;
+                vec3 p = dir * z;
                 vec3 w = p + vec3(uCamWorld.x, 0.0, uCamWorld.z);
-                float n = noise(vec2(dot(w, bu), dot(w, bv)) * 0.9 + vec2(uTime * 0.15, uTime * 0.05));
-                shafts += smoothstep(0.55, 0.9, n) * exp(-max(0.0, uSurface - p.y) * 0.08);
+                float n = noise(vec2(dot(w, bu), dot(w, bv)) * 0.22 + vec2(uTime * 0.03, uTime * 0.012));
+                shafts += smoothstep(0.5, 0.85, n) * exp(-max(0.0, uSurface - p.y) * 0.08);
             }
-            shafts *= reach / 14.0 / 6.0 * uDaylight * smoothstep(0.0, 0.3, uSunDir.y);
+            shafts *= max(0.0, reach - 1.5) / 14.5 / 10.0 * uDaylight * smoothstep(0.0, 0.3, uSunDir.y);
         }
-        scatter += uWaterColor * shafts * 2.0;
+        scatter += uWaterColor * shafts * 4.5;
         vec3 keep = exp(-vec3(0.17, 0.07, 0.055) * dist * (1.0 + 0.6 * uSplash));
         col = col * keep + scatter * (1.0 - keep);
         // Specks drifting in the water, a few layers in front of the eye.
@@ -128,7 +133,7 @@ void main() {
             float d = length(p - c);
             col += uWaterColor * 1.6 * smoothstep(0.035, 0.0, d) * step(0.85, h) * exp(-z * 0.15);
         }
-        col = mix(col, scatter * 1.3, 0.35 * uSplash * uSplash); // stirred, cloudy water at first
+        col = mix(col, scatter * 1.3, 0.2 * uSplash * uSplash); // stirred, cloudy water at first
         col *= 1.0 - 0.18 * dot(ndc, ndc);
     }
     // The waterline itself: a thin dark meniscus.

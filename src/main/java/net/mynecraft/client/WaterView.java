@@ -70,7 +70,7 @@ final class WaterView {
         surface = surfaceOver(world, x, y, z);
         if (under() && !was) splash = 1;
         if (!under() && was) wet = 1;
-        splash = heldSplash >= 0 ? heldSplash : Math.max(0, splash - (float) dt / 1.2f);
+        splash = heldSplash >= 0 ? heldSplash : Math.max(0, splash - (float) dt / 0.5f);
         wet = Math.max(0, wet - (float) dt / 3.5f);
         int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
         float sky = (world.getLight(bx, by, bz) >> 4) / 15f;
