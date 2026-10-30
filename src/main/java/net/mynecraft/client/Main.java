@@ -159,7 +159,8 @@ public final class Main {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
-        long window = glfwCreateWindow(1280, 720, "Mynecraft", 0, 0);
+        String[] size = option(args, "--window", "1280x720").split("x"); // e.g. --window 800x450 for small-window shots
+        long window = glfwCreateWindow(Integer.parseInt(size[0]), Integer.parseInt(size[1]), "Mynecraft", 0, 0);
         if (window == 0) throw new IllegalStateException("Window creation failed");
         glfwMakeContextCurrent(window);
         glfwSwapInterval(vsync ? 1 : 0);
