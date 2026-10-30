@@ -32,6 +32,8 @@ public final class Creature {
     public float health;
     /** Coat colour (0xRRGGBB) and adult size, chosen at birth; scale = size while growing up. */
     public int coat;
+    /** The block column last trodden (for tracks in the snow). */
+    long trod = Long.MIN_VALUE;
     public float scale = 1, size = 1;
     /** Walk cycle (radians, advances with distance) and a running clock for idle motion. */
     public float gait, clock;

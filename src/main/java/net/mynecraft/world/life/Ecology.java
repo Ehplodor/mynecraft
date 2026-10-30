@@ -237,24 +237,30 @@ public final class Ecology {
             manta = Species.SKY_MANTA.ordinal();
 
         // Producers. Plants: logistic toward the season's ceiling, on soil, helped by pollinators.
-        double k = eco.forageBase(p.biome) * (0.5 + 0.5 * p.rain) * season.vegetation() * (0.25 + 0.75 * warm) + 0.02;
+        // The patch's own calendar (Vegetation): an alpine pasture greens weeks after the valleys, a dry plain browns in summer.
+        double phase = season.phase(), local = 0.1 + 0.9 * Vegetation.growth(p.climate, p.rain, phase);
+        double k = eco.forageBase(p.biome) * (0.5 + 0.5 * p.rain) * local * (0.25 + 0.75 * warm) + 0.02;
         double pollination = n[lantern] / (n[lantern] + 2);
         double growth = 0.5 * (0.3 + 0.7 * p.soil) * (1 + 0.3 * pollination) * p.plants * (1 - p.plants / k);
         if (growth < 0) growth *= 0.5; // dieback is slower than growth
         // Type II functional response of grazers; twigs and bark tide them over when the grass is gone.
-        double satiety = (p.plants + 0.06 + 0.06 * p.forest) / (p.plants + 0.3);
+        // Snow hides most of the grass, except from the ibex, which paws it away.
+        double snow = Math.min(1, SnowCover.pack(p.climate, phase) / 4.0), reach = p.plants * (1 - 0.7 * snow);
+        double satiety = (reach + 0.06 + 0.06 * p.forest) / (reach + 0.3);
+        double pawing = (p.plants + 0.06 + 0.06 * p.forest) / (p.plants + 0.3);
         double[] intake = new double[N];
-        double eat = p.plants / (p.plants + 0.25); // what they actually take from the grass
+        double eat = reach / (reach + 0.25); // what they actually take from the grass
         intake[rabbit] = 0.002 * eat;
         intake[deer] = 0.006 * eat;
-        intake[ibex] = 0.005 * eat;
+        intake[ibex] = 0.005 * p.plants / (p.plants + 0.25);
         intake[moss] = 0.008 * eat;
         double grazed = 0;
         for (int s = 0; s < N; s++) grazed += intake[s] * n[s];
         p.plants = Math.max(0.01, p.plants + (growth - grazed) * dt);
         p.soil = clamp(p.soil - Math.max(0, growth) * 0.1 * dt);
-        // Flowers follow the plants in the warm half of the year, more where they are pollinated.
-        double bloom = season.phase() < 0.6 ? 1 : 0.1;
+        // Flowers follow the plants through the local growing season and bloom, more where they are pollinated.
+        double bloom = Math.max(0.1, Math.max(0.6 * Vegetation.growth(p.climate, p.rain, phase),
+            Math.min(1, 2.5 * Vegetation.bloom(p.climate, phase))));
         double flowerTarget = p.plants * bloom * warm * (0.4 + 0.6 * pollination); // flowers set seed where pollinated
         p.flowers += (flowerTarget - p.flowers) * Math.min(1, 0.25 * dt);
         p.flowers = Math.max(0, p.flowers - 0.002 * n[lantern] * dt); // nectar drunk
@@ -270,7 +276,8 @@ public final class Ecology {
             if (n[s] <= 0 && p.dormant[s] <= 0) continue;
             Species sp = S[s];
             double food = switch (sp) {
-                case RABBIT, DEER, IBEX, MOSSBACK -> satiety;
+                case RABBIT, DEER, MOSSBACK -> satiety;
+                case IBEX -> pawing;
                 case TROUT -> troutFood;
                 case LANTERN -> p.flowers / (p.flowers + 0.15);
                 case FROSTLING -> cold * (0.3 + 0.7 * (n[deer] + n[ibex]) / (n[deer] + n[ibex] + 3)); // commensal
@@ -320,7 +327,6 @@ public final class Ecology {
             deaths[s] += n[s] * 0.06 * p.sick[s];
         }
         // Migration and dormancy.
-        double phase = season.phase();
         boolean winter = phase >= 0.75, spring = phase < 0.2, summer = phase >= 0.25 && phase < 0.5;
         for (int s : new int[] {heron, manta}) {
             if (winter) deaths[s] += n[s] * 0.25;                                 // leaving south (counted out)

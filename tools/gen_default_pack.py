@@ -99,6 +99,15 @@ def main():
         if (x % 3 != 1 and y > (5 + (x * 7) % 6)) else (0, 0, 0, 0), 15))
     save("poppy", rgba(lambda x, y, r: (200, 30, 30, 255) if (x - 7.5) ** 2 + (y - 5) ** 2 < 9
         else (40, 120, 40, 255) if x in (7, 8) and y >= 7 else (0, 0, 0, 0), 16))
+    # Alpine flowers: a deep blue trumpet (gentian), a woolly white star (edelweiss) over grey-green leaves.
+    save("gentian", rgba(lambda x, y, r: (clamp(30 + r.randint(-8, 8)), clamp(60 + r.randint(-10, 10)), 205, 255)
+        if 5 <= x <= 10 and 3 <= y <= 8 and abs(x - 7.5) <= 1.5 + (8 - y) * 0.45
+        else (60, 120, 50, 255) if (x in (7, 8) and y >= 9) or (y == 14 and 4 <= x <= 11) else (0, 0, 0, 0), 43))
+    save("edelweiss", rgba(lambda x, y, r: (225, 210, 90, 255) if (x - 7.5) ** 2 + (y - 5.5) ** 2 < 2.3
+        else (clamp(232 + r.randint(-12, 8)),) * 2 + (clamp(226 + r.randint(-12, 8)), 255)
+        if min(abs(x - 7.5), abs(y - 5.5)) < 1.2 and abs(x - 7.5) + abs(y - 5.5) < 5.5
+        or abs(abs(x - 7.5) - abs(y - 5.5)) < 0.9 and abs(x - 7.5) < 3.2
+        else (125, 140, 115, 255) if x in (7, 8) and y >= 9 or y == 13 and 5 <= x <= 10 else (0, 0, 0, 0), 44))
     save("glowstone", rgba(lambda x, y, r: (lambda v: (clamp(v + 40), clamp(v), clamp(v - 80), 255))(
         170 + r.randint(-50, 50)), 17))
     save("water_still", rgba(lambda x, y, r: (lambda v: (v, v, v, 180))(clamp(190 + r.randint(-20, 20))), 18))
@@ -343,6 +352,19 @@ def main():
     write_json("models/block/oak_leaves.json", {"parent": "block/leaves", "textures": {"all": "block/oak_leaves"}})
     write_json("models/block/short_grass.json", {"parent": "block/tinted_cross", "textures": {"cross": "block/short_grass"}})
     write_json("models/block/poppy.json", {"parent": "block/cross", "textures": {"cross": "block/poppy"}})
+    for name in ("gentian", "edelweiss"):
+        write_json(f"models/block/{name}.json", {"parent": "block/cross", "textures": {"cross": f"block/{name}"}})
+    # Snow layers (vanilla snow_height2..14, layers=8 is the full block).
+    for n in range(1, 8):
+        write_json(f"models/block/snow_height{2 * n}.json", {
+            "parent": "block/block",
+            "textures": {"particle": "block/snow_block", "texture": "block/snow_block"},
+            "elements": [{"from": [0, 0, 0], "to": [16, 2 * n, 16], "faces": {
+                "down": {"texture": "#texture", "cullface": "down"}, "up": {"texture": "#texture"},
+                "north": {"texture": "#texture", "cullface": "north"}, "south": {"texture": "#texture", "cullface": "south"},
+                "west": {"texture": "#texture", "cullface": "west"}, "east": {"texture": "#texture", "cullface": "east"}}}]})
+    write_json("blockstates/snow.json", {"variants": {
+        f"layers={n}": {"model": "minecraft:block/" + (f"snow_height{2 * n}" if n < 8 else "snow_block")} for n in range(1, 9)}})
     # Slabs (vanilla parents) and the oak slab models.
     for name, lo, hi in (("slab", 0, 8), ("slab_top", 8, 16)):
         write_json(f"models/block/{name}.json", {
@@ -367,7 +389,7 @@ def main():
         "axis=y": {"model": "minecraft:block/oak_log"},
         "axis=z": {"model": "minecraft:block/oak_log", "x": 90}}})
     for name in ("stone", "dirt", "sand", "bedrock", "grass_block", "gravel", "cobblestone", "oak_planks", "glass",
-                 "glowstone", "oak_leaves", "short_grass", "poppy", "water"):
+                 "glowstone", "oak_leaves", "short_grass", "poppy", "water", "gentian", "edelweiss"):
         write_json(f"blockstates/{name}.json", {"variants": {"": {"model": f"minecraft:block/{name}"}}})
 
 

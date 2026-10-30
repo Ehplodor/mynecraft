@@ -18,7 +18,7 @@ import java.util.Arrays;
  *       | section index &lt;&lt; 24.</li>
  *   <li>light of corners 0 and 1 (12 bits each: smooth sky 0..60 | smooth block 0..60 &lt;&lt; 6)
  *       | ambient occlusion of corners 0..3 &lt;&lt; 24 (2 bits each).</li>
- *   <li>light of corners 2 and 3 | fluid surface height in sixteenths &lt;&lt; 24 (5 bits, SPECIAL_FLUID only).</li>
+ *   <li>light of corners 2 and 3 | fluid surface height in sixteenths &lt;&lt; 24 (5 bits, SPECIAL_FLUID only: fluids and snow layers).</li>
  * </ol>
  * SPECIAL_FLUID_CORNERS (moving or sloping fluid, one cell per quad): each corner has its own surface
  * height, minus one, in 4 bits: corners 0 and 1 in bits 24-31 of the last word, corners 2 and 3 in
@@ -135,6 +135,7 @@ public final class ChunkMesher {
         }
         meshCrosses();
         meshSlabs();
+        meshLayers();
         int vis = visibility.compute(section);
         int total = count[0] + count[1] + count[2];
         if (total == 0) return new Result(new int[0], 0, 0, 0, vis);
@@ -449,6 +450,33 @@ public final class ChunkMesher {
                         if (positive) p[d]++;
                         put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], f, 0, 0, top ? SPECIAL_SLAB_TOP : SPECIAL_SLAB_BOTTOM,
                             false, faceInfo[(b & 0xFFFF) * 6 + f], light[0], light[1]);
+                    }
+                }
+    }
+
+    /**
+     * Snow layers: one quad per visible face, lowered by the shader like a fluid surface (the height
+     * rides in the same 5 bits). Sides are hidden by an opaque neighbour or by snow at least as deep.
+     */
+    private void meshLayers() {
+        for (int y = 0; y < 16; y++)
+            for (int z = 0; z < 16; z++)
+                for (int x = 0; x < 16; x++) {
+                    int idx = pIndex(x, y, z);
+                    short b = padded[idx];
+                    if (Blocks.SHAPE[b & 0xFFFF] != Blocks.SHAPE_LAYER) continue;
+                    int layers = Blocks.snowLayers(b);
+                    for (int f = 0; f < 6; f++) {
+                        int d = f >> 1;
+                        boolean positive = (f & 1) != 0;
+                        int n = idx + (positive ? STRIDE[d] : -STRIDE[d]);
+                        short nb = padded[n];
+                        if (f != 3 && (Blocks.isOpaque(nb) || f != 2 && Blocks.snowLayers(nb) >= layers)) continue;
+                        int[] light = flatLight(paddedLight[f == 3 ? idx : n] & 0xFF);
+                        int[] p = {x, y, z};
+                        if (positive) p[d]++;
+                        put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], f, 0, 0, SPECIAL_FLUID, false,
+                            faceInfo[(b & 0xFFFF) * 6 + f], light[0], light[1] | 2 * layers << 24);
                     }
                 }
     }

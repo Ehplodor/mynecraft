@@ -1,0 +1,5 @@
+# M26: snow lying in layers, thick ice, alpine flowers, tracks (a fresh world per shot, same seed).
+winter-ground --seed 7 --season hiver --time 6000 --view 30,-25
+winter-snowfall --seed 7 --season hiver --time 6000 --view 30,-15 --weather snow
+winter-heights --seed 7 --season hiver --time 6000 --view 200,-8
+summer-heights --seed 7 --season ete --time 6000 --view 200,-8

@@ -348,6 +348,7 @@ public final class Main {
             };
             ticks = net.mynecraft.world.life.Ecosystem.ticksForSeason(season, ticks, DayCycle.DAY_TICKS);
         }
+        life.eco.update(ticks, DayCycle.daylight(ticks), DayCycle.DAY_TICKS); // the first chunks load in this season
         boolean timeFrozen = screenshot != null; // scripted shots must be reproducible
         float[] sky = new float[3];
         // Benchmark: fly east at a fixed speed and height through fresh terrain, then report timings.
@@ -377,6 +378,7 @@ public final class Main {
         long last = System.nanoTime(), fpsTimer = last;
         int frames = 0;
         double accumulator = 0, tickAccumulator = 0;
+        streamer.onLoad = life::settle; // chunks come in with the season's snow and ice
         FluidSimulator fluids = new FluidSimulator(world, renderer::blockChanged);
         float far = RENDER_RADIUS * 16f;
         Weather weather = new Weather(world, (x, y, z) -> {
@@ -386,6 +388,7 @@ public final class Main {
         int forced = argv.indexOf("--weather"); // scripted shots: rain, snow, sleet, hail or storm
         if (forced >= 0 && forced + 1 < args.length) weather.force(args[forced + 1]);
         weather.second(player.x, player.y, player.z, (float) Math.max(0, DayCycle.sunHeight(ticks)), false);
+        life.setWeather(weather);
         WeatherRenderer weatherRenderer = new WeatherRenderer();
         Minimap minimap = new Minimap(world.generator, explored);
         WorldMap worldMap = new WorldMap(world.generator, explored, waypoints);
@@ -632,6 +635,10 @@ public final class Main {
                     renderer.blockChanged(e[0], e[1], e[2]);
                     fluids.blockChanged(e[0], e[1], e[2]);
                 }
+                for (int[] c; (c = life.ice.poll()) != null; ) { // thin ice creaking, then giving way
+                    if (c[3] == 2) sound.blockBroken(Synth.Material.GLASS, c[0] + 0.5, c[1] + 0.5, c[2] + 0.5);
+                    else sound.hit(Synth.Material.GLASS, c[0] + 0.5, c[1] + 0.5, c[2] + 0.5);
+                }
             }
             double cp = Math.cos(cam.pitch);
             Raycast.Hit hit = Raycast.cast(world, cam.pos.x, cam.pos.y, cam.pos.z,
@@ -659,7 +666,7 @@ public final class Main {
                     sound.hit(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     nextHitSound = weatherClock + 0.25;
                 }
-                if (miningProgress >= 1 && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
+                if (miningProgress >= 1 && world.set(hit.x(), hit.y(), hit.z(), brokenInto(world, hit, target))) {
                     sound.blockBroken(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     inventory.add(Blocks.DROP[target & 0xFFFF], Blocks.DROP_COUNT[target & 0xFFFF]);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
@@ -673,7 +680,7 @@ public final class Main {
             }
             if (hit != null && ((creative && input.breakRequested) || (editDemo && streamer.settled()))) {
                 short broken = world.get(hit.x(), hit.y(), hit.z());
-                if (broken != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), Blocks.AIR)) {
+                if (broken != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), brokenInto(world, hit, broken))) {
                     sound.blockBroken(material(broken), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
@@ -761,7 +768,8 @@ public final class Main {
             if (hit != null) {
                 short target = world.get(hit.x(), hit.y(), hit.z());
                 float lo = Blocks.isSlab(target) ? Blocks.BOX_MIN[target & 0xFFFF] / 16f : 0;
-                float hi = Blocks.isSlab(target) ? Blocks.BOX_MAX[target & 0xFFFF] / 16f : 1;
+                int snow = Blocks.snowLayers(target); // the outline hugs a snow layer's visible top
+                float hi = Blocks.isSlab(target) ? Blocks.BOX_MAX[target & 0xFFFF] / 16f : snow > 0 ? snow / 8f : 1;
                 overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y),
                     (float) (hit.z() - cam.pos.z), lo, hi);
             }
@@ -952,6 +960,11 @@ public final class Main {
     }
 
     /** What a block sounds like (steps, breaking, placing). */
+    /** What a broken block leaves: ice over water opens onto the water, everything else leaves air. */
+    private static short brokenInto(World world, Raycast.Hit hit, short broken) {
+        return broken == Blocks.ICE && Blocks.isFluid(world.get(hit.x(), hit.y() - 1, hit.z())) ? Blocks.WATER : Blocks.AIR;
+    }
+
     private static Synth.Material material(short b) {
         if (b == Blocks.GRASS) return Synth.Material.GRASS;
         if (b == Blocks.DIRT) return Synth.Material.DIRT;
