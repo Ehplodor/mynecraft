@@ -85,6 +85,9 @@ void main() {
     }
     float alpha = tex.a;
 #ifdef TRANSLUCENT
+    // Under water both sides are drawn for the surface only: the back of ice or glass would
+    // lie in the plane of the block beside it and flicker against it.
+    if (!gl_FrontFacing && vWater < 0.5) discard;
     if (vWater > 0.5) {
         if (uHideWater > 0.5) discard;
         // Water: what is under it (bent by the ripples, darker and bluer with depth), the sky

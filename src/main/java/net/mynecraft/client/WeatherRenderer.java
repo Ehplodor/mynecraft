@@ -285,6 +285,9 @@ final class WeatherRenderer {
     // ---- frame ----
 
     /** Draws clouds, drops and lightning; {@code now} in seconds, {@code light} the sky brightness. */
+    /** The eye under water: clouds, rain and snow are not drawn (the weather still runs). */
+    boolean underwater;
+
     void draw(Matrix4f viewProj, Weather weather, World world, double camX, double camY, double camZ,
               double now, float light, float far, boolean frozen) {
         Atmosphere.Sample here = weather.here();
@@ -301,7 +304,7 @@ final class WeatherRenderer {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         float lit = Math.min(1, light + flash * 0.6f);
-        if (cloudVertices > 0) {
+        if (cloudVertices > 0 && !underwater) {
             glUniform3f(uOffset, (float) (anchorX + shiftX - camX), (float) -camY, (float) (anchorZ + shiftZ - camZ));
             glUniform4f(uTint, lit, lit, lit, 1);
             glUniform1f(uFadeEnd, Math.min(CLOUD_RANGE, far * 1.6f));
@@ -312,7 +315,7 @@ final class WeatherRenderer {
         glDepthMask(false);
         int drops = buildDrops(weather, world, here, camX, camY, camZ, now, lit);
         drops += lightning(weather, world, here, camX, camY, camZ, now, frozen);
-        if (drops > 0) {
+        if (drops > 0 && !underwater) {
             dropData.flip();
             glBindBuffer(GL_ARRAY_BUFFER, dropVbo);
             glBufferData(GL_ARRAY_BUFFER, dropData, GL_STREAM_DRAW);
