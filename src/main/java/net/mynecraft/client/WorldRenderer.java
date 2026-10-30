@@ -449,10 +449,11 @@ final class WorldRenderer {
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        // From under water the surface is seen from below (both sides drawn) and keeps its depth,
-        // so that the water view swallows it with its distance like the rest.
+        // From under water the surface is seen from below: both sides drawn. No depth written (ice
+        // and water faces meet in the same planes and would fight): the water view finds the
+        // surface's distance itself.
         if (underwater) glDisable(GL_CULL_FACE);
-        glDepthMask(underwater);
+        glDepthMask(false);
         pass(translucentProgram, true, 2, fog, far, camCx, camCz, offX, offY, offZ);
         glDepthMask(true);
         glEnable(GL_CULL_FACE);
