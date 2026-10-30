@@ -12,11 +12,14 @@ import java.util.SplittableRandom;
  * the place is in its growing season, poppies open where it is in flower, and both wither in autumn
  * and winter or where the grazers have eaten the patch down. The calendar is the column's own
  * ({@link Vegetation}): the mountain pastures green up and flower weeks after the valleys, and a
- * hot, dry plain browns in high summer.
+ * hot, dry plain browns in high summer. On the cold heights the flowers are alpine: gentians in the
+ * pastures, edelweiss on the bare rock and scree as well.
  */
 final class Flora {
     /** Columns looked at per second, and how far from the player. */
     static final int VISITS = 24, RADIUS = 48;
+    /** Climates (deg C before the season) below which flowers are alpine, and edelweiss rather than gentian. */
+    static final double ALPINE = 2.5, ROCKY = 0.5;
 
     private final World world;
     private final Ecology ecology;
@@ -44,11 +47,12 @@ final class Flora {
             short ground = world.get(x, y, z), above = world.get(x, y + 1, z);
             double climate = Vegetation.climate(ecology.columns.apply(x, z).temperature(), y);
             double growth = Vegetation.growth(climate, p.rain, season.phase()), bloom = Vegetation.bloom(climate, season.phase());
-            if (ground == Blocks.GRASS && above == Blocks.AIR && growth > 0.5) {
-                if (rng.nextDouble() < p.flowers * bloom * 0.35) set(x, y + 1, z, Blocks.POPPY, changed);
-                else if (rng.nextDouble() < p.plants * 0.3 * growth) set(x, y + 1, z, Blocks.SHORT_GRASS, changed);
-            } else if (above == Blocks.SHORT_GRASS || above == Blocks.POPPY) {
-                double wither = above == Blocks.POPPY ? (bloom < 0.2 ? 0.5 : 0.25 * (1 - p.flowers))
+            boolean rock = (ground == Blocks.STONE || ground == Blocks.GRAVEL) && climate < ROCKY;
+            if ((ground == Blocks.GRASS || rock) && above == Blocks.AIR && growth > 0.5) {
+                if (rng.nextDouble() < p.flowers * bloom * (rock ? 0.12 : 0.35)) set(x, y + 1, z, flower(climate, rock), changed);
+                else if (!rock && rng.nextDouble() < p.plants * 0.3 * growth) set(x, y + 1, z, Blocks.SHORT_GRASS, changed);
+            } else if (Blocks.isPlant(above)) {
+                double wither = above != Blocks.SHORT_GRASS ? (bloom < 0.2 ? 0.5 : 0.25 * (1 - p.flowers))
                     : (growth < 0.35 ? 0.3 : 0.4 * Math.max(0, 0.35 - p.plants));
                 if (rng.nextDouble() < wither) {
                     set(x, y + 1, z, Blocks.AIR, changed);
@@ -57,6 +61,12 @@ final class Flora {
                 }
             }
         }
+    }
+
+    /** The flower of a place: poppies below, gentians in the alpine pastures, edelweiss higher and on rock. */
+    private short flower(double climate, boolean rock) {
+        if (climate >= ALPINE) return Blocks.POPPY;
+        return rock || climate < ROCKY && rng.nextDouble() < 0.6 ? Blocks.EDELWEISS : Blocks.GENTIAN;
     }
 
     private void set(int x, int y, int z, short b, java.util.function.Consumer<int[]> changed) {
@@ -71,7 +81,7 @@ final class Flora {
         int h = ecology.columns.apply(x, z).height();
         for (int y = Math.min(Chunk.MAX_Y - 2, h + 12); y > h - 12; y--) {
             short b = world.get(x, y, z);
-            if (b == Blocks.AIR || b == Blocks.SHORT_GRASS || b == Blocks.POPPY) continue;
+            if (b == Blocks.AIR || Blocks.isPlant(b)) continue;
             return Blocks.isSolid(b) ? y : Integer.MIN_VALUE; // leaves, water...: not a meadow
         }
         return Integer.MIN_VALUE;

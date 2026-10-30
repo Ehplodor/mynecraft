@@ -14,8 +14,9 @@ public final class Blocks {
         SPRUCE_LOG_Z = 36, SPRUCE_PLANKS = 37, SPRUCE_LEAVES = 38,
         WATER_FLOW_1 = 39, /* ... WATER_FLOW_7 = 45 */ WATER_FALLING = 46,
         LAVA = 47, LAVA_FLOW_2 = 48, LAVA_FLOW_4 = 49, LAVA_FLOW_6 = 50, LAVA_FALLING = 51, OBSIDIAN = 52,
-        CRAFTING_TABLE = 53, SNOW_BLOCK = 54, ICE = 55, PACKED_ICE = 56;
-    public static final int COUNT = 57; // ids are shorts: up to 32 767 states
+        CRAFTING_TABLE = 53, SNOW_BLOCK = 54, ICE = 55, PACKED_ICE = 56,
+        SNOW_1 = 57, /* ... SNOW_8 = 64: snow layers, 2 to 16 sixteenths high */ GENTIAN = 65, EDELWEISS = 66;
+    public static final int COUNT = 67; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -27,16 +28,19 @@ public final class Blocks {
         "coal_ore", "iron_ore", "gold_ore", "diamond_ore", "birch_log", "birch_log", "birch_log", "birch_planks",
         "birch_leaves", "spruce_log", "spruce_log", "spruce_log", "spruce_planks", "spruce_leaves",
         "water", "water", "water", "water", "water", "water", "water", "water",
-        "lava", "lava", "lava", "lava", "lava", "obsidian", "crafting_table", "snow_block", "ice", "packed_ice"};
+        "lava", "lava", "lava", "lava", "lava", "obsidian", "crafting_table", "snow_block", "ice", "packed_ice",
+        "snow", "snow", "snow", "snow", "snow", "snow", "snow", "snow", "gentian", "edelweiss"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
         "", "axis=y", "axis=x", "axis=z", "", "",
         "level=1", "level=2", "level=3", "level=4", "level=5", "level=6", "level=7", "level=8",
-        "level=0", "level=2", "level=4", "level=6", "level=8", "", "", "", "", ""};
+        "level=0", "level=2", "level=4", "level=6", "level=8", "", "", "", "", "",
+        "layers=1", "layers=2", "layers=3", "layers=4", "layers=5", "layers=6", "layers=7", "layers=8", "", ""};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
-    public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4;
+    public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
+        SHAPE_LAYER = 5;
     public static final byte TINT_NONE = 0, TINT_GRASS = 1, TINT_FOLIAGE = 2, TINT_WATER = 3;
 
     // ---- fluids ----
@@ -87,6 +91,8 @@ public final class Blocks {
         plant(SHORT_GRASS);
         TINT[SHORT_GRASS] = TINT_GRASS;
         plant(POPPY);
+        plant(GENTIAN);
+        plant(EDELWEISS);
         for (int i = 0; i < COUNT; i++) FAMILY[i] = (short) i;
         for (int i = WATER_FLOW_1 - 1; i <= WATER_FALLING; i++) {
             short w = (short) (i == WATER_FLOW_1 - 1 ? WATER : i);
@@ -111,6 +117,14 @@ public final class Blocks {
         OPACITY[OAK_SLAB] = OPACITY[OAK_SLAB_TOP] = 0;
         BOX_MAX[OAK_SLAB] = 8;
         BOX_MIN[OAK_SLAB_TOP] = 8;
+        // Snow layers: drawn 2..16 sixteenths high, one layer less to stand on (feet sink in a little).
+        for (int n = 1; n <= 8; n++) {
+            short s = (short) (SNOW_1 + n - 1);
+            SHAPE[s] = n == 8 ? SHAPE_CUBE : SHAPE_LAYER;
+            OPACITY[s] = (byte) (n == 8 ? 15 : 0);
+            BOX_MAX[s] = (byte) (2 * (n - 1));
+            FAMILY[s] = SNOW_1;
+        }
         initSurvival();
         // Fluids are never full cubes: their surface is lowered, so neighbours keep their faces.
         for (int i = 1; i < COUNT; i++) FULL_OPAQUE[i] = LAYER[i] == LAYER_OPAQUE && SHAPE[i] == SHAPE_CUBE && FLUID[i] == FLUID_NONE;
@@ -140,6 +154,11 @@ public final class Blocks {
         hardness(50f, OBSIDIAN);
         hardness(2.5f, CRAFTING_TABLE);
         hardness(0.2f, SNOW_BLOCK);
+        for (int n = 0; n < 8; n++) {
+            HARDNESS[SNOW_1 + n] = 0.1f;
+            DROP[SNOW_1 + n] = AIR; // snowballs are not items yet
+        }
+        hardness(0f, GENTIAN, EDELWEISS);
         hardness(0.5f, ICE, PACKED_ICE);
         DROP[ICE] = AIR; // vanilla: ice breaks into nothing (water in survival, simplified)
         hardness(-1f, BEDROCK);
@@ -229,6 +248,22 @@ public final class Blocks {
         if (!n.endsWith("_log")) return null;
         short y = fromState(n, java.util.Map.of("axis", "y")), x = fromState(n, java.util.Map.of("axis", "x"));
         return new short[] {y, x, fromState(n, java.util.Map.of("axis", "z"))};
+    }
+
+    /** Snow layers on this state (1..8), 0 if it is not snow. */
+    public static int snowLayers(short id) {
+        int i = (id & 0xFFFF) - SNOW_1;
+        return i >= 0 && i < 8 ? i + 1 : 0;
+    }
+
+    /** The snow state with this many layers (clamped to 1..8). */
+    public static short snow(int layers) {
+        return (short) (SNOW_1 + Math.max(1, Math.min(8, layers)) - 1);
+    }
+
+    /** Low plants that stand in the open and are buried by snow, nipped by frost or eaten by grazers. */
+    public static boolean isPlant(short id) {
+        return id == SHORT_GRASS || id == POPPY || id == GENTIAN || id == EDELWEISS;
     }
 
     public static boolean isSlab(short id) {

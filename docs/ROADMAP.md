@@ -468,7 +468,9 @@ Fait : CI (tests + captures sous Xvfb, galerie en artefact), ids de bloc 16 bits
 - Registres pilotés par les données (blocs, objets, espèces) prêts pour les data packs puis l'API de mods
 - Captures scriptées rejouées en CI (comparaison d'images, vérification visuelle de M24)
 
-### M26 — Finir l'hiver
+### ✅ M26 — Finir l'hiver
+Fait : **neige au sol** en couches (bloc `snow`, 8 couches de 2/16, forme « couche » au mailleur dessinée comme une surface de fluide ; on s'y enfonce d'une couche) ; elle tombe là où la météo neige et gèle, fond quand il fait doux (deux fois plus vite sous la pluie), ensevelit herbes et fleurs, se pose mince sur les feuillages ; un chunk chargé reçoit d'emblée le manteau neigeux de son climat à cette date (`SnowCover.pack`, en retard d'une semaine sur le froid) et la glace de ses eaux dormantes. **Glace d'épaisseur variable** : 1 à 3 blocs selon le froid moyen (−4 °C, −8 °C), jamais jusqu'au fond, dégel par le dessous ; cassée, elle rend l'eau ; une feuille unique de glace fraîche ou pourrie (au-dessus de −3 °C) craque sous le joueur puis cède en 2,4 s (deux fois plus long accroupi). **Écologie sur le calendrier local** : croissance et floraison de chaque parcelle lues dans `Vegetation` ; la neige cache l'herbe aux brouteurs, sauf au bouquetin qui gratte. **Fleurs alpines** : gentiane (alpages) et edelweiss (plus haut, aussi sur roche et éboulis), résistantes au gel. **Traces** : chaque pas dans une neige d'au moins 2 couches la tasse d'une couche (joueur et animaux au sol), la neige suivante les comble. Captures `src/test/scenes/m26.txt`.
+Reste : flocons qui s'accumulent sur les blocs non cubiques (dalles), herbe enneigée sur les flancs (`grass_block[snowy=true]`), pelage blanc lu dans la neige réelle.
 - Couche de neige au sol, glace d'épaisseur variable (on marche dessus, on la brise), écologie branchée
   sur le calendrier local, fleurs alpines, traces dans la neige
 - Clôt le travail en cours sur les saisons avant que les besoins du corps (froid) n'en dépendent

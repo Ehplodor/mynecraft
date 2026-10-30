@@ -108,7 +108,9 @@ class SeasonalGroundTest {
         assertTrue(ice(w, 0) > ice(w, POND - 1) * 4 + 4, "ice starts at the shore: rim " + ice(w, 0) + ", centre " + ice(w, POND - 1));
         passes(f, 60, WINTER);
         assertEquals(4 * POND * POND, ice(w, -1), "the whole pond is iced over by midwinter");
-        assertEquals(Blocks.WATER, w.get(0, FLOOR - 1, 0), "only the top freezes");
+        // About -5 deg C: two blocks of ice, open water below them.
+        assertEquals(Blocks.ICE, w.get(0, FLOOR - 1, 0), "the ice thickens downward");
+        assertEquals(Blocks.WATER, w.get(0, FLOOR - 2, 0), "never down to the bed");
         passes(f, 60, SUMMER);
         assertEquals(0, ice(w, -1), "open water again in summer");
         assertTrue(f.frozen >= 4 * POND * POND && f.thawed >= 4 * POND * POND);

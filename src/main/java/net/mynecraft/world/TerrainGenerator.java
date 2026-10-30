@@ -364,7 +364,7 @@ public final class TerrainGenerator {
                     if (r == 2 && Math.abs(dx) == 2 && Math.abs(dz) == 2) continue; // round the corners
                     if (ly == top + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue;
                     short cur = c.get(x + dx, ly, z + dz);
-                    if (cur == Blocks.AIR || cur == Blocks.SHORT_GRASS || cur == Blocks.POPPY) {
+                    if (cur == Blocks.AIR || Blocks.isPlant(cur)) {
                         c.set(x + dx, ly, z + dz, leaves);
                     }
                 }

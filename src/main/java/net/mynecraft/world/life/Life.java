@@ -25,6 +25,10 @@ public final class Life {
     public final Ecology ecology;
     private final Flora flora;
     private final Frost frost;
+    private final SnowCover snow;
+    /** Ice creaking (x, y, z, 1) or giving way (x, y, z, 2) under the player, for the sound. */
+    public final java.util.ArrayDeque<int[]> ice = new java.util.ArrayDeque<>();
+    private long playerTrod = Long.MIN_VALUE;
     /** Blocks changed by living things (grass grown, withered or grazed), for the renderer to remesh. */
     public final java.util.ArrayDeque<int[]> edits = new java.util.ArrayDeque<>();
     private double ecologyClock;
@@ -47,6 +51,17 @@ public final class Life {
         this.ecology = new Ecology(seed, eco, (x, z) -> columns.apply(x, z));
         this.flora = new Flora(world, ecology, seed);
         this.frost = new Frost(world, (x, z) -> columns.apply(x, z), seed);
+        this.snow = new SnowCover(world, (x, z) -> columns.apply(x, z), seed);
+    }
+
+    /** Where it snows, rains, and how cold the air is (the snow falls and melts by it). */
+    public void setWeather(net.mynecraft.world.weather.Weather weather) {
+        snow.sky = weather == null ? null : weather::at;
+    }
+
+    /** Gives a chunk that has just been loaded the season's snow and ice (any thread, before it joins the world). */
+    public void settle(Chunk c) {
+        snow.settle(c, eco.season());
     }
 
     // ------------------------------------------------------------------------------- spawning
@@ -72,7 +87,11 @@ public final class Life {
         if (spawning) {
             flora.tick(dt, px, pz, eco.season(), edits::add);
             frost.tick(dt, px, pz, eco.season(), edits::add);
+            snow.tick(dt, px, pz, eco.season(), edits::add);
         }
+        int creak = frost.bear(px, py, pz, sneaking, dt, eco.season(), edits::add);
+        if (creak > 0) ice.add(new int[] {(int) Math.floor(px), (int) Math.floor(py - 0.05), (int) Math.floor(pz), creak});
+        playerTrod = tread(px, py, pz, playerTrod);
         boolean first = creatures.isEmpty();
         for (int i = 0; spawning && spawnClock >= 0.2 && i < (first ? 40 : 1); i++) trySpawn(px, pz, first ? 8 : SPAWN_MIN);
         if (spawnClock >= 0.2) spawnClock = 0;
@@ -81,9 +100,26 @@ public final class Life {
             double dx = c.x - px, dz = c.z - pz;
             if (dx * dx + dz * dz > KEEP * KEEP || c.y < Chunk.MIN_Y) c.dead = true;
             else if (world.chunk(Creature.fl(c.x) >> 4, Creature.fl(c.z) >> 4) == null) c.dead = true;
-            if (!c.dead) live(c, dt, px, py, pz, sneaking);
+            if (!c.dead) {
+                live(c, dt, px, py, pz, sneaking);
+                if (c.onGround && c.species.kind != Species.Kind.FLY && c.species.kind != Species.Kind.FLOAT)
+                    c.trod = tread(c.x, c.y, c.z, c.trod);
+            }
         }
         creatures.removeIf(c -> c.dead);
+    }
+
+    /**
+     * Tracks: stepping into a new column of snow at least two layers deep presses it down a layer,
+     * so the player and the animals leave trails that the next snowfall fills. Returns the column.
+     */
+    private long tread(double x, double y, double z, long last) {
+        int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
+        long cell = (long) bx << 32 ^ (bz & 0xFFFFFFFFL);
+        if (cell == last) return cell;
+        int layers = Blocks.snowLayers(world.get(bx, by, bz));
+        if (layers >= 2 && world.set(bx, by, bz, Blocks.snow(layers - 1))) edits.add(new int[] {bx, by, bz});
+        return cell;
     }
 
     private void trySpawn(double px, double pz, double minDist) {

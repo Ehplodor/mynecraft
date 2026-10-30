@@ -38,6 +38,8 @@ public final class ChunkStreamer implements AutoCloseable {
     private final ExecutorService io;
     private final int maxInFlight;
 
+    /** Brings a freshly loaded chunk up to date (season's snow and ice) on the loader thread, before it joins. */
+    public volatile java.util.function.Consumer<Chunk> onLoad;
     private final Set<Long> inFlight = new HashSet<>();
     private final Set<Long> visible = new HashSet<>();
     private final ConcurrentLinkedQueue<Chunk> completed = new ConcurrentLinkedQueue<>();
@@ -123,6 +125,8 @@ public final class ChunkStreamer implements AutoCloseable {
             loaders.execute(() -> {
                 Chunk c = storage == null ? null : storage.load(cx, cz);
                 if (c == null) c = world.generator.generate(cx, cz);
+                java.util.function.Consumer<Chunk> hook = onLoad;
+                if (hook != null) hook.accept(c);
                 c.unsettledFluids = FluidSimulator.unsettled(c);
                 completed.add(c);
             });
