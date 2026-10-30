@@ -1,4 +1,2 @@
 # F1 help screen over the world.
 help --seed 7 --time 6000 --view 30,-15 --help-screen
-help-small --seed 7 --time 6000 --view 30,-15 --help-screen --window 640x360
-help-narrow --seed 7 --time 6000 --view 30,-15 --help-screen --window 480x640
