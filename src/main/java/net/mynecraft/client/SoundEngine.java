@@ -22,9 +22,11 @@ import static org.lwjgl.openal.ALC10.*;
  * The game's sound, through OpenAL. Every sound is synthesised at start-up on a background thread
  * ({@link Synth}, several variants each), then uploaded. Ambiences are loops whose levels glide
  * towards targets set by the place, the hour and the weather: rain (light, heavy, on a roof),
- * hail, wind and leaves, crickets at night, the hum of caves; running water and surf are placed
+ * hail, wind and leaves, crickets at night, cicadas on summer days, frogs by the water on warm
+ * nights, the hum of caves; running water and surf are placed
  * in 3D at the nearest brook, river, waterfall or shore. Birds sing now and then by day, drops
- * fall in caves; thunder follows each flash after the time sound takes to travel. With the EFX
+ * fall in caves, owls call at night; the seasons set how much lives (few birds and no insects
+ * in winter), and falling snow hushes the landscape; thunder follows each flash after the time sound takes to travel. With the EFX
  * extension, a reverb follows the surroundings (open, forest, shelter, cave) and outside sounds
  * are muffled under a roof. Without an audio device, everything is silent and nothing breaks.
  */
@@ -41,6 +43,7 @@ final class SoundEngine {
         float grass;           // 0..1 open grassland around (crickets)
         float underground;     // 0..1 in a cave
         float daylight;        // 0 night .. 1 day
+        float warmth = 0.5f;   // 0 deep winter .. 1 high summer
         double[] coast;        // nearest shore point {x, y, z} or null
         double[][] water = new double[0][]; // {x, y, z, loudness, kind 0 brook / 1 river / 2 fall}
     }
@@ -57,7 +60,7 @@ final class SoundEngine {
     private int nextShot;
     private final SplittableRandom random = new SplittableRandom();
     private final ArrayDeque<double[]> thunder = new ArrayDeque<>(); // {time, x, y, z, gain, near}
-    private double nextBird = 5, nextDrip = 2, lastTime;
+    private double nextBird = 5, nextDrip = 2, nextOwl = 20, lastTime;
     private int reverbSlot, reverb, muffle, preset = -1;
     private boolean checked;
 
@@ -105,6 +108,9 @@ final class SoundEngine {
         m.put("leaves", new float[][] {Synth.leaves(8, 6)});
         m.put("crickets", new float[][] {Synth.crickets(6, 12)});
         m.put("cave", new float[][] {Synth.cave(8, 11)});
+        m.put("insects", new float[][] {Synth.insects(9, 13)});
+        m.put("frogs", new float[][] {Synth.frogs(7, 14)});
+        m.put("owl", variants(Synth::owl));
         m.put("brook", new float[][] {Synth.brook(6, 7)});
         m.put("river", new float[][] {Synth.river(6, 8)});
         m.put("fall", new float[][] {Synth.waterfall(5, 9)});
@@ -151,7 +157,7 @@ final class SoundEngine {
             }
             buffers.put(e.getKey(), ids);
         }
-        for (String n : new String[] {"rain_light", "rain_heavy", "rain_roof", "hail", "wind", "leaves", "crickets", "cave"}) {
+        for (String n : new String[] {"rain_light", "rain_heavy", "rain_roof", "hail", "wind", "leaves", "crickets", "cave", "insects", "frogs"}) {
             int s = loopSource(buffers.get(n)[0], true);
             loops.put(n, s);
             levels.put(n, 0f);
@@ -250,16 +256,20 @@ final class SoundEngine {
         target("rain_heavy", a.hail ? 0 : rain * heavy * 0.9f * out, dt);
         target("rain_roof", a.sheltered && !a.hail ? rain * 0.9f : 0, dt);
         target("hail", a.hail ? a.rain * outside * (a.sheltered ? 0.5f : 1) : 0, dt);
-        float wind = Math.min(1, Math.max(0, (a.wind - 1.5f) / 12)) * (0.15f + 0.85f * outside);
-        target("wind", wind * 0.7f * out, dt);
+        float wind = (float) Math.pow(Math.min(1, Math.max(0, (a.wind - 2f) / 18)), 1.5) * (0.15f + 0.85f * outside);
+        target("wind", wind * 0.5f * out, dt);
         target("leaves", wind * a.forest * 0.8f * out, dt);
         float night = 1 - smooth(0.2f, 0.6f, a.daylight);
-        target("crickets", night * a.grass * outside * (1 - Math.min(1, a.rain * 2)) * 0.5f * out, dt);
+        float dry = 1 - Math.min(1, a.rain * 2), alive = smooth(0.15f, 0.5f, a.warmth), summer = smooth(0.55f, 0.9f, a.warmth);
+        target("crickets", night * a.grass * outside * dry * alive * 0.5f * out, dt);
+        target("insects", (1 - night) * summer * Math.max(a.grass, a.forest * 0.6f) * outside * dry * 0.25f * out, dt);
+        boolean wetland = a.water.length > 0 || a.coast != null;
+        target("frogs", wetland ? night * alive * outside * (1 - Math.min(1, a.rain)) * 0.4f * out : 0, dt);
         target("cave", a.underground * 0.7f, dt);
         if (efx) {
             reverb(a.underground > 0.5f ? 3 : a.sheltered ? 2 : a.forest > 0.4f ? 1 : 0);
-            EXTEfx.alFilterf(muffle, EXTEfx.AL_LOWPASS_GAINHF, a.sheltered ? 0.15f : 1f);
-            for (String n : new String[] {"rain_light", "rain_heavy", "wind", "leaves", "crickets"})
+            EXTEfx.alFilterf(muffle, EXTEfx.AL_LOWPASS_GAINHF, a.sheltered ? 0.15f : a.snow ? 0.45f + 0.4f * (1 - a.rain) : 1f);
+            for (String n : new String[] {"rain_light", "rain_heavy", "wind", "leaves", "crickets", "insects", "frogs"})
                 alSourcei(loops.get(n), EXTEfx.AL_DIRECT_FILTER, muffle); // re-attached: the filter's settings are copied
         }
 
@@ -283,7 +293,15 @@ final class SoundEngine {
                 play("bird", x + Math.cos(angle) * d, y + 4 + random.nextDouble() * 8, z + Math.sin(angle) * d,
                     0.45f, 0.93f + random.nextFloat() * 0.15f, 60);
             }
-            nextBird = now + 2 + random.nextDouble() * 9 / (0.35 + a.forest);
+            nextBird = now + 2 + random.nextDouble() * 9 / ((0.35 + a.forest) * (0.25 + a.warmth)); // a quiet winter
+        }
+        // An owl now and then at night, from the woods.
+        if (now >= nextOwl) {
+            if (a.daylight < 0.15f && a.forest > 0.2f && a.underground < 0.3f && a.rain < 0.3f && !a.sheltered) {
+                double angle = random.nextDouble() * Math.PI * 2, d = 18 + random.nextDouble() * 30;
+                play("owl", x + Math.cos(angle) * d, y + 6, z + Math.sin(angle) * d, 0.5f, 0.95f + random.nextFloat() * 0.1f, 80);
+            }
+            nextOwl = now + 12 + random.nextDouble() * 30 / a.forest;
         }
         // Drops in caves, here and there around.
         if (now >= nextDrip) {
@@ -326,6 +344,17 @@ final class SoundEngine {
 
     void step(Synth.Material m, double x, double y, double z) {
         play("step_" + name(m), x, y, z, m == Synth.Material.WATER ? 0.35f : 0.4f, 0.93f + random.nextFloat() * 0.14f, 16);
+    }
+
+    /** Pushing off the ground for a jump: a light scuff of the ground. */
+    void jump(Synth.Material m, double x, double y, double z) {
+        play("step_" + name(m), x, y, z, 0.25f, 1.1f + random.nextFloat() * 0.08f, 16);
+    }
+
+    /** Landing after a fall: the step of the ground, heavier and lower the harder the landing (speed in blocks/s). */
+    void land(Synth.Material m, double x, double y, double z, double speed) {
+        float k = (float) Math.min(1, (speed - 4) / 10);
+        play("step_" + name(m), x, y, z, 0.5f + 0.4f * k, 0.8f - 0.15f * k + random.nextFloat() * 0.05f, 20);
     }
 
     void hit(Synth.Material m, double x, double y, double z) {

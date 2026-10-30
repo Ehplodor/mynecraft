@@ -98,7 +98,7 @@ public final class Synth {
         SplittableRandom r = new SplittableRandom(seed);
         int len = samples(seconds), fade = samples(0.8), n = len + fade;
         float[] base = pink(n, r), air = pink(n, r);
-        Biquad body = Biquad.bandpass(400, 0.8), whistle = Biquad.bandpass(800, 5), top = Biquad.lowpass(4000, 0.7);
+        Biquad body = Biquad.bandpass(300, 0.9), whistle = Biquad.bandpass(700, 6), top = Biquad.lowpass(1600, 0.7);
         float[] s = new float[n];
         double p1 = r.nextDouble() * 6.28, p2 = r.nextDouble() * 6.28, p3 = r.nextDouble() * 6.28;
         for (int i = 0; i < n; i++) {
@@ -106,10 +106,10 @@ public final class Synth {
             double gust = 0.55 + 0.25 * Math.sin(2 * Math.PI * t + p1) + 0.13 * Math.sin(2 * Math.PI * 3 * t + p2)
                 + 0.06 * Math.sin(2 * Math.PI * 7 * t + p3);
             if (i % 64 == 0) {
-                body.set(2, 180 + 420 * gust * gust, 0.8);
+                body.set(2, 140 + 320 * gust * gust, 0.9);
                 whistle.set(2, 600 + 300 * gust, 5);
             }
-            double w = body.process(base[i]) * gust + whistle.process(air[i]) * Math.max(0, gust - 0.75) * 0.6;
+            double w = body.process(base[i]) * gust * gust + whistle.process(air[i]) * Math.max(0, gust - 0.75) * 0.4;
             s[i] = (float) top.process(w);
         }
         return level(loop(clean(s), len), AMBIENT);
@@ -136,58 +136,70 @@ public final class Synth {
     // =====================================================================================
 
     /**
-     * A brook. Shallow running water is noise shaped by many small, moving resonances (water
-     * slipping over stones: the "gurgle"), with a few bubbles as accents rather than a cloud of
-     * them, which would sound like a synthesiser.
+     * A brook. Running water is mostly the sound of air bubbles trapped and ringing as the water
+     * tumbles (Minnaert resonances, rising in pitch as they surface): a dense, irregular cloud of
+     * tiny, soft "blips" between 400 Hz and 2 kHz, over a gentle low wash. No hiss on top: the
+     * highs are rolled off, which is what makes water sound wet rather than like static.
      */
     public static float[] brook(double seconds, long seed) {
         SplittableRandom r = new SplittableRandom(seed);
         int len = samples(seconds), fade = samples(0.4), n = len + fade;
-        float[] noise = pink(n, r), s = new float[n];
-        int bands = 6;
-        Biquad[] f = new Biquad[bands];
-        double[] centre = new double[bands], target = new double[bands], gain = new double[bands], gainTarget = new double[bands];
-        for (int b = 0; b < bands; b++) {
-            centre[b] = target[b] = logUniform(r, 350, 1800);
-            gain[b] = gainTarget[b] = 0.5;
-            f[b] = Biquad.bandpass(centre[b], 6);
-        }
-        for (int i = 0; i < n; i++) {
-            if (i % 64 == 0) for (int b = 0; b < bands; b++) {
-                if (r.nextDouble() < 0.02) { // each little stream of water changes its tune now and then
-                    target[b] = logUniform(r, 350, 1800);
-                    gainTarget[b] = r.nextDouble();
-                }
-                centre[b] += (target[b] - centre[b]) * 0.03;
-                gain[b] += (gainTarget[b] - gain[b]) * 0.05;
-                f[b].set(2, centre[b], 6);
-            }
-            double v = 0;
-            for (int b = 0; b < bands; b++) v += f[b].process(noise[i]) * gain[b];
-            s[i] = (float) v;
-        }
-        float[] wash = lowpass(highpass(pink(n, r), 600), 5000);
-        mix(s, wash, 0, 0.15);
-        for (int b = 0; b < (int) (12 * seconds); b++)
-            mixWrapped(s, bubble(logUniform(r, 500, 1500), 0.008 + r.nextDouble() * 0.01, 0.4), r.nextInt(len), 0.06 * r.nextDouble());
-        return level(loop(clean(s), len), AMBIENT);
+        float[] s = flow(n, len, r, 300, 1400, 1);
+        bubbles(s, r, len, seconds * 90, 450, 1800, 0.15);
+        lowpass(s, 3000);
+        return level(loop(clean(s), len), AMBIENT_QUIET + 2);
     }
 
-    /** A river: a full, soft rush with a low rumble of the current, breathing slightly. */
+    /** A river: a deep, soft rush of the current, and many lower, duller bubbles further off. */
     public static float[] river(double seconds, long seed) {
         SplittableRandom r = new SplittableRandom(seed);
         int len = samples(seconds), fade = samples(0.5), n = len + fade;
-        float[] s = rumble(n, r, 120, 1400);
-        mix(s, rumble(n, r, 60, 250), 0, 0.6);
-        Biquad g = Biquad.bandpass(600, 3);
-        float[] noise = pink(n, r);
-        for (int i = 0; i < n; i++) {
-            if (i % 256 == 0) g.set(2, 450 + 300 * Math.sin(2 * Math.PI * 3 * (i % len) / (double) len), 3);
-            s[i] += (float) (g.process(noise[i]) * 0.35); // a slow swirl in the middle
-        }
+        float[] s = flow(n, len, r, 150, 900, 1);
+        mix(s, rumble(n, r, 60, 300), 0, 0.5);
+        float[] cloud = new float[n];
+        bubbles(cloud, r, len, seconds * 120, 250, 1000, 0.08);
+        mix(s, lowpass(cloud, 1500), 0, 1);
         double p = r.nextDouble() * 6.28;
-        for (int i = 0; i < n; i++) s[i] *= (float) (0.9 + 0.1 * Math.sin(2 * Math.PI * 2 * (i % len) / len + p));
-        return level(loop(clean(s), len), AMBIENT_LOUD);
+        for (int i = 0; i < n; i++) s[i] *= (float) (0.85 + 0.15 * Math.sin(2 * Math.PI * 2 * (i % len) / len + p));
+        return level(loop(clean(s), len), AMBIENT);
+    }
+
+    /**
+     * The rush of a current: pink noise through three broad, slowly wandering bands between lo
+     * and hi Hz (the water's surface sliding and swirling), each band swelling on its own.
+     */
+    private static float[] flow(int n, int len, SplittableRandom r, double lo, double hi, double gain) {
+        float[] noise = pink(n, r), s = new float[n];
+        Biquad[] f = new Biquad[3];
+        double[] p = new double[3], c = new double[3];
+        for (int b = 0; b < 3; b++) {
+            p[b] = r.nextDouble() * 6.28;
+            c[b] = 1 + r.nextInt(3); // whole cycles per loop: seamless
+            f[b] = Biquad.bandpass(lo, 1.2);
+        }
+        for (int i = 0; i < n; i++) {
+            double u = (i % len) / (double) len, v = 0;
+            for (int b = 0; b < 3; b++) {
+                double w = 0.5 + 0.5 * Math.sin(2 * Math.PI * c[b] * u + p[b]);
+                if (i % 64 == 0) f[b].set(2, lo * Math.pow(hi / lo, (b + w) / 3), 1.2);
+                v += f[b].process(noise[i]) * (0.6 + 0.4 * w);
+            }
+            s[i] = (float) (v * gain);
+        }
+        return s;
+    }
+
+    /** Scatters {@code count} rising bubbles over a loop, in bursts (water tumbles in little gulps). */
+    private static void bubbles(float[] s, SplittableRandom r, int len, double count, double lo, double hi, double gain) {
+        double t = 0, rate = count / (len / (double) RATE);
+        while (t < len / (double) RATE) {
+            double gulp = 0.5 + 1.5 * r.nextDouble(); // a moment of more or fewer bubbles
+            for (int k = 0; k < 6; k++) {
+                t += -Math.log(1 - r.nextDouble()) / (rate * gulp);
+                double f = logUniform(r, lo, hi), tau = 0.004 + 0.01 * r.nextDouble() * (lo / f);
+                mixWrapped(s, bubble(f, tau, 0.6 + r.nextDouble()), samples(t), gain * Math.pow(r.nextDouble(), 2));
+            }
+        }
     }
 
     /** A waterfall: a broad roar, heavy in the lows, the top rolled off. */
@@ -265,6 +277,83 @@ public final class Synth {
                 }
         }
         return level(loop(clean(s), len), AMBIENT_QUIET);
+    }
+
+    /**
+     * Cicadas on a summer day, as their body makes them: a tymbal clicking 150-250 times a second,
+     * each click ringing the hollow abdomen (a resonance around 4-5 kHz, damped fast). A few
+     * insects in the trees, each singing phrases that swell and fade over seconds; all are far,
+     * so their highs are softened.
+     */
+    public static float[] insects(double seconds, long seed) {
+        SplittableRandom r = new SplittableRandom(seed);
+        int len = samples(seconds), fade = samples(0.5), n = len + fade;
+        float[] s = new float[n];
+        for (int c = 0; c < 3; c++) {
+            double f = 4500 + r.nextDouble() * 1500, rate = 250 + r.nextDouble() * 150, gain = 0.35 + 0.65 * r.nextDouble();
+            float[] click = mode(f, 0.0012, 0.006);
+            shape(click, t -> Math.min(1, t / 0.0003));
+            for (double start = r.nextDouble() * 2; start < seconds; ) {
+                double phrase = 2 + r.nextDouble() * 3;
+                double beat = 1 / (5 + r.nextDouble() * 5), echeme = beat * (0.45 + r.nextDouble() * 0.2);
+                for (double t = 0; t < phrase; t += (1 + 0.04 * white(r)) / rate) {
+                    double inBeat = (t % beat) / echeme; // clicks come in short trains, several a second
+                    if (inBeat > 1) continue;
+                    double env = Math.pow(Math.sin(Math.PI * t / phrase), 1.5) * Math.sin(Math.PI * inBeat);
+                    mixWrapped(s, click, samples(start + t), gain * env * (0.8 + 0.2 * r.nextDouble()));
+                }
+                start += phrase + 1 + r.nextDouble() * 3;
+            }
+        }
+        lowpass(s, 6500);
+        return level(loop(clean(s), len), AMBIENT_QUIET - 10);
+    }
+
+    /**
+     * Frogs by the water at night: a few voices, each croak a short "rrr-ek" of glottal pulses
+     * (70-110 a second) through two throat resonances, falling a little in pitch; each frog calls
+     * again at its own unsteady pace, and the far ones are dull.
+     */
+    public static float[] frogs(double seconds, long seed) {
+        SplittableRandom r = new SplittableRandom(seed);
+        int len = samples(seconds), fade = samples(0.3), n = len + fade;
+        float[] s = new float[n];
+        for (int c = 0; c < 4; c++) {
+            double f = 380 + r.nextDouble() * 250, period = 1.2 + r.nextDouble() * 1.8, rate = 70 + r.nextDouble() * 40;
+            double gain = 0.25 + 0.75 * Math.pow(r.nextDouble(), 2);
+            for (double t = r.nextDouble() * period; t < seconds; t += period * (0.7 + r.nextDouble() * 0.6)) {
+                int syllables = 1 + r.nextInt(2);
+                for (int y = 0; y < syllables; y++) {
+                    double length = y == 0 ? 0.09 + r.nextDouble() * 0.05 : 0.05;
+                    float[] croak = new float[samples(length + 0.02)];
+                    for (int k = 0; k < length * rate; k++) {
+                        double drop = 1 - 0.12 * k / (length * rate);
+                        mix(croak, mode(f * drop, 0.004, 0.02), samples(k / rate), 1);
+                        mix(croak, mode(f * 2.7 * drop, 0.002, 0.012), samples(k / rate), 0.5);
+                    }
+                    shape(croak, x -> Math.sin(Math.PI * Math.min(1, x / (length + 0.02))));
+                    float[] voice = gain < 0.5 ? lowpass(croak, 1200) : croak;
+                    mixWrapped(s, voice, samples(t + y * 0.16), gain);
+                }
+            }
+        }
+        return level(loop(clean(s), len), AMBIENT_QUIET);
+    }
+
+    /** An owl at night: two or three soft, breathy hoots around 350-450 Hz, the last one longer. */
+    public static float[] owl(long seed) {
+        SplittableRandom r = new SplittableRandom(seed);
+        double f = 350 + r.nextDouble() * 100;
+        int hoots = 2 + r.nextInt(2);
+        float[] s = new float[samples(hoots * 0.55 + 0.9)];
+        for (int k = 0; k < hoots; k++) {
+            double len = k == hoots - 1 ? 0.7 : 0.3, at = k * 0.5 + (k == hoots - 1 ? 0.15 : 0);
+            float[] h = note(r, t -> f * (1 + 0.05 * Math.sin(Math.PI * t / len)), len, 0.15);
+            float[] breath = scale(bandpass(white(h.length, r), f * 2, 2), 0.25);
+            for (int i = 0; i < h.length; i++) h[i] += breath[i] * (float) Math.pow(Math.sin(Math.PI * i / h.length), 2);
+            mix(s, h, samples(at), 0.9);
+        }
+        return level(space(lowpass(s, 1800), 0.5), BIRD);
     }
 
     /** One bird call; {@code kind} 0..5 picks a song type, the seed varies it. */
@@ -475,7 +564,7 @@ public final class Synth {
                 case GLASS -> knock(s, r, at, new double[][] {{1600, 0.008, 0.25}, {3100, 0.006, 0.12}, {700, 0.006, 0.3}}, 0.5, g);
             }
         }
-        return level(space(oneShot(s, 0.8), 0.3), STEP);
+        return level(space(lowpass(lowpass(oneShot(s, 0.8), 2600), 2600), 0.5), STEP - 6); // heard from head height: soft, a little distant
     }
 
     /** A block broken: how it gives way and what falls tell what it was made of. */

@@ -405,7 +405,8 @@ public final class Main {
         }
         pauseMenu.volume = Math.max(0, Math.min(100, Integer.parseInt(options.getProperty("volume", "60").trim())));
         sound.setVolume(pauseMenu.volume / 100f);
-        double stepDistance = 0, lastStepX = player.x, lastStepZ = player.z, waterScanAt = -1;
+        double stepDistance = 0, lastStepX = player.x, lastStepZ = player.z, waterScanAt = -1, fallSpeed = 0;
+        boolean wasOnGround = true;
         SoundEngine.Ambience ambience = new SoundEngine.Ambience();
         double nextHitSound = 0;
         short lastFluid = Blocks.FLUID_NONE;
@@ -615,6 +616,20 @@ public final class Main {
                 accumulator -= PHYSICS_STEP;
             }
             cam.pos.set(player.x, player.y + Player.EYE_HEIGHT, player.z);
+            // Jumping: a light scuff as the feet leave the ground; landing: a heavier step when it stops a fall.
+            if (wasOnGround && !player.onGround && player.vy > Player.JUMP_VELOCITY * 0.8 && player.fluid == Blocks.FLUID_NONE && !player.flying) {
+                short ground = world.get((int) Math.floor(player.x), (int) Math.floor(player.y - 0.5), (int) Math.floor(player.z));
+                sound.jump(material(ground), player.x, player.y, player.z);
+            }
+            wasOnGround = player.onGround;
+            if (!player.onGround) fallSpeed = Math.max(fallSpeed, -player.vy);
+            else {
+                if (fallSpeed > 5 && player.fluid == Blocks.FLUID_NONE && !player.flying) {
+                    short ground = world.get((int) Math.floor(player.x), (int) Math.floor(player.y - 0.2), (int) Math.floor(player.z));
+                    sound.land(material(ground), player.x, player.y, player.z, fallSpeed);
+                }
+                fallSpeed = 0;
+            }
             // Footsteps: one every 1.7 blocks walked on the ground (a splash in water), by material.
             double walked = Math.hypot(player.x - lastStepX, player.z - lastStepZ);
             lastStepX = player.x;
@@ -891,6 +906,7 @@ public final class Main {
                 ambience.sheltered = sheltered(world, cam.pos.x, cam.pos.y, cam.pos.z);
                 ambience.wind = here == null || paused ? 0 : (float) (Math.hypot(here.windX(), here.windZ()) * (1 + Math.max(0, cam.pos.y - 80) / 80));
                 ambience.daylight = (DayCycle.daylight(ticks) - 0.15f) / 0.85f;
+                ambience.warmth = (float) ((net.mynecraft.world.life.Ecosystem.temperatureOffset(life.eco.season().phase()) + 11) / 18);
                 sound.update(cam.pos.x, cam.pos.y, cam.pos.z, cam.yaw, cam.pitch, ambience, weatherClock);
             }
             if (stats != null) {
