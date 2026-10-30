@@ -256,8 +256,8 @@ final class SoundEngine {
         target("rain_heavy", a.hail ? 0 : rain * heavy * 0.9f * out, dt);
         target("rain_roof", a.sheltered && !a.hail ? rain * 0.9f : 0, dt);
         target("hail", a.hail ? a.rain * outside * (a.sheltered ? 0.5f : 1) : 0, dt);
-        float wind = Math.min(1, Math.max(0, (a.wind - 1.5f) / 12)) * (0.15f + 0.85f * outside);
-        target("wind", wind * 0.7f * out, dt);
+        float wind = (float) Math.pow(Math.min(1, Math.max(0, (a.wind - 2f) / 18)), 1.5) * (0.15f + 0.85f * outside);
+        target("wind", wind * 0.5f * out, dt);
         target("leaves", wind * a.forest * 0.8f * out, dt);
         float night = 1 - smooth(0.2f, 0.6f, a.daylight);
         float dry = 1 - Math.min(1, a.rain * 2), alive = smooth(0.15f, 0.5f, a.warmth), summer = smooth(0.55f, 0.9f, a.warmth);
