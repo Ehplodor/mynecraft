@@ -32,7 +32,7 @@ public final class LightEngine {
         public int opacity(int x, int y, int z) {
             if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return -1;
             Chunk c = world.chunk(x >> 4, z >> 4);
-            return c == null ? -1 : Blocks.OPACITY[c.get(x & 15, y, z & 15) & 0xFF];
+            return c == null ? -1 : Blocks.OPACITY[c.get(x & 15, y, z & 15) & 0xFFFF];
         }
         public int get(int x, int y, int z) {
             return world.getLight(x, y, z);
@@ -78,13 +78,13 @@ public final class LightEngine {
                         y = Chunk.sectionMinY(sy); // empty and fully sunlit: the default light already
                         continue;
                     }
-                    byte b = c.get(x, y, z);
-                    int op = Blocks.OPACITY[b & 0xFF];
+                    short b = c.get(x, y, z);
+                    int op = Blocks.OPACITY[b & 0xFFFF];
                     if (sky != 15 || op != 0) {
                         if (t < Chunk.MIN_Y) t = y;
                         sky = Math.max(0, sky - Math.max(1, op));
                     }
-                    int emission = Blocks.EMISSION[b & 0xFF];
+                    int emission = Blocks.EMISSION[b & 0xFFFF];
                     if (emission > 0) blockSeeds.push(pack(x, y, z), 0);
                     c.setLight(x, y, z, sky << 4 | emission);
                 }
@@ -94,7 +94,7 @@ public final class LightEngine {
         Access a = new Access() {
             public int opacity(int x, int y, int z) {
                 if (x < 0 || x > 15 || z < 0 || z > 15 || y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return -1;
-                return Blocks.OPACITY[c.get(x, y, z) & 0xFF];
+                return Blocks.OPACITY[c.get(x, y, z) & 0xFFFF];
             }
             public int get(int x, int y, int z) { return c.getLight(x, y, z); }
             public void set(int x, int y, int z, int value) { c.setLight(x, y, z, value); }
@@ -134,17 +134,17 @@ public final class LightEngine {
 
     /** Re-lights around a changed block. */
     void blockChanged(int x, int y, int z) {
-        byte b = world.get(x, y, z);
+        short b = world.get(x, y, z);
         for (int shift : new int[] {SKY, BLOCK}) {
             int old = (worldAccess.get(x, y, z) >> shift) & 15;
             write(worldAccess, shift, x, y, z, 0);
             if (old > 0) removeQueue.push(pack(x, y, z), old);
             remove(worldAccess, shift);
-            if (shift == BLOCK && Blocks.EMISSION[b & 0xFF] > 0) {
-                write(worldAccess, shift, x, y, z, Blocks.EMISSION[b & 0xFF]);
+            if (shift == BLOCK && Blocks.EMISSION[b & 0xFFFF] > 0) {
+                write(worldAccess, shift, x, y, z, Blocks.EMISSION[b & 0xFFFF]);
                 addQueue.push(pack(x, y, z), 0);
             }
-            if (shift == SKY && y == Chunk.MAX_Y - 1 && Blocks.OPACITY[b & 0xFF] == 0) {
+            if (shift == SKY && y == Chunk.MAX_Y - 1 && Blocks.OPACITY[b & 0xFFFF] == 0) {
                 write(worldAccess, shift, x, y, z, 15);
                 addQueue.push(pack(x, y, z), 0);
             }
@@ -261,7 +261,7 @@ public final class LightEngine {
                 if (nl < lv || (shift == SKY && d == DOWN && lv == 15 && nl == 15)) {
                     write(a, shift, nx, ny, nz, 0);
                     removeQueue.push(pack(nx, ny, nz), nl);
-                    int emission = shift == BLOCK ? Blocks.EMISSION[world.get(nx, ny, nz) & 0xFF] : 0;
+                    int emission = shift == BLOCK ? Blocks.EMISSION[world.get(nx, ny, nz) & 0xFFFF] : 0;
                     if (emission > 0) {
                         write(a, shift, nx, ny, nz, emission);
                         addQueue.push(pack(nx, ny, nz), 0);

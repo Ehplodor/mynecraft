@@ -93,8 +93,8 @@ public final class Creature {
         blocked = Math.abs(mx - dx) > 1e-4 || Math.abs(mz - dz) > 1e-4;
         if (Math.abs(mx - dx) > EPS) vx = 0;
         if (Math.abs(mz - dz) > EPS) vz = 0;
-        byte at = w.get(fl(x), fl(y + height() * 0.4), fl(z));
-        inWater = Blocks.FLUID[at & 0xFF] == Blocks.FLUID_WATER;
+        short at = w.get(fl(x), fl(y + height() * 0.4), fl(z));
+        inWater = Blocks.FLUID[at & 0xFFFF] == Blocks.FLUID_WATER;
     }
 
     /** True when the last move was stopped by a wall. */

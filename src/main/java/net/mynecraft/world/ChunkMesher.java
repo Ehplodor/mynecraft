@@ -75,10 +75,17 @@ public final class ChunkMesher {
     private static final Result SOLID = new Result(new int[0], 0, 0, 0, 0);
     private final Chunk[] around = new Chunk[9];
     private final int[] faceInfo;
-    private final byte[] padded = new byte[P * P * P];
+    private final short[] padded = new short[P * P * P];
     private final byte[] paddedLight = new byte[P * P * P];
     private final long[] mask = new long[Section.SIZE * Section.SIZE];
-    private static final int WATER_SURFACE = 0x80; // key bit on the block field (ids stay below 128)
+    private static final int WATER_SURFACE = 0x80; // key bit on the block field (local palette index below 128)
+    /**
+     * The merge key has room for 7 bits of block, so blocks are keyed by a palette local to the section
+     * being meshed (a padded section never holds anywhere near 127 distinct states); global ids are shorts.
+     */
+    private final short[] palette = new short[128];
+    private final byte[] paletteIndex = new byte[Blocks.COUNT];
+    private int paletteSize;
     private final int[][] out = {new int[4096], new int[1024], new int[1024]};
     private final int[] count = new int[3];
     private final SectionVisibility visibility = new SectionVisibility();
@@ -99,6 +106,17 @@ public final class ChunkMesher {
         return t;
     }
 
+    /** Palette index of a block for the merge key, assigned on first use in the current section. */
+    private int local(short b) {
+        int i = paletteIndex[b];
+        if (i == 0) {
+            if (paletteSize == 127) throw new IllegalStateException("more than 127 block states around one section");
+            palette[++paletteSize] = b;
+            i = paletteIndex[b] = (byte) paletteSize;
+        }
+        return i;
+    }
+
     private static int pIndex(int x, int y, int z) {
         return ((y + 1) * P + (z + 1)) * P + (x + 1);
     }
@@ -107,6 +125,8 @@ public final class ChunkMesher {
         Section section = chunk.section(sy);
         if (section == null) return Result.EMPTY;
         if (section.isFullyOpaque() && buried(world, chunk, sy)) return SOLID;
+        for (int i = 1; i <= paletteSize; i++) paletteIndex[palette[i]] = 0;
+        paletteSize = 0;
         fillPadded(world, chunk, sy, section);
         Arrays.fill(count, 0);
         for (int d = 0; d < 3; d++) {
@@ -217,18 +237,18 @@ public final class ChunkMesher {
                 for (int i = 0; i < Section.SIZE; i++) {
                     pos[u] = i;
                     int idx = pIndex(pos[0], pos[1], pos[2]);
-                    byte b = padded[idx];
+                    short b = padded[idx];
                     long key = 0;
-                    if (Blocks.SHAPE[b & 0xFF] == Blocks.SHAPE_CUBE
+                    if (Blocks.SHAPE[b & 0xFFFF] == Blocks.SHAPE_CUBE
                         && (Blocks.faceVisible(b, padded[idx + step]) || fluidStep(b, idx, idx + step, d, up))) {
                         int f = idx + step;
                         // Corners in quad order (u0,v0), (u1,v0), (u1,v1), (u0,v1).
                         long ao = ao(f, -su, -sv) | ao(f, su, -sv) << 2 | ao(f, su, sv) << 4 | ao(f, -su, sv) << 6;
                         long light = (long) smoothLight(f, -su, -sv) | (long) smoothLight(f, su, -sv) << 12
                             | (long) smoothLight(f, su, sv) << 24 | (long) smoothLight(f, -su, sv) << 36;
-                        int blockField = b & 0xFF;
+                        int blockField = local(b);
                         // Fluid surface: lowered unless the same fluid continues above.
-                        if (Blocks.isFluid(b) && Blocks.FLUID[padded[idx + up] & 0xFF] != Blocks.FLUID[b & 0xFF]) {
+                        if (Blocks.isFluid(b) && Blocks.FLUID[padded[idx + up] & 0xFF] != Blocks.FLUID[b & 0xFFFF]) {
                             blockField |= WATER_SURFACE;
                         }
                         if (Blocks.isFluid(b) && fluidCorners(b, idx, up)) {
@@ -273,9 +293,9 @@ public final class ChunkMesher {
      * Works out the corner heights of a fluid cell and says whether it needs its own sloped quad:
      * flowing or falling fluid, or a surface whose corners are not all at the cell's own height.
      */
-    private boolean fluidCorners(byte b, int idx, int up) {
+    private boolean fluidCorners(short b, int idx, int up) {
         int own = surface(idx, up);
-        boolean flat = Blocks.LEVEL[b & 0xFF] == 0;
+        boolean flat = Blocks.LEVEL[b & 0xFFFF] == 0;
         for (int oz = 0; oz < 2; oz++)
             for (int ox = 0; ox < 2; ox++) {
                 int h = own == 16 ? 16 : cornerHeight(b, idx + (ox - 1) * STRIDE[0] + (oz - 1) * STRIDE[2], up);
@@ -290,17 +310,17 @@ public final class ChunkMesher {
      * fluid above; otherwise the mean of those cells' surfaces, open air counting as 0 (surfaces
      * slope down to a free edge), solid blocks not counting.
      */
-    private int cornerHeight(byte b, int low, int up) {
+    private int cornerHeight(short b, int low, int up) {
         int sum = 0, n = 0;
-        byte type = Blocks.FLUID[b & 0xFF];
+        byte type = Blocks.FLUID[b & 0xFFFF];
         for (int k = 0; k < 4; k++) {
             int i = low + (k & 1) * STRIDE[0] + (k >> 1) * STRIDE[2];
-            byte c = padded[i];
-            if (Blocks.FLUID[c & 0xFF] == type) {
+            short c = padded[i];
+            if (Blocks.FLUID[c & 0xFFFF] == type) {
                 if (Blocks.FLUID[padded[i + up] & 0xFF] == type) return 16;
                 int h = Blocks.fluidHeight(c);
-                sum += Blocks.LEVEL[c & 0xFF] == 0 ? h * 4 : h; // sources weigh more, like vanilla
-                n += Blocks.LEVEL[c & 0xFF] == 0 ? 4 : 1;
+                sum += Blocks.LEVEL[c & 0xFFFF] == 0 ? h * 4 : h; // sources weigh more, like vanilla
+                n += Blocks.LEVEL[c & 0xFFFF] == 0 ? 4 : 1;
             } else if (!Blocks.isSolid(c)) {
                 n++;
             }
@@ -309,7 +329,7 @@ public final class ChunkMesher {
     }
 
     /** One fluid cell face with per-corner surface heights (see SPECIAL_FLUID_CORNERS). */
-    private void emitFluidCell(int d, int u, int v, int plane, int i, int j, int face, byte b, boolean positive, long light) {
+    private void emitFluidCell(int d, int u, int v, int plane, int i, int j, int face, short b, boolean positive, long light) {
         int[] p = new int[3];
         p[d] = plane;
         p[u] = i;
@@ -323,7 +343,7 @@ public final class ChunkMesher {
         }
         int l0 = (int) light & 0xFFF, l1 = (int) (light >> 12) & 0xFFF, l2 = (int) (light >> 24) & 0xFFF, l3 = (int) (light >>> 36) & 0xFFF;
         int info = faceInfo[(b & 0xFF) * 6 + face];
-        put(Blocks.LAYER[b & 0xFF], p[0], p[1], p[2], face, 0, 0, SPECIAL_FLUID_CORNERS, false, info,
+        put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], face, 0, 0, SPECIAL_FLUID_CORNERS, false, info,
             l0 | l1 << 12 | (nib[2] | nib[3] << 4) << 24, l2 | l3 << 12 | (nib[0] | nib[1] << 4) << 24);
     }
 
@@ -331,20 +351,20 @@ public final class ChunkMesher {
      * A side face between two cells of the same fluid is still visible where the neighbour's surface
      * is lower (a flowing step), otherwise a gap would show between the two surfaces.
      */
-    private boolean fluidStep(byte b, int idx, int n, int d, int up) {
-        if (d == 1 || !Blocks.isFluid(b) || Blocks.FLUID[padded[n] & 0xFF] != Blocks.FLUID[b & 0xFF]) return false;
+    private boolean fluidStep(short b, int idx, int n, int d, int up) {
+        if (d == 1 || !Blocks.isFluid(b) || Blocks.FLUID[padded[n] & 0xFF] != Blocks.FLUID[b & 0xFFFF]) return false;
         return surface(idx, up) > surface(n, up);
     }
 
     /** Height of a fluid cell's surface in sixteenths: full when the same fluid continues above. */
     private int surface(int i, int up) {
-        byte b = padded[i];
-        return Blocks.FLUID[padded[i + up] & 0xFF] == Blocks.FLUID[b & 0xFF] ? 16 : Blocks.fluidHeight(b);
+        short b = padded[i];
+        return Blocks.FLUID[padded[i + up] & 0xFF] == Blocks.FLUID[b & 0xFFFF] ? 16 : Blocks.fluidHeight(b);
     }
 
     private void emitQuad(int d, int u, int v, int plane, int i, int j, int w, int h,
                           int face, long key, boolean positive) {
-        int blockField = (int) (key & 0xFF), block = blockField & 0x7F;
+        int blockField = (int) (key & 0xFF), block = palette[blockField & 0x7F];
         int a0 = (int) (key >> 8) & 3, a1 = (int) (key >> 10) & 3, a2 = (int) (key >> 12) & 3, a3 = (int) (key >> 14) & 3;
         int l0 = (int) (key >> 16) & 0xFFF, l1 = (int) (key >> 28) & 0xFFF, l2 = (int) (key >> 40) & 0xFFF, l3 = (int) (key >>> 52);
         int[] p = new int[3];
@@ -354,7 +374,7 @@ public final class ChunkMesher {
         int info = faceInfo[block * 6 + face];
         boolean surface = (blockField & WATER_SURFACE) != 0;
         int special = surface ? SPECIAL_FLUID : overlay(info);
-        int fluidTop = surface ? Blocks.fluidHeight((byte) block) << 24 : 0;
+        int fluidTop = surface ? Blocks.fluidHeight((short) block) << 24 : 0;
         // Brightness per corner decides the split diagonal, otherwise light and AO look anisotropic.
         boolean split = score(a0, l0) + score(a2, l2) > score(a1, l1) + score(a3, l3);
         put(Blocks.LAYER[block], p[0], p[1], p[2], face, w - 1, h - 1, special, split, info,
@@ -394,8 +414,8 @@ public final class ChunkMesher {
             for (int z = 0; z < 16; z++)
                 for (int x = 0; x < 16; x++) {
                     int idx = pIndex(x, y, z);
-                    byte b = padded[idx];
-                    if (Blocks.SHAPE[b & 0xFF] != Blocks.SHAPE_CROSS) continue;
+                    short b = padded[idx];
+                    if (Blocks.SHAPE[b & 0xFFFF] != Blocks.SHAPE_CROSS) continue;
                     int[] light = flatLight(paddedLight[idx] & 0xFF);
                     int info = faceInfo[(b & 0xFF) * 6 + 4];
                     for (int diagonal = 0; diagonal < 2; diagonal++)
@@ -414,8 +434,8 @@ public final class ChunkMesher {
             for (int z = 0; z < 16; z++)
                 for (int x = 0; x < 16; x++) {
                     int idx = pIndex(x, y, z);
-                    byte b = padded[idx];
-                    byte shape = Blocks.SHAPE[b & 0xFF];
+                    short b = padded[idx];
+                    byte shape = Blocks.SHAPE[b & 0xFFFF];
                     if (shape != Blocks.SHAPE_SLAB_BOTTOM && shape != Blocks.SHAPE_SLAB_TOP) continue;
                     boolean top = shape == Blocks.SHAPE_SLAB_TOP;
                     for (int f = 0; f < 6; f++) {
@@ -427,7 +447,7 @@ public final class ChunkMesher {
                         int[] light = flatLight(paddedLight[inner ? idx : n] & 0xFF);
                         int[] p = {x, y, z};
                         if (positive) p[d]++;
-                        put(Blocks.LAYER[b & 0xFF], p[0], p[1], p[2], f, 0, 0, top ? SPECIAL_SLAB_TOP : SPECIAL_SLAB_BOTTOM,
+                        put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], f, 0, 0, top ? SPECIAL_SLAB_TOP : SPECIAL_SLAB_BOTTOM,
                             false, faceInfo[(b & 0xFF) * 6 + f], light[0], light[1]);
                     }
                 }

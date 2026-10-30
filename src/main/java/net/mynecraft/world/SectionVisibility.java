@@ -34,7 +34,7 @@ public final class SectionVisibility {
 
     public int compute(Section s) {
         if (s == null) return ALL;
-        byte[] blocks = s.blocks;
+        short[] blocks = s.blocks;
         java.util.Arrays.fill(seen, false);
         int result = 0;
         for (int start = 0; start < Section.VOLUME; start++) {
@@ -63,7 +63,7 @@ public final class SectionVisibility {
         return result;
     }
 
-    private int visit(byte[] blocks, int i, int top) {
+    private int visit(short[] blocks, int i, int top) {
         if (!seen[i] && !Blocks.isOpaque(blocks[i])) {
             seen[i] = true;
             stack[top++] = i;

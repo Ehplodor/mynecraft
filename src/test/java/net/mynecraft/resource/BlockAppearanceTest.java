@@ -29,11 +29,11 @@ class BlockAppearanceTest {
         };
     }
 
-    private static String tex(BlockAppearance a, byte block, int face) {
+    private static String tex(BlockAppearance a, short block, int face) {
         return a.textures.get(a.faceInfo[block * 6 + face] & BlockAppearance.LAYER_MASK);
     }
 
-    private static boolean tinted(BlockAppearance a, byte block, int face) {
+    private static boolean tinted(BlockAppearance a, short block, int face) {
         return (a.faceInfo[block * 6 + face] >> BlockAppearance.TINT_SHIFT & 3) != 0;
     }
 

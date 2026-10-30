@@ -44,7 +44,7 @@ public final class TerrainGenerator {
                 for (int dx = -r; dx <= r; dx += 16) {
                     if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                     Landscape.Column c = landscape.column(x + dx, z + dz);
-                    byte b = c.biome();
+                    short b = c.biome();
                     if (c.height() > SEA_LEVEL + 1 && c.height() < ROCK_LINE && b != Landscape.BEACH
                         && b != Landscape.GLACIER && b != Landscape.SNOWY_PEAKS) {
                         return new int[] {x + dx, c.height() + 1, z + dz};
@@ -67,7 +67,7 @@ public final class TerrainGenerator {
         Chunk c = new Chunk(cx, cz);
         Landscape.Column[] cols = landscape.chunkColumns(cx, cz);
         int[] heights = new int[256];
-        byte[] biomes = new byte[256];
+        short[] biomes = new short[256];
         int minH = Integer.MAX_VALUE;
         for (int z = 0; z < 16; z++)
             for (int x = 0; x < 16; x++) {
@@ -85,7 +85,7 @@ public final class TerrainGenerator {
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
                 int h = heights[z * 16 + x];
-                byte biome = biomes[z * 16 + x];
+                short biome = biomes[z * 16 + x];
                 // Steep ground shows bare rock (cliffs, plateau edges, ravine walls).
                 int steep = 0;
                 for (int[] o : new int[][] {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
@@ -93,7 +93,7 @@ public final class TerrainGenerator {
                     // Against water, the drop that shows is down to the surface, not to the bed.
                     steep = Math.max(steep, h - Math.max(nb.height(), Math.max(SEA_LEVEL, nb.water())));
                 }
-                byte[] surface = surface(biome, h, steep > 3);
+                short[] surface = surface(biome, h, steep > 3);
                 c.set(x, Chunk.MIN_Y, z, Blocks.BEDROCK);
                 for (int y = stoneFrom; y < h - 3; y++) c.set(x, y, z, y < DEEPSLATE_TOP ? Blocks.DEEPSLATE : Blocks.STONE);
                 for (int y = Math.max(Chunk.MIN_Y + 1, h - 3); y < h; y++) c.set(x, y, z, surface[1]);
@@ -117,24 +117,24 @@ public final class TerrainGenerator {
     }
 
     /** Top block and the 3 blocks below it for a biome. */
-    private static byte[] surface(byte biome, int h, boolean steep) {
+    private static short[] surface(short biome, int h, boolean steep) {
         switch (biome) {
             case Landscape.OCEAN, Landscape.FROZEN_OCEAN:
-                return h < SEA_LEVEL - 12 ? new byte[] {Blocks.GRAVEL, Blocks.GRAVEL} : new byte[] {Blocks.SAND, Blocks.SAND};
+                return h < SEA_LEVEL - 12 ? new short[] {Blocks.GRAVEL, Blocks.GRAVEL} : new short[] {Blocks.SAND, Blocks.SAND};
             case Landscape.RIVER, Landscape.FROZEN_RIVER, Landscape.LAKE:
-                return new byte[] {Blocks.SAND, Blocks.DIRT};
+                return new short[] {Blocks.SAND, Blocks.DIRT};
             case Landscape.BEACH:
-                return new byte[] {Blocks.SAND, Blocks.SAND};
+                return new short[] {Blocks.SAND, Blocks.SAND};
             case Landscape.STONY_PEAKS:
-                return new byte[] {Blocks.STONE, Blocks.STONE};
+                return new short[] {Blocks.STONE, Blocks.STONE};
             case Landscape.SNOWY_PEAKS:
-                return new byte[] {steep ? Blocks.STONE : Blocks.SNOW_BLOCK, Blocks.STONE};
+                return new short[] {steep ? Blocks.STONE : Blocks.SNOW_BLOCK, Blocks.STONE};
             case Landscape.GLACIER:
-                return new byte[] {Blocks.PACKED_ICE, Blocks.STONE};
+                return new short[] {Blocks.PACKED_ICE, Blocks.STONE};
             case Landscape.SNOWY_PLAINS, Landscape.SNOWY_TAIGA:
-                return new byte[] {steep ? Blocks.STONE : Blocks.SNOW_BLOCK, Blocks.DIRT};
+                return new short[] {steep ? Blocks.STONE : Blocks.SNOW_BLOCK, Blocks.DIRT};
             default:
-                return steep ? new byte[] {Blocks.STONE, Blocks.STONE} : new byte[] {Blocks.GRASS, Blocks.DIRT};
+                return steep ? new short[] {Blocks.STONE, Blocks.STONE} : new short[] {Blocks.GRASS, Blocks.DIRT};
         }
     }
 
@@ -163,15 +163,15 @@ public final class TerrainGenerator {
     }
 
     /** Trees and plants, with densities and species per biome. Trees stay inside the chunk. */
-    private void decorate(Chunk c, int[] heights, byte[] biomes) {
+    private void decorate(Chunk c, int[] heights, short[] biomes) {
         int cx = c.cx, cz = c.cz;
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
                 int h = heights[z * 16 + x];
-                byte ground = c.get(x, h, z);
+                short ground = c.get(x, h, z);
                 if (ground != Blocks.GRASS && ground != Blocks.SNOW_BLOCK) continue;
                 if (c.get(x, h + 1, z) != Blocks.AIR) continue;
-                byte biome = biomes[z * 16 + x];
+                short biome = biomes[z * 16 + x];
                 int r = hash((cx << 4) + x, (cz << 4) + z);
                 int trees = switch (biome) {
                     case Landscape.DARK_FOREST -> 140;
@@ -307,7 +307,7 @@ public final class TerrainGenerator {
     public static final int DEEPSLATE_TOP = 0;
 
     /** Vein kind: block, attempts per chunk, blob radius, height range. */
-    private record Vein(byte block, int count, double radius, int minY, int maxY) {}
+    private record Vein(short block, int count, double radius, int minY, int maxY) {}
 
     private static final Vein[] VEINS = {
         new Vein(Blocks.GRANITE, 3, 3.5, 0, 60), new Vein(Blocks.DIORITE, 3, 3.5, 0, 60),
@@ -333,7 +333,7 @@ public final class TerrainGenerator {
                             int bx = x + dx, by = y + dy, bz = z + dz;
                             if (bx < 0 || bx > 15 || bz < 0 || bz > 15 || by <= Chunk.MIN_Y || by >= Chunk.MAX_Y) continue;
                             if (dx * dx + dy * dy + dz * dz > v.radius * v.radius * (0.6 + 0.4 * rnd.nextDouble())) continue;
-                            byte cur = c.get(bx, by, bz);
+                            short cur = c.get(bx, by, bz);
                             if (cur == Blocks.STONE || cur == Blocks.DEEPSLATE) c.set(bx, by, bz, v.block);
                         }
             }
@@ -355,7 +355,7 @@ public final class TerrainGenerator {
         c.set(x, y - 1, z, Blocks.DIRT);
     }
 
-    private static void tree(Chunk c, int x, int y, int z, int trunk, byte log, byte leaves) {
+    private static void tree(Chunk c, int x, int y, int z, int trunk, short log, short leaves) {
         int top = y + trunk;
         for (int ly = top - 2; ly <= top + 1; ly++) {
             int r = ly >= top ? 1 : 2;
@@ -363,7 +363,7 @@ public final class TerrainGenerator {
                 for (int dx = -r; dx <= r; dx++) {
                     if (r == 2 && Math.abs(dx) == 2 && Math.abs(dz) == 2) continue; // round the corners
                     if (ly == top + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue;
-                    byte cur = c.get(x + dx, ly, z + dz);
+                    short cur = c.get(x + dx, ly, z + dz);
                     if (cur == Blocks.AIR || cur == Blocks.SHORT_GRASS || cur == Blocks.POPPY) {
                         c.set(x + dx, ly, z + dz, leaves);
                     }

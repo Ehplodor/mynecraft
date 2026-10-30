@@ -48,11 +48,11 @@ final class ItemNames {
         return Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
     }
 
-    String name(byte id) {
-        return names[id & 0xFF];
+    String name(short id) {
+        return names[id & 0xFFFF];
     }
 
-    boolean matches(byte id, String query) {
-        return query.isEmpty() || folded[id & 0xFF].contains(fold(query.trim()));
+    boolean matches(short id, String query) {
+        return query.isEmpty() || folded[id & 0xFFFF].contains(fold(query.trim()));
     }
 }

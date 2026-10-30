@@ -14,7 +14,7 @@ public final class Player {
     public double vx, vy, vz;
     public boolean onGround, flying;
     /** Fluid the body is in (Blocks.FLUID_*), updated every step. */
-    public byte fluid;
+    public short fluid;
 
     /** Integrates one step. Horizontal velocity is set by the controller; gravity is applied here. */
     public void step(World world, double dt) {
@@ -73,7 +73,7 @@ public final class Player {
         for (int by = fl(y - 1); by <= fl(y + HEIGHT - EPS); by++)
             for (int bz = fl(z - HALF_WIDTH); bz <= fl(z + HALF_WIDTH); bz++)
                 for (int bx = fl(x - HALF_WIDTH); bx <= fl(x + HALF_WIDTH); bx++)
-                    if (Blocks.FLUID[w.get(bx, by, bz) & 0xFF] != Blocks.FLUID_NONE) return true;
+                    if (Blocks.FLUID[w.get(bx, by, bz) & 0xFFFF] != Blocks.FLUID_NONE) return true;
         return false;
     }
 
@@ -81,15 +81,15 @@ public final class Player {
     /** Upward speed (blocks/s) of a swimmer pushing against a ledge. */
     private static final double CLIMB_OUT_SPEED = 5;
 
-    private byte fluidAround(World w) {
-        byte found = Blocks.FLUID_NONE;
+    private short fluidAround(World w) {
+        short found = Blocks.FLUID_NONE;
         for (int by = fl(y); by <= fl(y + HEIGHT - EPS); by++)
             for (int bz = fl(z - HALF_WIDTH); bz <= fl(z + HALF_WIDTH); bz++)
                 for (int bx = fl(x - HALF_WIDTH); bx <= fl(x + HALF_WIDTH); bx++) {
-                    byte b = w.get(bx, by, bz);
-                    byte t = Blocks.FLUID[b & 0xFF];
+                    short b = w.get(bx, by, bz);
+                    short t = Blocks.FLUID[b & 0xFFFF];
                     if (t == Blocks.FLUID_NONE) continue;
-                    double top = by + (Blocks.FLUID[w.get(bx, by + 1, bz) & 0xFF] == t ? 1 : Blocks.fluidHeight(b) / 16.0);
+                    double top = by + (Blocks.FLUID[w.get(bx, by + 1, bz) & 0xFFFF] == t ? 1 : Blocks.fluidHeight(b) / 16.0);
                     if (top <= y + WADE_DEPTH) continue;
                     if (t == Blocks.FLUID_WATER) return t;
                     if (t != Blocks.FLUID_NONE) found = t;

@@ -14,7 +14,7 @@ import static org.lwjgl.glfw.GLFW.*;
 final class Input {
     private static final float SENSITIVITY = 0.0025f;
     private static final double CLICK_REPEAT = 0.25;
-    private static final byte[] DEFAULT_HOTBAR = {Blocks.STONE, Blocks.OAK_SLAB, Blocks.GRASS, Blocks.OAK_PLANKS,
+    private static final short[] DEFAULT_HOTBAR = {Blocks.STONE, Blocks.OAK_SLAB, Blocks.GRASS, Blocks.OAK_PLANKS,
         Blocks.COBBLESTONE, Blocks.GLASS, Blocks.OAK_LOG, Blocks.OAK_LEAVES, Blocks.GLOWSTONE};
 
     private final long window;
@@ -25,13 +25,13 @@ final class Input {
     private double breakCooldown, placeCooldown;
 
     /** Default state of every block name except air and fluids, in registry order. */
-    private static final byte[] PLACEABLE = placeable();
+    private static final short[] PLACEABLE = placeable();
     private double scroll;
 
     /** Hotbar contents (editable with the wheel) and the selected slot. */
-    final byte[] hotbar = DEFAULT_HOTBAR.clone();
+    final short[] hotbar = DEFAULT_HOTBAR.clone();
     int slot;
-    byte selected = hotbar[0];
+    short selected = hotbar[0];
     boolean breakRequested, placeRequested;
     /** Left button held (survival mining is continuous). */
     boolean breakHeld;
@@ -53,14 +53,14 @@ final class Input {
         return s;
     }
 
-    private static byte[] placeable() {
-        java.util.List<Byte> ids = new java.util.ArrayList<>();
+    private static short[] placeable() {
+        java.util.List<Short> ids = new java.util.ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (int i = 1; i < Blocks.COUNT; i++) {
             if (!seen.add(Blocks.NAMES[i])) continue; // first state of each name: sources for fluids
-            ids.add((byte) i);
+            ids.add((short) i);
         }
-        byte[] out = new byte[ids.size()];
+        short[] out = new short[ids.size()];
         for (int i = 0; i < out.length; i++) out[i] = ids.get(i);
         return out;
     }
@@ -133,7 +133,7 @@ final class Input {
         return new double[] {wx[0] * sx, wy[0] * sy};
     }
 
-    static byte[] placeableBlocks() {
+    static short[] placeableBlocks() {
         return PLACEABLE.clone();
     }
 

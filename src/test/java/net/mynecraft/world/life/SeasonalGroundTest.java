@@ -54,7 +54,7 @@ class SeasonalGroundTest {
 
     // ------------------------------------------------------------------------------- frost
 
-    private static void put(World w, int x, int y, int z, byte b) {
+    private static void put(World w, int x, int y, int z, short b) {
         w.chunk(x >> 4, z >> 4).set(x & 15, y, z & 15, b);
     }
 

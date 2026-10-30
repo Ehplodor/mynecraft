@@ -176,7 +176,7 @@ final class WeatherRenderer {
                 int x = cx - RAIN_RADIUS + i, z = cz - RAIN_RADIUS + j, y = Math.min(Chunk.MAX_Y - 1, cy + DROP_SPAN);
                 int stop = cy - DROP_SPAN;
                 while (y > stop) {
-                    byte b = world.get(x, y, z);
+                    short b = world.get(x, y, z);
                     if (Blocks.isSolid(b) || Blocks.isFluid(b)) break;
                     y--;
                 }

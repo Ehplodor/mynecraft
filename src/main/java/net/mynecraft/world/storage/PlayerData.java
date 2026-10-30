@@ -27,7 +27,7 @@ public final class PlayerData {
             int slot = Nbt.getInt(item, "Slot", -1);
             String id = String.valueOf(item.get("id"));
             int count = item.containsKey("count") ? Nbt.getInt(item, "count", 1) : Nbt.getInt(item, "Count", 1);
-            byte block = Blocks.fromState(id.startsWith("minecraft:") ? id.substring(10) : id, Map.of());
+            short block = Blocks.fromState(id.startsWith("minecraft:") ? id.substring(10) : id, Map.of());
             if (slot < 0 || slot >= Inventory.SIZE || block <= 0 || count <= 0) continue; // non-block items are skipped
             d.inventory.ids[slot] = block;
             d.inventory.counts[slot] = Math.min(count, Inventory.MAX_STACK);

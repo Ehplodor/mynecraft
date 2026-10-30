@@ -13,7 +13,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CraftingTest {
-    private static final byte A = Blocks.AIR, LOG = Blocks.OAK_LOG, OAK = Blocks.OAK_PLANKS, BIRCH = Blocks.BIRCH_PLANKS;
+    private static final short A = Blocks.AIR, LOG = Blocks.OAK_LOG, OAK = Blocks.OAK_PLANKS, BIRCH = Blocks.BIRCH_PLANKS;
 
     private static RecipeBook builtIn() {
         return RecipeBook.load(List.of(PackSource.classpath("defaultdata")));
@@ -40,9 +40,9 @@ class CraftingTest {
         RecipeBook book = builtIn();
         assertEquals(List.of(), book.warnings);
         // A log anywhere in a 2x2 grid gives 4 planks (shapeless).
-        assertEquals(new RecipeBook.Result(OAK, 4), book.match(new byte[] {A, A, A, LOG}, 2));
+        assertEquals(new RecipeBook.Result(OAK, 4), book.match(new short[] {A, A, A, LOG}, 2));
         // Each wood gives its own planks (items are default states: a broken horizontal log drops a plain log).
-        assertEquals(new RecipeBook.Result(Blocks.BIRCH_PLANKS, 4), book.match(new byte[] {Blocks.BIRCH_LOG, A, A, A}, 2));
+        assertEquals(new RecipeBook.Result(Blocks.BIRCH_PLANKS, 4), book.match(new short[] {Blocks.BIRCH_LOG, A, A, A}, 2));
         assertEquals(Blocks.BIRCH_LOG, Blocks.DROP[Blocks.BIRCH_LOG_X]);
     }
 
@@ -50,12 +50,12 @@ class CraftingTest {
     void tagsAndShapes() {
         RecipeBook book = builtIn();
         // 4 planks of any wood (tag #planks) make a crafting table.
-        assertEquals(new RecipeBook.Result(Blocks.CRAFTING_TABLE, 1), book.match(new byte[] {OAK, BIRCH, BIRCH, OAK}, 2));
+        assertEquals(new RecipeBook.Result(Blocks.CRAFTING_TABLE, 1), book.match(new short[] {OAK, BIRCH, BIRCH, OAK}, 2));
         // 3 planks in a row need a 3-wide grid; the same row anywhere in a 3x3 works.
-        assertEquals(new RecipeBook.Result(Blocks.OAK_SLAB, 6), book.match(new byte[] {A, A, A, A, A, A, OAK, OAK, OAK}, 3));
-        assertNull(book.match(new byte[] {OAK, OAK, OAK, A}, 2));
-        assertNull(book.match(new byte[] {OAK, A, A, OAK}, 2), "diagonal is not a recipe");
-        assertNull(book.match(new byte[] {A, A, A, A}, 2));
+        assertEquals(new RecipeBook.Result(Blocks.OAK_SLAB, 6), book.match(new short[] {A, A, A, A, A, A, OAK, OAK, OAK}, 3));
+        assertNull(book.match(new short[] {OAK, OAK, OAK, A}, 2));
+        assertNull(book.match(new short[] {OAK, A, A, OAK}, 2), "diagonal is not a recipe");
+        assertNull(book.match(new short[] {A, A, A, A}, 2));
     }
 
     @Test
@@ -71,11 +71,11 @@ class CraftingTest {
                 + "\"key\":{\"#\":\"minecraft:oak_planks\"},\"result\":{\"id\":\"minecraft:oak_slab\",\"count\":1}}",
             "data/custom/recipe/diamond_pickaxe.json", "{\"type\":\"minecraft:crafting_shaped\",\"pattern\":[\"#\"],"
                 + "\"key\":{\"#\":\"minecraft:diamond\"},\"result\":{\"id\":\"minecraft:diamond_pickaxe\"}}"))));
-        byte S = Blocks.STONE, G = Blocks.GLASS, R = Blocks.GRANITE;
-        assertEquals(new RecipeBook.Result(Blocks.GLOWSTONE, 2), book.match(new byte[] {S, G, A, R}, 2));
-        assertEquals(new RecipeBook.Result(Blocks.GLOWSTONE, 2), book.match(new byte[] {G, S, R, A}, 2), "mirrored");
-        assertEquals(new RecipeBook.Result(Blocks.OAK_SLAB, 1), book.match(new byte[] {OAK, OAK, A, A}, 2), "overridden");
-        assertNull(book.match(new byte[] {A, A, A, A, A, A, OAK, OAK, OAK}, 3), "the old 3-plank slab recipe is gone");
+        short S = Blocks.STONE, G = Blocks.GLASS, R = Blocks.GRANITE;
+        assertEquals(new RecipeBook.Result(Blocks.GLOWSTONE, 2), book.match(new short[] {S, G, A, R}, 2));
+        assertEquals(new RecipeBook.Result(Blocks.GLOWSTONE, 2), book.match(new short[] {G, S, R, A}, 2), "mirrored");
+        assertEquals(new RecipeBook.Result(Blocks.OAK_SLAB, 1), book.match(new short[] {OAK, OAK, A, A}, 2), "overridden");
+        assertNull(book.match(new short[] {A, A, A, A, A, A, OAK, OAK, OAK}, 3), "the old 3-plank slab recipe is gone");
         assertTrue(book.warnings.stream().anyMatch(w -> w.contains("diamond_pickaxe")), "non-block items are reported");
     }
 
@@ -86,7 +86,7 @@ class CraftingTest {
         java.nio.file.Files.writeString(recipe, "{\"type\":\"minecraft:crafting_shapeless\","
             + "\"ingredients\":[\"minecraft:dirt\",\"minecraft:dirt\"],\"result\":{\"id\":\"minecraft:stone\"}}");
         RecipeBook book = RecipeBook.load(List.of(PackSource.open(dir)));
-        assertEquals(new RecipeBook.Result(Blocks.STONE, 1), book.match(new byte[] {Blocks.DIRT, A, A, Blocks.DIRT}, 2));
+        assertEquals(new RecipeBook.Result(Blocks.STONE, 1), book.match(new short[] {Blocks.DIRT, A, A, Blocks.DIRT}, 2));
     }
 
     @Test

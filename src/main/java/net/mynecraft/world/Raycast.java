@@ -42,12 +42,12 @@ public final class Raycast {
         int nx = 0, ny = 0, nz = 0;
         double t = 0;
         while (t <= maxDist) {
-            byte b = world.get(x, y, z);
+            short b = world.get(x, y, z);
             if (Blocks.isTargetable(b)) {
                 if (!Blocks.isSlab(b)) return new Hit(x, y, z, nx, ny, nz);
                 // Partial block: the ray must actually cross its box, otherwise keep going.
                 Hit partial = box(ox, oy, oz, dx, dy, dz, maxDist, x, y, z,
-                    Blocks.BOX_MIN[b & 0xFF] / 16.0, Blocks.BOX_MAX[b & 0xFF] / 16.0);
+                    Blocks.BOX_MIN[b & 0xFFFF] / 16.0, Blocks.BOX_MAX[b & 0xFFFF] / 16.0);
                 if (partial != null) return partial;
             }
             if (tmx < tmy && tmx < tmz) {

@@ -41,7 +41,7 @@ public final class Chunk {
     }
 
     /** Fills a whole section with one block (generation fast path). */
-    public void fillSection(int sy, byte id) {
+    public void fillSection(int sy, short id) {
         if (sections[sy] == null) sections[sy] = new Section();
         sections[sy].fill(id);
     }
@@ -50,12 +50,12 @@ public final class Chunk {
         return sections[sy];
     }
 
-    public byte get(int x, int y, int z) {
+    public short get(int x, int y, int z) {
         Section s = sections[(y - MIN_Y) >> 4];
         return s == null ? Blocks.AIR : s.get(x, y & 15, z);
     }
 
-    public void set(int x, int y, int z, byte id) {
+    public void set(int x, int y, int z, short id) {
         int sy = (y - MIN_Y) >> 4;
         Section s = sections[sy];
         if (s == null) {

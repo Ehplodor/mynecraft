@@ -183,7 +183,7 @@ final class Hud {
     int height() { return height; }
 
     /** Hotbar at the bottom centre with optional stack counts; returns its top edge (pixels). */
-    float hotbar(byte[] slots, int[] counts, int selected) {
+    float hotbar(short[] slots, int[] counts, int selected) {
         float slot = 20 * scale, gap = 2 * scale;
         float total = slots.length * slot + (slots.length - 1) * gap;
         float x0 = (width - total) / 2, y0 = height - slot - 4 * scale;
@@ -257,7 +257,7 @@ final class Hud {
     }
 
     /** Block icon centred on (cx, cy), {@code size} pixels wide. */
-    void item(byte block, float cx, float cy, float size) {
+    void item(short block, float cx, float cy, float size) {
         if (block != Blocks.AIR) icon(block, cx, cy, size);
     }
 
@@ -269,8 +269,8 @@ final class Hud {
     }
 
     /** Isometric cube (top, left, right faces with simple shading), or a flat square for plants. */
-    private void icon(byte block, float cx, float cy, float s) {
-        if (Blocks.SHAPE[block & 0xFF] == Blocks.SHAPE_CROSS) {
+    private void icon(short block, float cx, float cy, float s) {
+        if (Blocks.SHAPE[block & 0xFFFF] == Blocks.SHAPE_CROSS) {
             face(block, 4, 1, cx - s / 2, cy - s / 2, cx + s / 2, cy - s / 2, cx + s / 2, cy + s / 2, cx - s / 2, cy + s / 2, 0);
             return;
         }
@@ -285,7 +285,7 @@ final class Hud {
      * Quad with the face's texture; corners in texture order (u0v0, u1v0, u1v1, u0v1). {@code v0}
      * crops the top of the texture (0.5 shows its lower half, like a slab side).
      */
-    private void face(byte block, int f, float shade, float ax, float ay, float bx, float by, float cx, float cy,
+    private void face(short block, int f, float shade, float ax, float ay, float bx, float by, float cx, float cy,
                       float dx, float dy, float v0) {
         int info = faceInfo[(block & 0xFF) * 6 + f];
         float layer = info & BlockAppearance.LAYER_MASK;

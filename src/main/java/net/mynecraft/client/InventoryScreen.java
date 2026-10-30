@@ -11,11 +11,11 @@ import net.mynecraft.world.crafting.CraftingMenu;
  */
 final class InventoryScreen {
     private static final int SLOT = 18, COLS = 9;
-    private final byte[] palette;
+    private final short[] palette;
     /** Display names (set by the game; ids are shown without it). */
     ItemNames names;
 
-    InventoryScreen(byte[] palette) {
+    InventoryScreen(short[] palette) {
         this.palette = palette;
     }
 
@@ -65,18 +65,18 @@ final class InventoryScreen {
         return menu == null && slot >= Inventory.SIZE;
     }
 
-    byte paletteBlock(int slot) {
+    short paletteBlock(int slot) {
         return palette[slot - Inventory.SIZE];
     }
 
     /** The item in a slot (menu, palette or creative hotbar). */
-    byte idAt(CraftingMenu menu, int slot, byte[] creativeHotbar) {
+    short idAt(CraftingMenu menu, int slot, short[] creativeHotbar) {
         if (menu != null) return menu.id(slot);
         if (slot >= Inventory.SIZE) return palette[slot - Inventory.SIZE];
         return slot < Inventory.HOTBAR ? creativeHotbar[slot] : Blocks.AIR;
     }
 
-    void draw(Hud hud, CraftingMenu menu, Inventory inventory, byte[] creativeHotbar, int selectedSlot,
+    void draw(Hud hud, CraftingMenu menu, Inventory inventory, short[] creativeHotbar, int selectedSlot,
               double mx, double my) {
         float s = hud.scale, x0 = (hud.width() - 176 * s) / 2, y0 = (hud.height() - 166 * s) / 2;
         hud.rect(0, 0, hud.width(), hud.height(), 0, 0, 0, 0.45f);
@@ -95,7 +95,7 @@ final class InventoryScreen {
             hud.rect(p[0] - s - pad, p[1] - s - pad, size + 2 * pad, size + 2 * pad, 0.22f, 0.22f, 0.24f, 1);
             hud.rect(p[0] - pad, p[1] - pad, size - 2 * s + 2 * pad, size - 2 * s + 2 * pad, 0.52f, 0.52f, 0.55f, 1);
             if (i == hover) hud.rect(p[0], p[1], size - 2 * s, size - 2 * s, 1, 1, 1, 0.35f);
-            byte id;
+            short id;
             int n;
             if (menu != null) { id = menu.id(i); n = menu.count(i); }
             else if (i >= Inventory.SIZE) { id = palette[i - Inventory.SIZE]; n = 1; }
@@ -116,7 +116,7 @@ final class InventoryScreen {
             hud.count(menu.cursorCount, (float) mx - 8 * s, (float) my - 8 * s, size);
         }
         if (hover >= 0) {
-            byte id = menu != null ? menu.id(hover) : hover >= Inventory.SIZE ? palette[hover - Inventory.SIZE]
+            short id = menu != null ? menu.id(hover) : hover >= Inventory.SIZE ? palette[hover - Inventory.SIZE]
                 : hover < Inventory.HOTBAR ? creativeHotbar[hover] : Blocks.AIR;
             if (id != Blocks.AIR && (menu == null || menu.cursorCount == 0)) {
                 hud.text(names != null ? names.name(id) : Blocks.NAMES[id], (float) mx + 10 * s, (float) my - 12 * s, 1, 1, 0.6f);

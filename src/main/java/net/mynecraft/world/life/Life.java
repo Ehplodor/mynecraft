@@ -131,11 +131,11 @@ public final class Life {
         int bx = Creature.fl(x), bz = Creature.fl(z);
         int top = topAt(bx, col.height() + 24, bz, 48);
         if (top == Integer.MIN_VALUE) return null;
-        byte surface = world.get(bx, top, bz);
-        boolean water = Blocks.FLUID[surface & 0xFF] == Blocks.FLUID_WATER;
+        short surface = world.get(bx, top, bz);
+        boolean water = Blocks.FLUID[surface & 0xFFFF] == Blocks.FLUID_WATER;
         switch (s.kind) {
             case SWIM -> {
-                if (!water || Blocks.FLUID[world.get(bx, top - 1, bz) & 0xFF] != Blocks.FLUID_WATER) return null;
+                if (!water || Blocks.FLUID[world.get(bx, top - 1, bz) & 0xFFFF] != Blocks.FLUID_WATER) return null;
                 return new double[] {x, top - 1.2 + rng.nextDouble() * 0.6, z};
             }
             case FLY -> {
@@ -146,7 +146,7 @@ public final class Life {
                 return new double[] {x, top + 1.5 + rng.nextDouble() * 2, z};
             }
             case WADER -> {
-                if (water && Blocks.FLUID[world.get(bx, top - 1, bz) & 0xFF] == Blocks.FLUID_NONE) return new double[] {x, top + 0.0, z}; // shallow
+                if (water && Blocks.FLUID[world.get(bx, top - 1, bz) & 0xFFFF] == Blocks.FLUID_NONE) return new double[] {x, top + 0.0, z}; // shallow
                 if (water || !nearWater(bx, top, bz, 3)) return null;
                 return new double[] {x, top + 1.0, z};
             }
@@ -162,14 +162,14 @@ public final class Life {
         for (int dz = -r; dz <= r; dz++)
             for (int dx = -r; dx <= r; dx++)
                 for (int dy = -1; dy <= 0; dy++)
-                    if (Blocks.FLUID[world.get(x + dx, y + dy, z + dz) & 0xFF] == Blocks.FLUID_WATER) return true;
+                    if (Blocks.FLUID[world.get(x + dx, y + dy, z + dz) & 0xFFFF] == Blocks.FLUID_WATER) return true;
         return false;
     }
 
     /** Highest block that is solid or fluid at or below {@code from}, searching {@code depth} blocks down. */
     private int topAt(int x, int from, int z, int depth) {
         for (int y = Math.min(from, Chunk.MAX_Y - 1); y > from - depth && y >= Chunk.MIN_Y; y--) {
-            byte b = world.get(x, y, z);
+            short b = world.get(x, y, z);
             if (Blocks.isFluid(b) || world.collisionBox(x, y, z) >= 0) return y;
         }
         return Integer.MIN_VALUE;
@@ -401,7 +401,7 @@ public final class Life {
         }
         // Wading birds fish standing in the shallows.
         if (s.kind == Species.Kind.WADER) {
-            boolean wet = Blocks.FLUID[world.get(Creature.fl(c.x), Creature.fl(c.y), Creature.fl(c.z)) & 0xFF] == Blocks.FLUID_WATER;
+            boolean wet = Blocks.FLUID[world.get(Creature.fl(c.x), Creature.fl(c.y), Creature.fl(c.z)) & 0xFFFF] == Blocks.FLUID_WATER;
             if (wet && c.state != Creature.State.WANDER) {
                 if (c.state != Creature.State.FISH) { c.state = Creature.State.FISH; c.stateTime = 8 + rng.nextDouble() * 12; }
                 Creature fish = nearest(c, 2.5, o -> o.species == Species.TROUT && o.dying <= 0);
@@ -421,8 +421,8 @@ public final class Life {
         }
         // Grazing on grass when hungry.
         if (s.diet == Species.Diet.GRASS && (c.hunger > 0.3 || c.state == Creature.State.GRAZE)) {
-            byte under = world.get(Creature.fl(c.x), Creature.fl(c.y - 0.5), Creature.fl(c.z));
-            byte at = world.get(Creature.fl(c.x), Creature.fl(c.y), Creature.fl(c.z));
+            short under = world.get(Creature.fl(c.x), Creature.fl(c.y - 0.5), Creature.fl(c.z));
+            short at = world.get(Creature.fl(c.x), Creature.fl(c.y), Creature.fl(c.z));
             boolean food = under == Blocks.GRASS || at == Blocks.SHORT_GRASS || under == Blocks.SNOW_BLOCK && s == Species.IBEX
                 || under == Blocks.STONE && s == Species.IBEX || under == Blocks.DIRT;
             if (food) {
@@ -537,8 +537,8 @@ public final class Life {
         if (world.collisionBox(ax, fy, az) >= 0 && world.collisionBox(ax, fy + 1, az) >= 0) return 3;
         if (world.collisionBox(ax, fy, az) >= 0) return 0; // a single step: jumped
         for (int y = fy; y >= fy - 3; y--) {
-            byte b = world.get(ax, y, az);
-            if (Blocks.FLUID[b & 0xFF] == Blocks.FLUID_WATER || Blocks.FLUID[b & 0xFF] == Blocks.FLUID_LAVA) return 1;
+            short b = world.get(ax, y, az);
+            if (Blocks.FLUID[b & 0xFFFF] == Blocks.FLUID_WATER || Blocks.FLUID[b & 0xFFFF] == Blocks.FLUID_LAVA) return 1;
             if (world.collisionBox(ax, y, az) >= 0) return 0;
         }
         return 2;
@@ -623,7 +623,7 @@ public final class Life {
         c.vz += (tz - c.vz) * k;
         c.vy += (gy / Math.max(gd, 1e-3) * speed * 0.6 - c.vy) * k;
         // Stay under the surface.
-        byte above = world.get(Creature.fl(c.x), Creature.fl(c.y + c.height() + 0.2), Creature.fl(c.z));
+        short above = world.get(Creature.fl(c.x), Creature.fl(c.y + c.height() + 0.2), Creature.fl(c.z));
         if (!Blocks.isFluid(above) && c.vy > 0) c.vy = -0.3;
         c.pitch = (float) Math.atan2(-c.vy, Math.hypot(c.vx, c.vz) + 0.1) * 0.7f;
         c.move(world, dt, false);
@@ -635,8 +635,8 @@ public final class Life {
         for (int i = 0; i < 6; i++) {
             double d = 1.5 + rng.nextDouble() * r, aa = a + (rng.nextDouble() - 0.5) * 1.2 * i / 3;
             double gx = c.x + Math.sin(aa) * d, gz = c.z + Math.cos(aa) * d, gy = c.y + (rng.nextDouble() - 0.5) * 1.6;
-            if (Blocks.FLUID[world.get(Creature.fl(gx), Creature.fl(gy), Creature.fl(gz)) & 0xFF] == Blocks.FLUID_WATER
-                && Blocks.FLUID[world.get(Creature.fl(gx), Creature.fl(gy + 0.3), Creature.fl(gz)) & 0xFF] == Blocks.FLUID_WATER) {
+            if (Blocks.FLUID[world.get(Creature.fl(gx), Creature.fl(gy), Creature.fl(gz)) & 0xFFFF] == Blocks.FLUID_WATER
+                && Blocks.FLUID[world.get(Creature.fl(gx), Creature.fl(gy + 0.3), Creature.fl(gz)) & 0xFFFF] == Blocks.FLUID_WATER) {
                 c.goalX = gx;
                 c.goalY = gy;
                 c.goalZ = gz;

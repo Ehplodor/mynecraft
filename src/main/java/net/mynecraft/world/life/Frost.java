@@ -54,7 +54,7 @@ final class Frost {
         if (world.chunk(x >> 4, z >> 4) == null) return;
         int y = top(x, z);
         if (y == Integer.MIN_VALUE) return;
-        byte b = world.get(x, y, z);
+        short b = world.get(x, y, z);
         double t = celsius(x, z, y, season);
         if (b == Blocks.WATER && world.get(x, y + 1, z) == Blocks.AIR && t < FREEZE) {
             // Ice forms first along the shore and spreads from the ice already there.
@@ -72,7 +72,7 @@ final class Frost {
                 if (set(x, y, z, Blocks.WATER, changed)) thawed++;
             }
         } else if (t < KILLING) {
-            byte above = world.get(x, y + 1, z);
+            short above = world.get(x, y + 1, z);
             if ((above == Blocks.SHORT_GRASS || above == Blocks.POPPY) && rng.nextDouble() < Math.min(1, (KILLING - t) / 4)) {
                 if (set(x, y + 1, z, Blocks.AIR, changed)) nipped++;
             }
@@ -85,14 +85,14 @@ final class Frost {
      */
     private boolean touches(int x, int y, int z, boolean freezing) {
         for (int[] d : SIDES) {
-            byte n = world.get(x + d[0], y, z + d[1]);
+            short n = world.get(x + d[0], y, z + d[1]);
             if (Blocks.isSolid(n) && n != Blocks.ICE) return true;
             if (freezing ? n == Blocks.ICE : Blocks.isFluid(n)) return true;
         }
         return false;
     }
 
-    private boolean set(int x, int y, int z, byte b, Consumer<int[]> changed) {
+    private boolean set(int x, int y, int z, short b, Consumer<int[]> changed) {
         if (!world.set(x, y, z, b)) return false;
         changed.accept(new int[] {x, y, z});
         return true;
@@ -102,7 +102,7 @@ final class Frost {
     private int top(int x, int z) {
         int h = columns.apply(x, z).height();
         for (int y = Math.min(Chunk.MAX_Y - 2, h + 12); y > Math.max(Chunk.MIN_Y, h - 12); y--) {
-            byte b = world.get(x, y, z);
+            short b = world.get(x, y, z);
             if (b == Blocks.AIR || b == Blocks.SHORT_GRASS || b == Blocks.POPPY) continue;
             return Blocks.isSolid(b) || b == Blocks.WATER ? y : Integer.MIN_VALUE;
         }

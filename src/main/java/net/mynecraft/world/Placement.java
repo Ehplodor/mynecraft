@@ -5,7 +5,7 @@ public final class Placement {
     private Placement() {}
 
     /** Cells a placed block may overwrite. */
-    private static boolean replaceable(byte b) {
+    private static boolean replaceable(short b) {
         return b == Blocks.AIR || Blocks.isFluid(b) || b == Blocks.SHORT_GRASS;
     }
 
@@ -15,8 +15,8 @@ public final class Placement {
      *
      * @return the changed position as {x, y, z}, or null if nothing was placed.
      */
-    public static int[] place(World world, Player player, Raycast.Hit hit, double hitY, byte selected) {
-        byte clicked = world.get(hit.x(), hit.y(), hit.z());
+    public static int[] place(World world, Player player, Raycast.Hit hit, double hitY, short selected) {
+        short clicked = world.get(hit.x(), hit.y(), hit.z());
         if (Blocks.isSlab(selected)) {
             // Clicking the open face of a slab completes it.
             if ((clicked == Blocks.OAK_SLAB && hit.ny() == 1) || (clicked == Blocks.OAK_SLAB_TOP && hit.ny() == -1)) {
@@ -24,8 +24,8 @@ public final class Placement {
             }
         }
         int px = hit.x() + hit.nx(), py = hit.y() + hit.ny(), pz = hit.z() + hit.nz();
-        byte there = world.get(px, py, pz);
-        byte state = selected;
+        short there = world.get(px, py, pz);
+        short state = selected;
         if (Blocks.isSlab(selected)) {
             boolean top = hit.ny() == -1 || (hit.ny() == 0 && hitY > 0.5);
             state = top ? Blocks.OAK_SLAB_TOP : Blocks.OAK_SLAB;
@@ -35,7 +35,7 @@ public final class Placement {
                 there = Blocks.AIR;
             }
         } else if (Blocks.logStates(selected) != null) {
-            byte[] axes = Blocks.logStates(selected); // y, x, z
+            short[] axes = Blocks.logStates(selected); // y, x, z
             state = hit.nx() != 0 ? axes[1] : hit.nz() != 0 ? axes[2] : axes[0];
         }
         if (!replaceable(there)) return null;

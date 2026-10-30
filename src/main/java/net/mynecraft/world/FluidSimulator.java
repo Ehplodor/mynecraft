@@ -56,9 +56,9 @@ public final class FluidSimulator {
             for (int y = y0; y < y0 + 16; y++)
                 for (int z = 0; z < 16; z++)
                     for (int x = 0; x < 16; x++) {
-                        byte b = c.get(x, y, z);
-                        if (Blocks.FLUID[b & 0xFF] == Blocks.FLUID_NONE) continue;
-                        boolean open = Blocks.LEVEL[b & 0xFF] != 0 || (y > Chunk.MIN_Y && free(c.get(x, y - 1, z)));
+                        short b = c.get(x, y, z);
+                        if (Blocks.FLUID[b & 0xFFFF] == Blocks.FLUID_NONE) continue;
+                        boolean open = Blocks.LEVEL[b & 0xFFFF] != 0 || (y > Chunk.MIN_Y && free(c.get(x, y - 1, z)));
                         for (int i = 0; i < 4 && !open; i++) {
                             int nx = x + HX[i], nz = z + HZ[i];
                             open = nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && free(c.get(nx, y, nz));
@@ -73,7 +73,7 @@ public final class FluidSimulator {
         return n == 0 ? null : java.util.Arrays.copyOf(out, n);
     }
 
-    private static boolean free(byte b) {
+    private static boolean free(short b) {
         return b == Blocks.AIR || isPlant(b);
     }
 
@@ -122,7 +122,7 @@ public final class FluidSimulator {
     }
 
     private void schedule(int x, int y, int z) {
-        byte type = Blocks.FLUID[world.get(x, y, z) & 0xFF];
+        short type = Blocks.FLUID[world.get(x, y, z) & 0xFFFF];
         if (type == Blocks.FLUID_NONE) return;
         long p = LightEngine.pack(x, y, z);
         if (!scheduled.add(p)) return;
@@ -164,30 +164,30 @@ public final class FluidSimulator {
     }
 
     private void update(int x, int y, int z) {
-        byte b = world.get(x, y, z);
-        byte type = Blocks.FLUID[b & 0xFF];
+        short b = world.get(x, y, z);
+        short type = Blocks.FLUID[b & 0xFFFF];
         if (type == Blocks.FLUID_NONE) return;
         int step = type == Blocks.FLUID_LAVA ? 2 : 1, max = type == Blocks.FLUID_LAVA ? 6 : 7;
 
-        if (Blocks.LEVEL[b & 0xFF] != 0) {
+        if (Blocks.LEVEL[b & 0xFFFF] != 0) {
             int level = supportedLevel(x, y, z, type, step, max);
             if (level == DRY) {
                 set(x, y, z, Blocks.AIR);
                 return;
             }
-            byte state = Blocks.fluidState(type, level);
+            short state = Blocks.fluidState(type, level);
             if (state != b) {
                 set(x, y, z, state);
                 b = state;
             }
         }
 
-        byte below = world.get(x, y - 1, z);
+        short below = world.get(x, y - 1, z);
         if (flowInto(x, y - 1, z, below, type, 8, true)) return; // falling takes priority
         // Moving fluid resting on the same fluid does not spread over it (like vanilla): a fall into a
         // lake or a spill onto a lower stretch of river joins it instead of laying a sheet on top.
-        if (Blocks.FLUID[below & 0xFF] == type && (Blocks.LEVEL[below & 0xFF] != 0 || Blocks.LEVEL[b & 0xFF] != 0)) return;
-        int level = Blocks.LEVEL[b & 0xFF];
+        if (Blocks.FLUID[below & 0xFFFF] == type && (Blocks.LEVEL[below & 0xFFFF] != 0 || Blocks.LEVEL[b & 0xFFFF] != 0)) return;
+        int level = Blocks.LEVEL[b & 0xFFFF];
         int next = (level >= 8 ? 0 : level) + step;
         if (next > max) return;
         for (int i = 0; i < 4; i++) {
@@ -203,14 +203,14 @@ public final class FluidSimulator {
      */
     private static final int FALLING = 8, DRY = Integer.MAX_VALUE;
 
-    private int supportedLevel(int x, int y, int z, byte type, int step, int max) {
-        if (Blocks.FLUID[world.get(x, y + 1, z) & 0xFF] == type) return FALLING;
+    private int supportedLevel(int x, int y, int z, short type, int step, int max) {
+        if (Blocks.FLUID[world.get(x, y + 1, z) & 0xFFFF] == type) return FALLING;
         int best = Integer.MAX_VALUE, sources = 0;
         for (int i = 0; i < 4; i++) {
             int nx = x + HX[i], nz = z + HZ[i];
-            byte n = world.get(nx, y, nz);
-            if (Blocks.FLUID[n & 0xFF] != type) continue;
-            int lvl = Blocks.LEVEL[n & 0xFF];
+            short n = world.get(nx, y, nz);
+            if (Blocks.FLUID[n & 0xFFFF] != type) continue;
+            int lvl = Blocks.LEVEL[n & 0xFFFF];
             if (lvl == 0) sources++;
             if (lvl >= 8) {
                 if (!stopsFall(world.get(nx, y - 1, nz), type)) continue; // still falling past us
@@ -219,7 +219,7 @@ public final class FluidSimulator {
             best = Math.min(best, lvl + step);
         }
         if (type == Blocks.FLUID_WATER && sources >= 2) {
-            byte below = world.get(x, y - 1, z);
+            short below = world.get(x, y - 1, z);
             if (Blocks.isSolid(below) || below == Blocks.WATER) return 0;
         }
         // Too far from any source: dry. (Must not reach 8, which would read as "falling".)
@@ -227,21 +227,21 @@ public final class FluidSimulator {
     }
 
     /** True if a falling fluid lands on this block (anything it cannot flow into). */
-    private static boolean stopsFall(byte below, byte type) {
-        return !(below == Blocks.AIR || isPlant(below) || (Blocks.FLUID[below & 0xFF] == type && Blocks.LEVEL[below & 0xFF] != 0));
+    private static boolean stopsFall(short below, short type) {
+        return !(below == Blocks.AIR || isPlant(below) || (Blocks.FLUID[below & 0xFFFF] == type && Blocks.LEVEL[below & 0xFFFF] != 0));
     }
 
-    private static boolean isPlant(byte b) {
-        return Blocks.SHAPE[b & 0xFF] == Blocks.SHAPE_CROSS;
+    private static boolean isPlant(short b) {
+        return Blocks.SHAPE[b & 0xFFFF] == Blocks.SHAPE_CROSS;
     }
 
     /** Tries to put fluid of {@code type} at {@code level} into a cell; returns true if it did something. */
-    private boolean flowInto(int x, int y, int z, byte target, byte type, int level, boolean down) {
+    private boolean flowInto(int x, int y, int z, short target, short type, int level, boolean down) {
         if (y < Chunk.MIN_Y || world.chunk(x >> 4, z >> 4) == null) return false; // never into unloaded land
-        byte targetType = Blocks.FLUID[target & 0xFF];
+        short targetType = Blocks.FLUID[target & 0xFFFF];
         if (targetType != Blocks.FLUID_NONE && targetType != type) {
             // Water and lava meet.
-            if (type == Blocks.FLUID_WATER) set(x, y, z, Blocks.LEVEL[target & 0xFF] == 0 ? Blocks.OBSIDIAN : Blocks.COBBLESTONE);
+            if (type == Blocks.FLUID_WATER) set(x, y, z, Blocks.LEVEL[target & 0xFFFF] == 0 ? Blocks.OBSIDIAN : Blocks.COBBLESTONE);
             else set(x, y, z, Blocks.STONE);
             return true;
         }
@@ -249,8 +249,8 @@ public final class FluidSimulator {
             set(x, y, z, Blocks.fluidState(type, level));
             return true;
         }
-        if (targetType == type && Blocks.LEVEL[target & 0xFF] != 0) {
-            int current = Blocks.LEVEL[target & 0xFF];
+        if (targetType == type && Blocks.LEVEL[target & 0xFFFF] != 0) {
+            int current = Blocks.LEVEL[target & 0xFFFF];
             boolean better = down ? current != 8 : current < 8 && current > level;
             if (better) {
                 set(x, y, z, Blocks.fluidState(type, level));
@@ -260,7 +260,7 @@ public final class FluidSimulator {
         return false;
     }
 
-    private void set(int x, int y, int z, byte b) {
+    private void set(int x, int y, int z, short b) {
         if (!world.set(x, y, z, b)) return;
         listener.changed(x, y, z);
         blockChanged(x, y, z);
