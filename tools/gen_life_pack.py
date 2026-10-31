@@ -107,6 +107,20 @@ def main():
     cross("oak_sapling", "oak_sapling")
     state("oak_sapling")
     save("clay", noisy((160, 165, 178), 8, 115))
+
+    def trap(full):
+        def px(x, y, r):
+            if full and 4 <= x <= 11 and 6 <= y <= 9 and (x - 7.5) ** 2 / 16 + (y - 7.5) ** 2 / 4 < 1:
+                return (150, 160, 175, 255) if y < 8 else (200, 120, 110, 255)
+            if (x + y) % 4 == 0 or (x - y) % 4 == 0:
+                return wood(x, y, r, (170, 135, 80))
+            return (0, 0, 0, 0)
+        return px
+    for n, f in (("fish_trap", False), ("fish_trap_full", True)):
+        save(n, rgba(trap(f), 116 + f))
+        write_json(f"models/block/{n}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{n}"}})
+    state("fish_trap", {"full=false": {"model": "minecraft:block/fish_trap"},
+                        "full=true": {"model": "minecraft:block/fish_trap_full"}})
     # ---- building
     def door(open_):
         def px(x, y, r):
@@ -212,7 +226,7 @@ def main():
               "water_wheel": "Roue à aubes", "windmill": "Moulin à vent", "red_wool": "Drap rouge", "blue_wool": "Drap bleu",
               "white_wool": "Drap blanc", "yellow_wool": "Drap jaune", "terracotta": "Terre cuite",
               "decorated_pot": "Pot décoré", "painting": "Tableau", "statue": "Statue", "sawmill": "Scierie",
-              "dye_vat": "Cuve de teinture"}
+              "dye_vat": "Cuve de teinture", "fish_trap": "Nasse"}
     items = {"wooden_pickaxe": "Pioche en bois", "stone_pickaxe": "Pioche en pierre", "iron_pickaxe": "Pioche en fer",
              "wooden_axe": "Hache en bois", "stone_axe": "Hache en pierre", "iron_axe": "Hache en fer",
              "wooden_shovel": "Pelle en bois", "stone_shovel": "Pelle en pierre", "iron_shovel": "Pelle en fer",
@@ -235,6 +249,81 @@ def main():
     with open(path, "w", encoding="utf-8") as f:
         json.dump(lang, f, indent=2, ensure_ascii=False)
         f.write("\n")
+
+
+def items():
+    """16 x 16 item sprites: tools (a handle and a head of their material), food, materials."""
+    from PIL import Image
+    out = os.path.join(NS, "textures", "item")
+    os.makedirs(out, exist_ok=True)
+    mat = {"wooden": (150, 112, 62), "stone": (125, 125, 128), "iron": (205, 205, 212), "flint": (60, 60, 70)}
+    stick = (110, 78, 40)
+
+    def img():
+        return Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+
+    def put(im, pts, c):
+        for x, y in pts:
+            if 0 <= x < 16 and 0 <= y < 16:
+                im.putpixel((x, y), c + (255,) if len(c) == 3 else c)
+
+    def handle(im, n=11):
+        put(im, [(3 + i, 14 - i) for i in range(n)] + [(4 + i, 14 - i) for i in range(n - 1)], stick)
+
+    def blob(c, r=5.5, cx=7.5, cy=8.5, seed=0, spots=None):
+        im = img()
+        rr = random.Random(seed)
+        for y in range(16):
+            for x in range(16):
+                if (x - cx) ** 2 + (y - cy) ** 2 < r * r:
+                    d = rr.randint(-15, 15) - (25 if (x - cx) + (y - cy) > r * 0.6 else 0)
+                    col = spots if spots and rr.random() < 0.15 else c
+                    im.putpixel((x, y), tuple(max(0, min(255, v + d)) for v in col) + (255,))
+        return im
+
+    shapes = {}
+    for m, c in mat.items():
+        if m == "flint":
+            continue
+        im = img(); handle(im); put(im, [(x, 2 + abs(x - 8) // 3) for x in range(3, 14)] + [(x, 3 + abs(x - 8) // 3) for x in range(4, 13)], c)
+        shapes[f"{m}_pickaxe"] = im
+        im = img(); handle(im); put(im, [(x, y) for x in range(8, 13) for y in range(2, 7) if x + y < 16], c)
+        shapes[f"{m}_axe"] = im
+        im = img(); handle(im, 9); put(im, [(x, y) for x in range(9, 14) for y in range(2, 7) if abs(x - 11) + abs(y - 4) < 3], c)
+        shapes[f"{m}_shovel"] = im
+        im = img(); handle(im); put(im, [(x, y) for x in range(8, 14) for y in range(2, 4)], c)
+        shapes[f"{m}_hoe"] = im
+    for m in ("flint", "iron"):
+        im = img(); put(im, [(3 + i, 13 - i) for i in range(5)], stick); put(im, [(7 + i, 9 - i) for i in range(6)] + [(8 + i, 9 - i) for i in range(5)], mat[m])
+        shapes[f"{m}_knife"] = im
+    im = img(); put(im, [(2 + i, 14 - i) for i in range(12)], stick); put(im, [(13, y) for y in range(3, 15)], (230, 230, 230))
+    shapes["fishing_rod"] = im
+    im = img(); put(im, [(int(8 + 6 * math.cos(a / 10)), int(8 - 6 * math.sin(a / 10))) for a in range(-16, 17)], stick)
+    put(im, [(int(8 + 6 * math.cos(1.6)) + 0, y) for y in range(2, 15)], (230, 230, 230)); shapes["bow"] = im
+    im = img(); put(im, [(3 + i, 13 - i) for i in range(9)], stick); put(im, [(12, 4), (11, 3), (12, 3), (13, 3), (12, 2)], mat["flint"])
+    put(im, [(3, 12), (2, 13), (4, 14), (3, 14)], (240, 240, 240)); shapes["arrow"] = im
+    im = img(); handle(im, 9); put(im, [(x, y) for x in range(8, 14) for y in range(2, 6)], mat["iron"]); shapes["hammer"] = im
+    im = img(); put(im, [(4 + i, 12 - i) for i in range(5)], stick); put(im, [(9 + i, 7 - i) for i in range(4)], mat["iron"]); shapes["chisel"] = im
+    im = img(); put(im, [(2 + i, 13 - i) for i in range(12)] + [(3 + i, 13 - i) for i in range(11)], (180, 140, 80))
+    put(im, [(5, 11), (7, 9), (9, 7)], (40, 25, 10)); shapes["flute"] = im
+    im = img(); put(im, [(3 + i, 13 - i) for i in range(11)], stick); shapes["stick"] = im
+    food = {"apple": ((200, 30, 30), 5), "sweet_berries": ((190, 20, 50), 3.5), "wild_herbs": ((70, 150, 60), 5),
+            "wheat": ((220, 190, 90), 5), "wheat_seeds": ((140, 160, 60), 3), "bread": ((190, 140, 70), 6),
+            "flour": ((240, 235, 220), 5), "venison": ((180, 60, 60), 5.5), "cooked_venison": ((130, 80, 45), 5.5),
+            "rabbit": ((210, 120, 110), 4.5), "cooked_rabbit": ((160, 100, 60), 4.5), "trout": ((150, 160, 170), 5),
+            "cooked_trout": ((190, 140, 90), 5), "smoked_meat": ((110, 55, 35), 5.5), "roasted_mushroom": ((150, 100, 60), 4.5),
+            "herb_trout": ((180, 150, 90), 5), "berry_tart": ((200, 150, 90), 6), "coal": ((35, 35, 38), 5),
+            "charcoal": ((55, 45, 40), 5), "flint": ((60, 60, 70), 4.5), "iron_ingot": ((205, 205, 212), 5),
+            "hide": ((150, 110, 75), 6), "leather": ((140, 85, 45), 6), "plant_fiber": ((150, 175, 90), 4.5),
+            "string": ((235, 235, 225), 4), "cloth": ((230, 225, 205), 6), "clay_ball": ((160, 165, 178), 4.5),
+            "ash": ((150, 150, 150), 5), "compost": ((80, 60, 35), 5.5), "slag": ((80, 70, 70), 5),
+            "red_dye": ((190, 30, 30), 4), "blue_dye": ((40, 70, 180), 4), "white_dye": ((240, 240, 240), 4),
+            "yellow_dye": ((230, 200, 40), 4), "canvas": ((235, 230, 210), 6.5)}
+    spots = {"berry_tart": (190, 20, 50), "herb_trout": (70, 150, 60), "trout": (90, 110, 130), "wheat": (180, 150, 60)}
+    for i, (n, (c, r)) in enumerate(food.items()):
+        shapes[n] = blob(c, r, seed=200 + i, spots=spots.get(n))
+    for n, im in shapes.items():
+        im.save(os.path.join(out, n + ".png"))
 
 
 DATA = os.path.join(os.path.dirname(__file__), "..", "src", "main", "resources", "defaultdata")
@@ -288,6 +377,7 @@ def gen_data():
     shaped("flint_knife", ["F", "S"], {"F": "flint", "S": "stick"}, "flint_knife")
     shaped("arrow", ["F", "S", "P"], {"F": "flint", "S": "stick", "P": "plant_fiber"}, "arrow", 4, skill="hunting")
     shaped("string", ["PPP"], {"P": "plant_fiber"}, "string")
+    shaped("fish_trap", ["SFS", "F F", "SFS"], {"S": "stick", "F": "string"}, "fish_trap", skill="fishing")
     shaped("fishing_rod", ["  S", " SF", "S F"], {"S": "stick", "F": "string"}, "fishing_rod", skill="fishing")
     shaped("bow", [" SF", "S F", " SF"], {"S": "stick", "F": "string"}, "bow", skill="hunting", level=1)
     shaped("hammer", [" I ", " SI", "S  "], {"I": "iron_ingot", "S": "stick"}, "hammer", skill="smithing")
@@ -360,4 +450,5 @@ def gen_data():
 
 if __name__ == "__main__":
     main()
+    items()
     gen_data()

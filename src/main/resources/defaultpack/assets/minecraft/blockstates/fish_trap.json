@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "full=false": {
+      "model": "minecraft:block/fish_trap"
+    },
+    "full=true": {
+      "model": "minecraft:block/fish_trap_full"
+    }
+  }
+}

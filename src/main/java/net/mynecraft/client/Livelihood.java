@@ -235,7 +235,7 @@ final class Livelihood {
         }
         if ((growTimer -= dt) <= 0) {
             growTimer = 5;
-            if (!Double.isNaN(lastGrowDay) && day > lastGrowDay) changed.addAll(growth.grow(w, life.ecology, phase, day - lastGrowDay));
+            if (!Double.isNaN(lastGrowDay) && day > lastGrowDay) changed.addAll(growth.grow(w, life.ecology, flows, phase, day - lastGrowDay));
             lastGrowDay = day;
         }
         // Fishing: a bite after a while, if the river holds fish; moving or changing item reels in.
@@ -345,6 +345,7 @@ final class Livelihood {
 
     /** The block the player just placed may be the plan's next step. */
     void placed(World w, int x, int y, int z) {
+        if (w.get(x, y, z) == Blocks.FISH_TRAP) growth.planted(x, y, z);
         if (activePlan == null) return;
         int ax = x - planAnchor[0], ay = y - planAnchor[1], az = z - planAnchor[2];
         if (ax >= 0 && ay >= 0 && az >= 0 && ax < activePlan.w && ay < activePlan.h && az < activePlan.d

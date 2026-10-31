@@ -18,6 +18,7 @@ import net.mynecraft.world.build.Blueprint;
 import net.mynecraft.world.crafting.RecipeBook;
 import net.mynecraft.world.crafting.Workshop;
 import net.mynecraft.world.life.Ecology;
+import net.mynecraft.world.life.Ecosystem;
 import net.mynecraft.world.life.Species;
 
 import java.io.IOException;
@@ -68,6 +69,10 @@ public final class Hamlet {
         Villager fisher = person("Corentin", Job.FISHER, 0x3a5a90, 0x3a3a3a, false);
         fisher.skills.xp[Skill.FISHING.ordinal()] = 250;
         Villager child = person("Daphné", Job.GATHERER, 0xd0a040, 0x6a4a30, true);
+        Villager hunter = person("Edmond", Job.HUNTER, 0x4a5a30, 0x50402a, false);
+        hunter.skills.xp[Skill.HUNTING.ordinal()] = 280;
+        hunter.setHome(a[0] + 2.5, a[1] + 1, a[2] + 6.5); // lodges by the hermit's fire
+        place(hunter, a[0] + 3.5, a[1] + 1, a[2] + 6.5);
         for (Villager v : List.of(builder, fisher, child)) v.setHome(b[0] + 2.5, b[1] + 1, b[2] + 6.5);
         place(hermit, a[0] + 2.5, a[1] + 1, a[2] + 6.5);
         for (int i = 0; i < 3; i++) place(List.of(builder, fisher, child).get(i), b[0] + 1.5 + i, b[1] + 1, b[2] + 6.5);
@@ -166,12 +171,13 @@ public final class Hamlet {
                 int[] a = huts.size() > 1 ? huts.get(1) : null;
                 int[] step = a == null ? null : hut.next(w, a[0], a[1], a[2]);
                 if (step == null) { cook(v, recipes, flows); return; }
+                if (v.workAt != null) { fetch(v, w, flows); return; } // on the way to a tree, a rock, a tuft of grass
                 if (dist(v, step[0] + 0.5, step[2] + 0.5) > 7) { go(v, w, a[0] + 2, a[1] + 1, a[2] + 6); return; } // works from the yard
                 v.state = Villager.State.WORK;
                 if (v.workTimer < 2.5 / v.efficiency(Skill.BUILDING)) return;
                 v.workTimer = 0;
                 short need = step[3] == Blocks.AIR ? Blocks.AIR : Blueprint.item((short) step[3]);
-                if (need != Blocks.AIR && store.count(need) == 0) { gatherMaterial(v, need, flows); return; }
+                if (need != Blocks.AIR && store.count(need) == 0) { gatherMaterial(v, w, need, flows); return; }
                 if (need != Blocks.AIR) store.remove(need, 1);
                 set(w, step[0], step[1], step[2], (short) step[3]);
                 v.skills.practice(Skill.BUILDING, 1);
@@ -193,6 +199,23 @@ public final class Hamlet {
                     say(v, "Une belle truite !");
                 } else say(v, "Rien ne mord... la rivière est vide.");
                 v.skills.practice(Skill.FISHING, 2);
+            }
+            case HUNTER -> { // hunts deer in the forest around, never in their breeding season, never the last ones
+                if (v.stateTime > 30) wander(v, w);
+                if (v.workTimer < 120 / v.efficiency(Skill.HUNTING)) return;
+                v.workTimer = 0;
+                Ecology.Patch p = ecology.existing(v.x, v.z);
+                if (p == null) return;
+                if (Ecology.breeding(Species.DEER, ecology.day() % Ecosystem.YEAR_DAYS / (double) Ecosystem.YEAR_DAYS) > 0.3) say(v, "Je laisse les biches mettre bas.");
+                else if (p.pop[Species.DEER.ordinal()] < 3) say(v, "Trop peu de cerfs ici : je les laisse en paix.");
+                else {
+                    ecology.died(Species.DEER, v.x, v.z);
+                    flows.take(Matter.GAME, 1, v.x, v.z);
+                    store.add(Items.VENISON, 2);
+                    store.add(Items.HIDE, 1);
+                    say(v, "Un cerf. Merci à la forêt.");
+                }
+                v.skills.practice(Skill.HUNTING, 2);
             }
             default -> { // gatherers and the herbalist
                 if (v.workAt == null || v.stateTime > 60) {
@@ -241,13 +264,86 @@ public final class Hamlet {
             if (from.counts[i] > 0 && Items.FUEL[from.ids[i]] > 0) { to.add(from.ids[i], from.counts[i]); from.counts[i] = 0; from.ids[i] = Blocks.AIR; }
     }
 
-    /** Material for the plan, drawn from the patch: wood for timber, stone for the footing, straw for thatch. */
-    private void gatherMaterial(Villager v, short item, Flows flows) {
-        byte m = Blocks.MATTER[item & 0xFFFF];
-        Matter matter = m >= 0 ? Matter.values()[m] : item == Blocks.THATCH || item == Blocks.STRAW_BED ? Matter.PLANTS : Matter.WOOD;
-        flows.take(matter, 1, v.x, v.z);
-        store.add(item, 1);
-        v.skills.practice(matter == Matter.STONE ? Skill.MINING : Skill.WOODCUTTING, 0.5);
+    /**
+     * Material for the plan: timber from a real tree, stone from a real rock, straw from real grass,
+     * each found within 24 blocks and walked to ({@link #fetch}); planks, doors, thatch and the bed are
+     * then made from them as the recipes say. What has no source near (glass, a campfire) is drawn from
+     * the patch's account.
+     */
+    private void gatherMaterial(Villager v, World w, short item, Flows flows) {
+        if (item == Blocks.THATCH && store.count(Items.PLANT_FIBER) >= 4) { store.remove(Items.PLANT_FIBER, 4); store.add(Blocks.THATCH, 1); return; }
+        if (item == Blocks.STRAW_BED && store.count(Blocks.THATCH) >= 3 && store.count(Blocks.OAK_PLANKS) >= 3) {
+            store.remove(Blocks.THATCH, 3); store.remove(Blocks.OAK_PLANKS, 3); store.add(Blocks.STRAW_BED, 1); return;
+        }
+        if ((item == Blocks.OAK_PLANKS || item == Blocks.OAK_DOOR) && store.count(Blocks.OAK_LOG) > 0) {
+            store.remove(Blocks.OAK_LOG, 1); store.add(Blocks.OAK_PLANKS, 4);
+            if (item == Blocks.OAK_DOOR && store.count(Blocks.OAK_PLANKS) >= 6) { store.remove(Blocks.OAK_PLANKS, 6); store.add(Blocks.OAK_DOOR, 3); }
+            return;
+        }
+        if (item == Blocks.OAK_DOOR && store.count(Blocks.OAK_PLANKS) >= 6) { store.remove(Blocks.OAK_PLANKS, 6); store.add(Blocks.OAK_DOOR, 3); return; }
+        java.util.function.Predicate<Short> source = item == Blocks.COBBLESTONE ? b -> b == Blocks.STONE || b == Blocks.COBBLESTONE
+            : item == Blocks.THATCH || item == Blocks.STRAW_BED ? b -> b == Blocks.SHORT_GRASS
+            : item == Blocks.OAK_LOG || item == Blocks.OAK_PLANKS || item == Blocks.OAK_DOOR ? b -> b == Blocks.OAK_LOG : null;
+        int[] at = source == null ? null : find(w, (int) Math.floor(v.homeX), (int) Math.floor(v.homeY), (int) Math.floor(v.homeZ), source);
+        if (at == null) { // nothing of it nearby: drawn from the patch's account
+            byte m = Blocks.MATTER[item & 0xFFFF];
+            Matter matter = m >= 0 ? Matter.values()[m] : Matter.WOOD;
+            flows.take(matter, 1, v.x, v.z);
+            store.add(item, 1);
+            return;
+        }
+        v.workAt = at;
+    }
+
+    /** Walks to the source in {@code v.workAt} and takes it: a log, a stone, a tuft of grass. */
+    private void fetch(Villager v, World w, Flows flows) {
+        int[] at = v.workAt;
+        if (dist(v, at[0] + 0.5, at[2] + 0.5) > 3 || Math.abs(v.y - at[1]) > 4) {
+            if (v.state != Villager.State.WALK) go(v, w, at[0], at[1], at[2]);
+            if (v.path.isEmpty()) v.workAt = null; // out of reach: another next time
+            return;
+        }
+        v.state = Villager.State.WORK;
+        if (v.workTimer < 3 / v.efficiency(Skill.WOODCUTTING)) return;
+        v.workTimer = 0;
+        short b = w.get(at[0], at[1], at[2]);
+        v.workAt = null;
+        if (b == Blocks.OAK_LOG) {
+            int top = at[1]; // fells the whole trunk
+            while (w.get(at[0], top, at[2]) == Blocks.OAK_LOG) { set(w, at[0], top, at[2], Blocks.AIR); store.add(Blocks.OAK_LOG, 1); top++; }
+            flows.take(Matter.WOOD, top - at[1], at[0], at[2]);
+            v.skills.practice(Skill.WOODCUTTING, 2);
+            say(v, "Un chêne pour la charpente.");
+        } else if (b == Blocks.STONE || b == Blocks.COBBLESTONE) {
+            set(w, at[0], at[1], at[2], Blocks.AIR);
+            store.add(Blocks.COBBLESTONE, 1);
+            flows.take(Matter.STONE, 1, at[0], at[2]);
+            v.skills.practice(Skill.MINING, 1);
+        } else if (b == Blocks.SHORT_GRASS) {
+            set(w, at[0], at[1], at[2], Blocks.AIR);
+            store.add(Items.PLANT_FIBER, 2);
+            flows.take(Matter.PLANTS, 1, at[0], at[2]);
+            v.skills.practice(Skill.FORAGING, 0.5);
+        }
+    }
+
+    /** The nearest block matching {@code what} within 24 blocks that has open air beside or above it. */
+    private static int[] find(World w, int x, int y, int z, java.util.function.Predicate<Short> what) {
+        for (int r = 3; r <= 24; r++)
+            for (int dz = -r; dz <= r; dz++)
+                for (int dx = -r; dx <= r; dx++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                    for (int dy = -6; dy <= 8; dy++) {
+                        short b = w.get(x + dx, y + dy, z + dz);
+                        if (!what.test(b)) continue;
+                        if (w.get(x + dx, y + dy + 1, z + dz) == Blocks.AIR || w.get(x + dx, y + dy - 1, z + dz) != Blocks.OAK_LOG
+                            && PathFinder.standable(w, x + dx + 1, y + dy, z + dz)) {
+                            if (b == Blocks.OAK_LOG) while (w.get(x + dx, y + dy - 1, z + dz) == Blocks.OAK_LOG) dy--; // the foot of the trunk
+                            return new int[] {x + dx, y + dy, z + dz};
+                        }
+                    }
+                }
+        return null;
     }
 
     // ---------------------------------------------------------------------------- moving

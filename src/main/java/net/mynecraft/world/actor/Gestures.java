@@ -64,6 +64,13 @@ public final class Gestures {
             return Use.PICKED;
         }
         if (target == Blocks.STRAW_BED && night) return Use.SLEPT;
+        if (target == Blocks.FISH_TRAP_FULL) { // the trap's catch (already counted when it filled)
+            w.set(x, y, z, Blocks.FISH_TRAP);
+            a.inventory.add(Items.TROUT, 1);
+            if (growth != null) growth.planted(x, y, z);
+            a.skills.practice(Skill.FISHING, 1);
+            return Use.PICKED;
+        }
         byte kind = Items.TOOL[held & 0xFFFF];
         if (kind == Items.TOOL_HOE && (target == Blocks.GRASS || target == Blocks.DIRT) && w.get(x, y + 1, z) == Blocks.AIR) {
             w.set(x, y, z, Blocks.FARMLAND);

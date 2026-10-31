@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SFS",
+    "F F",
+    "SFS"
+  ],
+  "key": {
+    "S": "minecraft:stick",
+    "F": "minecraft:string"
+  },
+  "result": {
+    "id": "minecraft:fish_trap",
+    "count": 1
+  },
+  "mynecraft:skill": "fishing"
+}

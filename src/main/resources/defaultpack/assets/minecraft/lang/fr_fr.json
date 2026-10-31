@@ -123,5 +123,6 @@
   "item.minecraft.blue_dye": "Teinture bleue",
   "item.minecraft.white_dye": "Teinture blanche",
   "item.minecraft.yellow_dye": "Teinture jaune",
-  "item.minecraft.canvas": "Toile à peindre"
+  "item.minecraft.canvas": "Toile à peindre",
+  "block.minecraft.fish_trap": "Nasse"
 }

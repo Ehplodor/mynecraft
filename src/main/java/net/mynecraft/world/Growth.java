@@ -20,7 +20,7 @@ import java.util.Map;
  */
 public final class Growth {
     /** Days of full growth per wheat stage, for a berry bush to bear again, for a sapling to become a tree. */
-    static final double WHEAT_STAGE_DAYS = 1.5, BERRY_DAYS = 3, SAPLING_DAYS = 4;
+    static final double WHEAT_STAGE_DAYS = 1.5, BERRY_DAYS = 3, SAPLING_DAYS = 4, TRAP_DAYS = 1;
 
     private final Map<Long, double[]> places = new LinkedHashMap<>(); // position -> {progress 0..1}
 
@@ -46,7 +46,7 @@ public final class Growth {
      * Advances {@code days} of the calendar for every followed place whose chunk is loaded; returns
      * the blocks changed (x, y, z) so the caller can redraw them.
      */
-    public List<int[]> grow(World w, Ecology ecology, double phase, double days) {
+    public List<int[]> grow(World w, Ecology ecology, net.mynecraft.world.actor.Flows flows, double phase, double days) {
         List<int[]> changed = new ArrayList<>();
         for (Iterator<Map.Entry<Long, double[]>> it = places.entrySet().iterator(); it.hasNext(); ) {
             var e = it.next();
@@ -66,6 +66,18 @@ public final class Growth {
                     changed.add(p);
                     if (age + 1 == 3) {
                         patch.soil = Math.max(0, patch.soil - 0.002); // the ear draws on the soil
+                        it.remove();
+                    }
+                }
+            } else if (b == Blocks.FISH_TRAP) { // a fish trap fills in about a day, if the stream holds trout
+                e.getValue()[0] += days / TRAP_DAYS;
+                if (e.getValue()[0] >= 1) {
+                    e.getValue()[0] = 0;
+                    if (patch.pop[net.mynecraft.world.life.Species.TROUT.ordinal()] >= 1) {
+                        ecology.died(net.mynecraft.world.life.Species.TROUT, p[0], p[2]);
+                        if (flows != null) flows.take(net.mynecraft.world.actor.Matter.FISH, 1, p[0], p[2]);
+                        w.set(p[0], p[1], p[2], Blocks.FISH_TRAP_FULL);
+                        changed.add(p);
                         it.remove();
                     }
                 }
