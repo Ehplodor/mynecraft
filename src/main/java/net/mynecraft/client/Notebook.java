@@ -15,6 +15,93 @@ import net.mynecraft.world.life.Vegetation;
  */
 final class Notebook {
     boolean open;
+    /** 0 the patch, 1 the harmony compass and the flows, 2 skills and trades (N turns the pages, then closes). */
+    int page;
+
+    /** N: next page, closing after the last. */
+    void turn() {
+        if (!open) { open = true; page = 0; }
+        else if (++page > 2) { open = false; page = 0; }
+    }
+
+    void draw(Hud hud, Life life, double x, double z, Livelihood me) {
+        if (page == 1) compass(hud, life, x, z, me);
+        else if (page == 2) skills(hud, me);
+        else draw(hud, life, x, z);
+    }
+
+    private void compass(Hud hud, Life life, double x, double z, Livelihood me) {
+        float s = hud.scale, line = hud.lineHeight() + s;
+        float w = Math.min(hud.width() * 0.6f, 330 * s), left = 6 * s, top = 6 * s;
+        hud.rect(left - 3 * s, top - 3 * s, w + 6 * s, 34 * line + 8 * s, 0.05f, 0.06f, 0.04f, 0.78f);
+        float y = top;
+        var n = me.nature;
+        var self = me.self;
+        hud.text("Boussole d'harmonie" + (me.actor.hasHome() ? String.format(" - foyer %.0f, %.0f", me.actor.homeX, me.actor.homeZ)
+            : " - pas de foyer (H : le fixer ici)"), left, y, 1, 0.95f, 0.7f);
+        y += line * 1.3f;
+        y = gauge(hud, "Avec la nature", n.score(), 0.35f, 0.75f, 0.35f, left, y, w);
+        y = gauge(hud, "  végétation", n.plants(), 0.3f, 0.6f, 0.3f, left, y, w);
+        y = gauge(hud, "  sol", n.soil(), 0.6f, 0.45f, 0.3f, left, y, w);
+        y = gauge(hud, "  eaux", n.water(), 0.35f, 0.6f, 0.9f, left, y, w);
+        y = gauge(hud, "  biodiversité", n.biodiversity(), 0.9f, 0.6f, 0.3f, left, y, w);
+        y = gauge(hud, "  pression (prélèvements)", n.pressure(), 0.85f, 0.3f, 0.25f, left, y, w);
+        y += line * 0.3f;
+        y = gauge(hud, "Avec soi", self.score(), 0.95f, 0.75f, 0.35f, left, y, w);
+        y = gauge(hud, "  besoins du corps", self.needs(), 0.8f, 0.6f, 0.4f, left, y, w);
+        y = gauge(hud, "  le lieu (abri, confort, beauté)", self.place(), 0.7f, 0.6f, 0.8f, left, y, w);
+        y = gauge(hud, "  variété (repas, activités)", self.variety(), 0.5f, 0.8f, 0.7f, left, y, w);
+        y = gauge(hud, "  compagnie", self.company(), 0.9f, 0.5f, 0.6f, left, y, w);
+        y += line * 0.3f;
+        var a = me.actor.needs;
+        hud.text(String.format("Faim %.0f/20  Soif %.0f/20  Repos %.0f %%  Chaleur %s", a.food, a.water, 100 * a.rest,
+            a.warmth < 0.3 ? "froid" : a.warmth > 0.7 ? "chaud" : "bien"), left, y, 0.85f, 0.85f, 0.85f);
+        y += line;
+        var p = me.place;
+        hud.text(String.format("Ici : toit %.0f %%, murs %.0f %%, feu %.0f %%, beauté %.0f %%%s", 100 * p.roof(), 100 * p.walls(),
+            100 * p.fire(), 100 * p.beauty(), p.bed() ? ", un lit" : ""), left, y, 0.8f, 0.8f, 0.9f);
+        y += line * 1.3f;
+        hud.text("Flux de matières de cette parcelle (pris / rendu)", left, y, 1, 0.95f, 0.7f);
+        y += line;
+        var acc = me.flows.at(x, z);
+        for (var m : net.mynecraft.world.actor.Matter.values()) {
+            double t = acc.taken[m.ordinal()], g = acc.returned[m.ordinal()];
+            if (t < 0.01 && g < 0.01) continue;
+            hud.text(String.format("%-18s %7.1f / %.1f", m.displayName, t, g), left, y, 0.8f, 0.85f, 0.8f);
+            y += line;
+        }
+        if (acc.offSeasonKills > 0) {
+            hud.text(String.format("Animaux tués en saison des petits : %.0f", acc.offSeasonKills), left, y, 0.95f, 0.5f, 0.45f);
+            y += line;
+        }
+        hud.text("N : page suivante", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
+    }
+
+    private void skills(Hud hud, Livelihood me) {
+        float s = hud.scale, line = hud.lineHeight() + s;
+        float w = Math.min(hud.width() * 0.6f, 330 * s), left = 6 * s, top = 6 * s;
+        var sk = me.actor.skills;
+        hud.rect(left - 3 * s, top - 3 * s, w + 6 * s, 34 * line + 8 * s, 0.05f, 0.06f, 0.04f, 0.78f);
+        float y = top;
+        String role = sk.roleTitle();
+        hud.text("Savoir-faire" + (role.isEmpty() ? " - novice en tout" : " - " + role), left, y, 1, 0.95f, 0.7f);
+        y += line * 1.3f;
+        for (var a : net.mynecraft.world.actor.Ability.values())
+            y = gauge(hud, a.displayName, sk.ability[a.ordinal()], 0.6f, 0.7f, 0.95f, left, y, w);
+        y += line * 0.3f;
+        for (var k : net.mynecraft.world.actor.Skill.values()) {
+            double xp = sk.xp[k.ordinal()];
+            if (xp < 0.5) continue;
+            int lvl = sk.level(k);
+            double into = (xp - 5.0 * lvl * lvl) / Math.max(1, 5.0 * ((lvl + 1) * (lvl + 1) - lvl * lvl));
+            boolean taught = sk.today < sk.taughtUntil[k.ordinal()];
+            y = gauge(hud, String.format("%s %d%s", k.displayName, lvl, taught ? " (leçon)" : ""), Math.min(1, into), 0.85f, 0.7f, 0.35f, left, y, w);
+        }
+        y += line * 0.3f;
+        hud.text("Plans connus : " + String.join(", ", me.actor.plans), left, y, 0.8f, 0.85f, 0.8f);
+        y += line;
+        hud.text("N : fermer", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
+    }
 
     private static final String[] INTERACTION = {"prédation", "herbivorie", "compétition", "mutualisme", "commensalisme",
         "parasitisme", "décomposition"};
@@ -71,7 +158,7 @@ final class Notebook {
             hud.text(INTERACTION[l.kind().ordinal()] + " : " + l.text(), left, y, 0.75f, 0.9f, 1);
             y += line;
         }
-        hud.text("N : fermer", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
+        hud.text("N : page suivante", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
     }
 
     private static float gauge(Hud hud, String label, double v, float r, float g, float b, float x, float y, float w) {

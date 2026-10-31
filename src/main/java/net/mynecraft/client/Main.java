@@ -228,6 +228,7 @@ public final class Main {
             });
 
         boolean editDemo = argv.contains("--edit-demo"), fluidDemo = argv.contains("--fluid-demo");
+        boolean blocksDemo = argv.contains("--blocks-demo");
         // Animals (M22): simulated around the player, drawn with the world and its shadows.
         Life life = new Life(world, world.seed);
         try { // the ecosystem's patches as they were left (else bootstrapped afresh)
@@ -302,6 +303,16 @@ public final class Main {
         ItemNames itemNames = new ItemNames(resources);
         inventoryScreen.names = itemNames;
         RecipeViewer viewer = new RecipeViewer(new RecipeIndex(recipes), itemNames, Input.placeableBlocks());
+        // The player's life on the land (M27..M34): skills, needs, flows, growth, the hamlet, plans.
+        Livelihood liv = new Livelihood(worldDir, inventory, life);
+        liv.spawn = storage.spawn;
+        creatureRenderer.people = liv.hamlet.villagers;
+        String needsRate = option(args, "--needs", null); // off / slow / normal
+        if (needsRate != null) liv.actor.needs.rate = needsRate.equals("off") ? 0 : needsRate.equals("slow") ? 0.5 : 1;
+        StationScreen stationScreen = new StationScreen();
+        boolean stationOpen = false;
+        int[] tableAt = null;
+        net.mynecraft.world.people.Villager aimedVillager = null;
         int[] drag = new int[64];      // slots crossed while dragging a held stack
         int dragCount = 0, dragButton = -1;
         long lastClickAt = 0;
@@ -317,6 +328,7 @@ public final class Main {
             viewer.show(Blocks.CRAFTING_TABLE, false); // and the recipe viewer on the crafting table
             if (!creative) {
                 menu = new CraftingMenu(inventory, recipes, 2);
+                menu.skills = liv.actor.skills;
                 menu.click(0, true, false);                 // half the logs on the cursor
                 menu.click(menu.gridStart(), false, false); // into the grid: 4 planks offered
             }
@@ -331,6 +343,36 @@ public final class Main {
             survival.health = 13;
             survival.air = 130;
         }
+        if (argv.contains("--life-demo")) { // scripted shots of M27..M34: tools, food, a trade learnt, a hearth
+            for (short t : new short[] {net.mynecraft.world.Items.STONE_PICKAXE, net.mynecraft.world.Items.WOODEN_AXE,
+                net.mynecraft.world.Items.FISHING_ROD, net.mynecraft.world.Items.BOW, net.mynecraft.world.Items.FLUTE}) inventory.add(t, 1);
+            inventory.wear[0] = 40;
+            inventory.add(net.mynecraft.world.Items.VENISON, 3);
+            inventory.add(net.mynecraft.world.Items.TROUT, 2);
+            inventory.add(net.mynecraft.world.Items.WILD_HERBS, 2);
+            inventory.add(Blocks.OAK_PLANKS, 12);
+            inventory.add(net.mynecraft.world.Items.COAL, 4);
+            inventory.add(net.mynecraft.world.Items.WHEAT, 6);
+            inventory.add(net.mynecraft.world.Items.ARROW, 8);
+            var sk = liv.actor.skills;
+            sk.xp[net.mynecraft.world.actor.Skill.COOKING.ordinal()] = 90;
+            sk.xp[net.mynecraft.world.actor.Skill.FORAGING.ordinal()] = 40;
+            sk.xp[net.mynecraft.world.actor.Skill.BUILDING.ordinal()] = 25;
+            sk.xp[net.mynecraft.world.actor.Skill.WOODCUTTING.ordinal()] = 30;
+            java.util.Arrays.fill(sk.lastPractice, sk.today);
+            liv.actor.needs.food = 13;
+            liv.actor.needs.water = 9;
+            liv.actor.needs.eat(net.mynecraft.world.Items.APPLE);
+            liv.actor.needs.eat(net.mynecraft.world.Items.COOKED_TROUT);
+        }
+        String stationDemo = option(args, "--station", null); // scripted shot: a workstation's screen
+        if (stationDemo != null) {
+            liv.openStation(stationDemo, new int[] {0, 0, 0}, world, 0);
+            stationOpen = true;
+            screenOpen = true;
+        }
+        String notebookPage = option(args, "--notebook-page", null);
+        if (notebookPage != null) { notebook.open = true; notebook.page = Integer.parseInt(notebookPage); }
         String pos = option(args, "--pos", null); // "x,y,z" (y "~": on the ground): start there, flying (scripted views)
         if (pos != null) {
             String[] xyz = pos.split(",");
@@ -341,6 +383,12 @@ public final class Main {
                 player.y = Math.max(col.height(), col.water()) + (xyz[1].length() > 1 ? Double.parseDouble(xyz[1].substring(1)) : 1.2);
             } else player.y = Double.parseDouble(xyz[1]);
             player.flying = true;
+        }
+        if (argv.contains("--life-demo")) {
+            liv.flows.take(net.mynecraft.world.actor.Matter.WOOD, 12, player.x, player.z);
+            liv.flows.take(net.mynecraft.world.actor.Matter.FRUIT, 5, player.x, player.z);
+            liv.flows.give(net.mynecraft.world.actor.Matter.ASH, 1.5, player.x, player.z);
+            liv.flows.give(net.mynecraft.world.actor.Matter.COMPOST, 2, player.x, player.z);
         }
         double ticks = Double.parseDouble(option(args, "--time", Long.toString(storage.dayTime)));
         String seasonName = option(args, "--season", null); // printemps, ete, automne, hiver: jump to that season
@@ -435,6 +483,7 @@ public final class Main {
                 streamer.autosave();
                 explored.save();
                 saveEcology(life, worldDir);
+                liv.save();
                 lastAutosave = now;
             }
             if (stats == null && screenshot == null) {
@@ -456,16 +505,32 @@ public final class Main {
                     if (menu != null && menu.close() > 0) System.err.println("[inventory] full: items lost");
                     menu = null;
                     screenOpen = false;
+                    stationOpen = false;
+                    liv.closeStation();
                     input.capture(true);
                 } else if (escape) {
                     paused = !paused;
                     input.capture(!paused);
                 } else if (inventoryKey && !paused && !survival.dead) {
                     menu = creative ? null : new CraftingMenu(inventory, recipes, 2);
+                    if (menu != null) menu.skills = liv.actor.skills;
                     screenOpen = true;
                     input.capture(false);
                 }
-                if (screenOpen) {
+                if (stationOpen) {
+                    double[] m = input.mouseInFramebuffer();
+                    input.takeTyped();
+                    if (input.clicked(GLFW_MOUSE_BUTTON_LEFT)) {
+                        var p = stationScreen.at(m[0], m[1]);
+                        if (p != null) { liv.start(p); sound.click(); }
+                    }
+                } else if (screenOpen && menu != null && menu.gridSize == 3 && input.pressed(GLFW_KEY_TAB) && tableAt != null) {
+                    menu.close(); // the table's own recipes (art, music...): the station screen
+                    menu = null;
+                    stationOpen = true;
+                    liv.openStation("crafting_table", tableAt, world, 0);
+                }
+                if (screenOpen && !stationOpen) {
                     double[] m = input.mouseInFramebuffer();
                     boolean left = input.clicked(GLFW_MOUSE_BUTTON_LEFT), right = input.clicked(GLFW_MOUSE_BUTTON_RIGHT);
                     int hover = inventoryScreen.slotAt(hud, menu, m[0], m[1]);
@@ -519,7 +584,22 @@ public final class Main {
                         worldMap.open(player.x, player.z);
                         input.capture(false);
                     }
-                    if (input.pressedChar('n')) notebook.open = !notebook.open; // naturalist's notebook
+                    if (input.pressedChar('n')) notebook.turn(); // naturalist's notebook: patch, compass, skills
+                    if (input.pressedChar('h')) { // the hearth: centre of the territory the compass watches
+                        liv.actor.setHome(player.x, player.y, player.z);
+                        liv.say("Votre foyer est ici.");
+                    }
+                    Raycast.Hit aimHit = Raycast.cast(world, cam.pos.x, cam.pos.y, cam.pos.z, -Math.sin(cam.yaw) * Math.cos(cam.pitch),
+                        Math.sin(cam.pitch), -Math.cos(cam.yaw) * Math.cos(cam.pitch), REACH);
+                    int[] aimBlock = aimHit == null ? null : new int[] {aimHit.x(), aimHit.y(), aimHit.z()};
+                    if (input.pressedChar('k') && aimBlock != null) liv.mark(aimBlock);
+                    if (input.pressedChar('p')) liv.savePlan(world);
+                    if (input.pressedChar('o')) liv.cyclePlan(aimBlock);
+                    java.util.List<int[]> built = null;
+                    if (creative && input.pressedChar('g')) built = liv.fill(world, input.selected);
+                    if (creative && input.pressedChar('l')) built = liv.buildPlan(world);
+                    if (creative && input.pressed(GLFW_KEY_BACKSPACE)) built = liv.undo(world);
+                    if (built != null) for (int[] e : built) { renderer.blockChanged(e[0], e[1], e[2]); fluids.blockChanged(e[0], e[1], e[2]); }
                     if (input.pressedChar('b')) // waypoint where the player stands
                         waypoints.add((int) Math.floor(player.x), (int) Math.floor(player.y), (int) Math.floor(player.z));
                 }
@@ -655,6 +735,11 @@ public final class Main {
                     showcase = false;
                 }
                 life.tick(dt, player.x, player.y, player.z, input.shiftDown());
+                for (int[] e : liv.tick(dt, world, player, weather, life, recipes, DayCycle.daylight(ticks), creative, survival,
+                    miningProgress > 0)) {
+                    renderer.blockChanged(e[0], e[1], e[2]);
+                    fluids.blockChanged(e[0], e[1], e[2]);
+                }
                 if (streamer.settled()) lifeClock += dt;
                 for (int[] e; (e = life.edits.poll()) != null; ) { // grass grown, eaten, frozen; lakes iced over or thawed
                     renderer.blockChanged(e[0], e[1], e[2]);
@@ -672,9 +757,22 @@ public final class Main {
             aimed = life.raycast(cam.pos.x, cam.pos.y, cam.pos.z, -Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp,
                 hit == null ? REACH : Math.max(0, Math.sqrt(Math.pow(hit.x() + 0.5 - cam.pos.x, 2) + Math.pow(hit.y() + 0.5 - cam.pos.y, 2)
                     + Math.pow(hit.z() + 0.5 - cam.pos.z, 2)) - 0.5));
+            aimedVillager = liv.aimedVillager(cam.pos.x, cam.pos.y, cam.pos.z, -Math.sin(cam.yaw) * cp, Math.sin(cam.pitch),
+                -Math.cos(cam.yaw) * cp, hit == null ? REACH : Math.sqrt(Math.pow(hit.x() + 0.5 - cam.pos.x, 2)
+                    + Math.pow(hit.y() + 0.5 - cam.pos.y, 2) + Math.pow(hit.z() + 0.5 - cam.pos.z, 2)));
+            if (aimedVillager != null) {
+                if (input.placeRequested && !screenOpen && !paused) liv.talk(aimedVillager);
+                input.placeRequested = false;
+                aimed = null;
+                hit = null;
+            }
             if (aimed != null) {
                 if (input.breakRequested && !screenOpen && !paused) {
-                    life.strike(aimed, creative ? 100 : 4, player.x, player.z);
+                    short weapon = inventory.id(input.slot); // a knife or an axe strikes harder
+                    byte wk = net.mynecraft.world.Items.TOOL[weapon & 0xFFFF];
+                    life.strike(aimed, creative ? 100 : wk == net.mynecraft.world.Items.TOOL_KNIFE || wk == net.mynecraft.world.Items.TOOL_AXE
+                        ? 4 + 2 * net.mynecraft.world.Items.TIER[weapon & 0xFFFF] : 4, player.x, player.z);
+                    if (!creative) liv.struck(aimed, life);
                     sound.hit(Synth.Material.WOOD, aimed.x, aimed.y + aimed.height() / 2, aimed.z);
                 }
                 hit = null;
@@ -686,14 +784,14 @@ public final class Main {
                     miningProgress = 0;
                 }
                 short target = world.get(hit.x(), hit.y(), hit.z());
-                miningProgress += dt / Blocks.breakSeconds(target);
+                miningProgress += dt / liv.breakSeconds(target, input.slot);
                 if (weatherClock >= nextHitSound && dt > 0) { // the tool striking, four times a second
                     sound.hit(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     nextHitSound = weatherClock + 0.25;
                 }
                 if (miningProgress >= 1 && world.set(hit.x(), hit.y(), hit.z(), brokenInto(world, hit, target))) {
                     sound.blockBroken(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
-                    inventory.add(Blocks.DROP[target & 0xFFFF], Blocks.DROP_COUNT[target & 0xFFFF]);
+                    liv.broke(target, input.slot, hit.x(), hit.y(), hit.z());
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                     mining = null;
@@ -711,9 +809,50 @@ public final class Main {
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                 }
             }
-            if (hit != null && input.placeRequested && !creative && !input.shiftDown()
+            short aimedBlock = hit == null ? Blocks.AIR : world.get(hit.x(), hit.y(), hit.z());
+            boolean interactive = aimedBlock == Blocks.OAK_DOOR || aimedBlock == Blocks.OAK_DOOR_OPEN || aimedBlock == Blocks.BERRY_BUSH
+                || aimedBlock == Blocks.STRAW_BED;
+            short heldItem = inventory.id(input.slot);
+            boolean used = false;
+            if (input.placeRequested && !screenOpen && !paused && hit != null && !creative && !input.shiftDown()
+                && Blocks.isStation(aimedBlock) && aimedBlock != Blocks.CRAFTING_TABLE) { // a workstation's recipes
+                liv.openStation(Blocks.NAMES[aimedBlock], new int[] {hit.x(), hit.y(), hit.z()}, world,
+                    Math.hypot(weather.here().windX(), weather.here().windZ()));
+                stationOpen = true;
+                screenOpen = true;
+                menu = null;
+                input.capture(false);
+                used = true;
+            } else if (input.placeRequested && !screenOpen && !paused && !creative && (hit == null || interactive
+                || !net.mynecraft.world.Items.isBlock(heldItem) || heldItem == Blocks.OAK_SAPLING)) {
+                double[] dir = {-Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp};
+                int[] waterAt = Livelihood.water(world, cam.pos.x, cam.pos.y, cam.pos.z, dir[0], dir[1], dir[2],
+                    net.mynecraft.world.Items.TOOL[heldItem & 0xFFFF] == net.mynecraft.world.Items.TOOL_ROD ? 12 : REACH);
+                var u = liv.use(world, input.slot, hit == null ? null : new int[] {hit.x(), hit.y(), hit.z()}, waterAt,
+                    DayCycle.daylight(ticks) < 0.25, life, new double[] {cam.pos.x, cam.pos.y, cam.pos.z}, dir, sound);
+                used = u != net.mynecraft.world.actor.Gestures.Use.NONE || !net.mynecraft.world.Items.isBlock(heldItem) || interactive;
+                if (u == net.mynecraft.world.actor.Gestures.Use.SLEPT) { // to the morning; the night's rest, and hunger
+                    ticks = (Math.floor(ticks / DayCycle.DAY_TICKS) + (ticks % DayCycle.DAY_TICKS > 6000 ? 1 : 0)) * DayCycle.DAY_TICKS;
+                    liv.actor.needs.rest = 1;
+                    liv.actor.needs.food = Math.max(0, liv.actor.needs.food - 3);
+                    liv.actor.needs.water = Math.max(0, liv.actor.needs.water - 3);
+                }
+                if (hit != null && u != net.mynecraft.world.actor.Gestures.Use.NONE) {
+                    for (int dy = 0; dy <= 1; dy++) { renderer.blockChanged(hit.x(), hit.y() + dy, hit.z()); fluids.blockChanged(hit.x(), hit.y() + dy, hit.z()); }
+                    sound.blockPlaced(material(aimedBlock), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
+                }
+            } else if (hit != null && input.placeRequested && creative && interactive && aimedBlock != Blocks.STRAW_BED) {
+                liv.use(world, input.slot, new int[] {hit.x(), hit.y(), hit.z()}, null, false, life, null, null, sound); // doors
+                renderer.blockChanged(hit.x(), hit.y(), hit.z());
+                used = true;
+            }
+            if (used) {
+                // done: the right hand did something else than placing
+            } else if (hit != null && input.placeRequested && !creative && !input.shiftDown()
                 && world.get(hit.x(), hit.y(), hit.z()) == Blocks.CRAFTING_TABLE) {
                 menu = new CraftingMenu(inventory, recipes, 3); // like vanilla: sneak to place against it instead
+                menu.skills = liv.actor.skills;
+                tableAt = new int[] {hit.x(), hit.y(), hit.z()};
                 screenOpen = true;
                 input.capture(false);
             } else if (hit != null && input.placeRequested && net.mynecraft.world.Items.isBlock(input.selected)) {
@@ -722,8 +861,20 @@ public final class Main {
                 if (placed != null) {
                     sound.blockPlaced(material(world.get(placed[0], placed[1], placed[2])), placed[0] + 0.5, placed[1] + 0.5, placed[2] + 0.5);
                     if (!creative) inventory.takeOne(input.slot);
+                    liv.placed(world, placed[0], placed[1], placed[2]);
                     renderer.blockChanged(placed[0], placed[1], placed[2]);
                     fluids.blockChanged(placed[0], placed[1], placed[2]);
+                }
+            }
+            if (blocksDemo && streamer.settled()) { // scripted shot: the blocks of M27..M34 in a row, on the ground before the eyes
+                blocksDemo = false;
+                int ox = (int) Math.floor(player.x) - 7, oz = (int) Math.floor(player.z) - 5, n = 0;
+                for (short b = Blocks.CAMPFIRE; b < Blocks.COUNT; b++) {
+                    if (b == Blocks.WHEAT_0 + 1 || b == Blocks.WHEAT_0 + 2 || b == Blocks.OAK_DOOR_OPEN || b == Blocks.BERRY_BUSH_PICKED) continue;
+                    int x = ox + 2 * (n % 8), z = oz - 2 * (n / 8), y = (int) Math.floor(player.y) + 4;
+                    n++;
+                    while (!world.isSolid(x, y, z) && y > 0) y--;
+                    demoSet(world, renderer, x, y + 1, z, b);
                 }
             }
             if (editDemo && streamer.settled()) {
@@ -809,6 +960,12 @@ public final class Main {
                 overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y),
                     (float) (hit.z() - cam.pos.z), lo, hi);
             }
+            int[] step = liv.nextStep(world); // the plan's next block, and the corners marked
+            if (step != null) overlay.outline(renderer.viewProj(), (float) (step[0] - cam.pos.x), (float) (step[1] - cam.pos.y),
+                (float) (step[2] - cam.pos.z), 0, 1);
+            for (int[] mk : new int[][] {liv.markA, liv.markB})
+                if (mk != null) overlay.outline(renderer.viewProj(), (float) (mk[0] - cam.pos.x), (float) (mk[1] - cam.pos.y),
+                    (float) (mk[2] - cam.pos.z), -0.02f, 1.02f);
             overlay.crosshair(fbW[0], fbH[0]);
             if (debug) gpuTimer.end();
             if (waterView.active()) {
@@ -823,12 +980,20 @@ public final class Main {
                 hotbarTop = hud.status(hotbarTop, hud.hotbarLeft(), hud.hotbarRight(), survival.health, survival.air, Survival.MAX_AIR);
                 if (miningProgress > 0) hud.progress((float) miningProgress);
             }
+            hotbarTop = liv.drawHud(hud, hotbarTop, hud.hotbarLeft(), hud.hotbarRight(), creative, world, itemNames);
             if (now < hurtFlashUntil) hud.rect(0, 0, hud.width(), hud.height(), 0.8f, 0, 0, 0.25f);
             if (input.selected != shownBlock) {
                 shownBlock = input.selected;
                 blockShownAt = now;
             }
-            if (notebook.open && !screenOpen && !worldMap.open) notebook.draw(hud, life, player.x, player.z);
+            if (notebook.open && !screenOpen && !worldMap.open) notebook.draw(hud, life, player.x, player.z, liv);
+            if (aimedVillager != null && !screenOpen) { // an inhabitant: name, trade, what they say
+                String title = aimedVillager.skills.roleTitle();
+                hud.textCentered(aimedVillager.name + " - " + (title.isEmpty() ? aimedVillager.job.displayName : title)
+                    + " (clic droit : parler)", hud.width() / 2f, hud.height() / 2f + 2 * hud.lineHeight(), 1, 1, 0.85f);
+                if (liv.hamlet.clock < aimedVillager.sayingUntil)
+                    hud.textCentered(aimedVillager.saying, hud.width() / 2f, hud.height() / 2f + 3.3f * hud.lineHeight(), 0.85f, 0.95f, 1);
+            }
             if (aimed != null && !screenOpen) { // the name of the animal under the crosshair
                 hud.textCentered(aimed.species.displayName + (aimed.adult() ? "" : " (jeune)"), hud.width() / 2f,
                     hud.height() / 2f + 2 * hud.lineHeight(), 1, 1, 0.85f);
@@ -840,12 +1005,16 @@ public final class Main {
                 debugScreen(hud, world, renderer, streamer, player, cam, hit, ticks, fps, frameMillis, gpuTimer.lastMillis,
                     fluids.pending(), fluidRate, settling, weather.here());
             }
-            if (screenOpen) {
+            if (stationOpen) {
+                double[] m = screenshot != null ? new double[] {0, 0} : input.mouseInFramebuffer();
+                stationScreen.draw(hud, liv, recipes, itemNames, m[0], m[1]);
+            } else if (screenOpen) {
                 double[] m = screenshot != null ? new double[] {hud.width() * 0.62, hud.height() * 0.42} : input.mouseInFramebuffer();
                 inventoryScreen.draw(hud, menu, inventory, input.hotbar, input.slot, m[0], m[1]);
                 viewer.draw(hud, menu, menu != null ? inventory : null, m[0], m[1]);
                 String help = menu != null
                     ? "T : trier | 1-9 : vers la barre | double-clic : regrouper | glisser : répartir | R / U : recettes / utilisations"
+                        + (menu.gridSize == 3 ? " | Tab : ouvrages de l'établi" : "")
                     : "clic : prendre un bloc | R / U : recettes / utilisations";
                 hud.rect(0, hud.height() - hud.lineHeight() - 4 * hud.scale, hud.width(), hud.lineHeight() + 4 * hud.scale, 0, 0, 0, 0.55f);
                 hud.textCentered(help, hud.width() / 2f, hud.height() - hud.lineHeight() - 2 * hud.scale, 0.85f, 0.85f, 0.85f);
@@ -981,6 +1150,7 @@ public final class Main {
             storage.close();
             explored.save();
             saveEcology(life, worldDir);
+            liv.save();
         } catch (IOException | InterruptedException e) {
             System.err.println("[storage] save failed: " + e.getMessage());
         }
