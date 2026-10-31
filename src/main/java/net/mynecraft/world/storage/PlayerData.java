@@ -30,7 +30,8 @@ public final class PlayerData {
             short block = net.mynecraft.world.Items.fromName(id);
             if (slot < 0 || slot >= Inventory.SIZE || block <= 0 || count <= 0) continue; // unknown items are skipped
             d.inventory.ids[slot] = block;
-            d.inventory.counts[slot] = Math.min(count, Inventory.MAX_STACK);
+            d.inventory.counts[slot] = Math.min(count, Inventory.maxStack(block));
+            d.inventory.wear[slot] = Nbt.getInt(item, "Damage", 0);
         }
         return d;
     }
@@ -52,6 +53,7 @@ public final class PlayerData {
             item.put("Slot", (byte) i);
             item.put("id", "minecraft:" + net.mynecraft.world.Items.name(inventory.ids[i]));
             item.put("count", inventory.counts[i]);
+            if (inventory.wear[i] > 0) item.put("Damage", inventory.wear[i]);
             items.values().add(item);
         }
         p.put("Inventory", items);

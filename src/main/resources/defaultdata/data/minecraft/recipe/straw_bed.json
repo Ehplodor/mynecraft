@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "TTT",
+    "PPP"
+  ],
+  "key": {
+    "T": "minecraft:thatch",
+    "P": "#minecraft:planks"
+  },
+  "result": {
+    "id": "minecraft:straw_bed",
+    "count": 1
+  }
+}

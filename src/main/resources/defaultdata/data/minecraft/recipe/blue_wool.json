@@ -1,0 +1,29 @@
+{
+  "type": "mynecraft:process",
+  "station": "dye_vat",
+  "ingredients": [
+    {
+      "item": "minecraft:white_wool",
+      "count": 1
+    },
+    {
+      "item": "minecraft:blue_dye",
+      "count": 1
+    }
+  ],
+  "skill": "dyeing",
+  "level": 0,
+  "seconds": 6,
+  "results": [
+    {
+      "id": "minecraft:blue_wool",
+      "count": 1
+    }
+  ],
+  "waste": [
+    {
+      "matter": "wastewater",
+      "amount": 0.1
+    }
+  ]
+}

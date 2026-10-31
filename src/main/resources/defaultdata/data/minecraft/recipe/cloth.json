@@ -1,0 +1,19 @@
+{
+  "type": "mynecraft:process",
+  "station": "loom",
+  "ingredients": [
+    {
+      "item": "minecraft:string",
+      "count": 4
+    }
+  ],
+  "skill": "weaving",
+  "level": 0,
+  "seconds": 10,
+  "results": [
+    {
+      "id": "minecraft:cloth",
+      "count": 1
+    }
+  ]
+}

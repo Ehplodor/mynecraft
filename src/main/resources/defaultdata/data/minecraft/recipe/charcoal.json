@@ -1,0 +1,29 @@
+{
+  "type": "mynecraft:process",
+  "station": "furnace",
+  "ingredients": [
+    {
+      "tag": "minecraft:logs",
+      "count": 1
+    }
+  ],
+  "skill": "woodcutting",
+  "level": 0,
+  "seconds": 8,
+  "results": [
+    {
+      "id": "minecraft:charcoal",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  },
+  "waste": [
+    {
+      "matter": "ash",
+      "amount": 0.2
+    }
+  ]
+}

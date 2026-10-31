@@ -1,0 +1,25 @@
+{
+  "type": "mynecraft:process",
+  "station": "dye_vat",
+  "ingredients": [
+    {
+      "item": "minecraft:gentian",
+      "count": 1
+    }
+  ],
+  "skill": "dyeing",
+  "level": 0,
+  "seconds": 6,
+  "results": [
+    {
+      "id": "minecraft:blue_dye",
+      "count": 2
+    }
+  ],
+  "waste": [
+    {
+      "matter": "wastewater",
+      "amount": 0.2
+    }
+  ]
+}

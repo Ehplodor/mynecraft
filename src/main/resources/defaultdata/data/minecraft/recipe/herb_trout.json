@@ -1,0 +1,27 @@
+{
+  "type": "mynecraft:process",
+  "station": "campfire",
+  "ingredients": [
+    {
+      "item": "minecraft:trout",
+      "count": 1
+    },
+    {
+      "item": "minecraft:wild_herbs",
+      "count": 1
+    }
+  ],
+  "skill": "cooking",
+  "level": 2,
+  "seconds": 8,
+  "results": [
+    {
+      "id": "minecraft:herb_trout",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  }
+}

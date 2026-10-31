@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " SF",
+    "S F",
+    " SF"
+  ],
+  "key": {
+    "S": "minecraft:stick",
+    "F": "minecraft:string"
+  },
+  "result": {
+    "id": "minecraft:bow",
+    "count": 1
+  },
+  "mynecraft:skill": "hunting",
+  "mynecraft:level": 1
+}

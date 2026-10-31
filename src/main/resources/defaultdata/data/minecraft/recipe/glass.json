@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "furnace",
+  "ingredients": [
+    {
+      "item": "minecraft:sand",
+      "count": 1
+    }
+  ],
+  "skill": "glasswork",
+  "level": 0,
+  "seconds": 6,
+  "results": [
+    {
+      "id": "minecraft:glass",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  }
+}

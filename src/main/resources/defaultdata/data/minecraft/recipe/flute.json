@@ -1,0 +1,20 @@
+{
+  "type": "mynecraft:process",
+  "station": "crafting_table",
+  "ingredients": [
+    {
+      "item": "minecraft:stick",
+      "count": 1
+    }
+  ],
+  "skill": "music",
+  "level": 0,
+  "seconds": 8,
+  "results": [
+    {
+      "id": "minecraft:flute",
+      "count": 1
+    }
+  ],
+  "tool": "knife"
+}

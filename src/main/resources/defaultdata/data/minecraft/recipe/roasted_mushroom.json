@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "campfire",
+  "ingredients": [
+    {
+      "item": "minecraft:brown_mushroom",
+      "count": 1
+    }
+  ],
+  "skill": "cooking",
+  "level": 0,
+  "seconds": 3,
+  "results": [
+    {
+      "id": "minecraft:roasted_mushroom",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 0.5
+  }
+}

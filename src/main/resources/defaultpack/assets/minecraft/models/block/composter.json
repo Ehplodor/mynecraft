@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "block/composter",
+    "up": "block/composter_top",
+    "down": "block/oak_planks",
+    "north": "block/composter",
+    "south": "block/composter",
+    "east": "block/composter",
+    "west": "block/composter"
+  }
+}

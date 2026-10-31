@@ -1,0 +1,29 @@
+{
+  "type": "mynecraft:process",
+  "station": "furnace",
+  "ingredients": [
+    {
+      "item": "minecraft:iron_ore",
+      "count": 1
+    }
+  ],
+  "skill": "smithing",
+  "level": 0,
+  "seconds": 10,
+  "results": [
+    {
+      "id": "minecraft:iron_ingot",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 2
+  },
+  "waste": [
+    {
+      "matter": "slag",
+      "amount": 0.3
+    }
+  ]
+}

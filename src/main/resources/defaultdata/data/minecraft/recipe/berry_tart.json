@@ -1,0 +1,27 @@
+{
+  "type": "mynecraft:process",
+  "station": "furnace",
+  "ingredients": [
+    {
+      "item": "minecraft:flour",
+      "count": 2
+    },
+    {
+      "item": "minecraft:sweet_berries",
+      "count": 3
+    }
+  ],
+  "skill": "cooking",
+  "level": 3,
+  "seconds": 12,
+  "results": [
+    {
+      "id": "minecraft:berry_tart",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 2
+  }
+}

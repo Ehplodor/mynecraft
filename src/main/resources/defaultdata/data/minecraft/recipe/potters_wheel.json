@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "KKK",
+    "SPS"
+  ],
+  "key": {
+    "K": "minecraft:clay_ball",
+    "S": "minecraft:stick",
+    "P": "#minecraft:planks"
+  },
+  "result": {
+    "id": "minecraft:potters_wheel",
+    "count": 1
+  }
+}

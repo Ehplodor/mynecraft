@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "block/millstone_side",
+    "up": "block/millstone_top",
+    "down": "block/millstone_side",
+    "north": "block/millstone_side",
+    "south": "block/millstone_side",
+    "east": "block/millstone_side",
+    "west": "block/millstone_side"
+  }
+}

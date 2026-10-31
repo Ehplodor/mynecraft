@@ -16,6 +16,8 @@ public final class Survival {
     private int hurtCooldown, regenTimer, drownTimer;
     /** Set when health reaches 0; cleared by {@link #respawn}. */
     public boolean dead;
+    /** Fed and watered enough to heal (M28); always true when the needs are off. */
+    public boolean fed = true;
     /** Damage taken during the last tick (for a red flash in the HUD). */
     public int lastDamage;
 
@@ -53,7 +55,7 @@ public final class Survival {
             drownTimer = 0;
         }
         // Slow natural regeneration.
-        if (health < MAX_HEALTH && ++regenTimer >= REGEN_INTERVAL) {
+        if (health < MAX_HEALTH && fed && ++regenTimer >= REGEN_INTERVAL) {
             regenTimer = 0;
             health++;
         }

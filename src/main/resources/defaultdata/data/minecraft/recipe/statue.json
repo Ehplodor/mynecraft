@@ -1,0 +1,20 @@
+{
+  "type": "mynecraft:process",
+  "station": "crafting_table",
+  "ingredients": [
+    {
+      "item": "minecraft:stone",
+      "count": 2
+    }
+  ],
+  "skill": "art",
+  "level": 2,
+  "seconds": 30,
+  "results": [
+    {
+      "id": "minecraft:statue",
+      "count": 1
+    }
+  ],
+  "tool": "chisel"
+}

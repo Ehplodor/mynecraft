@@ -1,0 +1,45 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "particle": "block/campfire"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "up": {
+          "texture": "block/campfire_top"
+        },
+        "down": {
+          "texture": "block/campfire_top",
+          "cullface": "down"
+        },
+        "north": {
+          "texture": "block/campfire",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "block/campfire",
+          "cullface": "south"
+        },
+        "east": {
+          "texture": "block/campfire",
+          "cullface": "east"
+        },
+        "west": {
+          "texture": "block/campfire",
+          "cullface": "west"
+        }
+      }
+    }
+  ]
+}

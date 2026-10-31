@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "potters_wheel",
+  "ingredients": [
+    {
+      "item": "minecraft:terracotta",
+      "count": 1
+    },
+    {
+      "tag": "minecraft:dyes",
+      "count": 1
+    }
+  ],
+  "skill": "pottery",
+  "level": 1,
+  "seconds": 15,
+  "results": [
+    {
+      "id": "minecraft:decorated_pot",
+      "count": 1
+    }
+  ]
+}

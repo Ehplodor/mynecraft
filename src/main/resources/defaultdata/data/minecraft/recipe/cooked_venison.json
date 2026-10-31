@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "campfire",
+  "ingredients": [
+    {
+      "item": "minecraft:venison",
+      "count": 1
+    }
+  ],
+  "skill": "cooking",
+  "level": 0,
+  "seconds": 6,
+  "results": [
+    {
+      "id": "minecraft:cooked_venison",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  }
+}

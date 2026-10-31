@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "furnace",
+  "ingredients": [
+    {
+      "item": "minecraft:cobblestone",
+      "count": 1
+    }
+  ],
+  "skill": "mining",
+  "level": 0,
+  "seconds": 6,
+  "results": [
+    {
+      "id": "minecraft:stone",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  }
+}

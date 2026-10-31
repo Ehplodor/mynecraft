@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " S ",
+    "SFS",
+    "CCC"
+  ],
+  "key": {
+    "S": "minecraft:stick",
+    "F": "minecraft:flint",
+    "C": "minecraft:cobblestone"
+  },
+  "result": {
+    "id": "minecraft:campfire",
+    "count": 1
+  }
+}

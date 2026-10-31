@@ -1,5 +1,6 @@
-# M27: the view from the water (seed 7, a lake 400 blocks from spawn): under it, looking up at the surface, at the waterline.
-underwater --seed 7 --season ete --time 6000 --pos 264,~-6,-296 --view 20,10
-underwater-up --seed 7 --season ete --time 6000 --pos 264,~-5,-296 --view 20,55
-waterline --seed 7 --season ete --time 6000 --pos 264,~-0.75,-296 --view 20,-5
-dive --seed 7 --season ete --time 6000 --pos 264,~-3,-296 --view 20,-10 --splash 0.6
+# M27..M34: the common grammar, the body and the compass, living from nature, building, the hamlet, fields, energy, art.
+compass --seed 7 --time 6000 --life-demo --notebook-page 1 --view 0,-20
+skills --seed 7 --time 6000 --life-demo --notebook-page 2 --view 0,-20
+campfire --seed 7 --time 6000 --life-demo --station campfire --view 0,-20
+blocks --seed 7 --time 6000 --pos -40,~5,30 --view 0,-35 --blocks-demo
+hamlet --seed 7 --time 6000 --pos 27,~4,16 --view 0,-15 --life-seconds 25

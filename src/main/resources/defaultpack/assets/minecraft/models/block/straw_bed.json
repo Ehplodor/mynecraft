@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "block/straw_bed_side",
+    "up": "block/straw_bed_top",
+    "down": "block/oak_planks",
+    "north": "block/straw_bed_side",
+    "south": "block/straw_bed_side",
+    "east": "block/straw_bed_side",
+    "west": "block/straw_bed_side"
+  }
+}
