@@ -119,6 +119,25 @@ def main():
     for n, f in (("fish_trap", False), ("fish_trap_full", True)):
         save(n, rgba(trap(f), 116 + f))
         write_json(f"models/block/{n}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{n}"}})
+    # snare: a bent stick and a loop of string; full, a rabbit caught in it
+    def snare(full):
+        def px(x, y, r):
+            if full and 3 <= x <= 12 and 9 <= y <= 14 and (x - 7.5) ** 2 / 20 + (y - 11.5) ** 2 / 6 < 1:
+                return (clamp(140 + r.randint(-12, 12)), clamp(115 + r.randint(-10, 10)), 85, 255)
+            if x == 7 and y >= 2:
+                return wood(x, y, r, (120, 90, 55))
+            if abs(math.hypot(x - 7.5, y - 10.5) - 3.5) < 0.6:
+                return (220, 210, 185, 255)
+            return (0, 0, 0, 0)
+        return px
+    for n, f in (("snare", False), ("snare_full", True)):
+        save(n, rgba(snare(f), 118 + f))
+        cross(n, n)
+    state("snare", {"full=false": {"model": "minecraft:block/snare"}, "full=true": {"model": "minecraft:block/snare_full"}})
+    # roofs and stairs: ramps, drawn by the mesher from a full-cube model
+    for n, tex in (("thatch_roof", "thatch"), ("oak_stairs", "oak_planks")):
+        write_json(f"models/block/{n}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{tex}"}})
+        state(n, {f"facing={f}": {"model": f"minecraft:block/{n}"} for f in ("north", "south", "west", "east")})
     state("fish_trap", {"full=false": {"model": "minecraft:block/fish_trap"},
                         "full=true": {"model": "minecraft:block/fish_trap_full"}})
     # ---- building
@@ -226,13 +245,14 @@ def main():
               "water_wheel": "Roue à aubes", "windmill": "Moulin à vent", "red_wool": "Drap rouge", "blue_wool": "Drap bleu",
               "white_wool": "Drap blanc", "yellow_wool": "Drap jaune", "terracotta": "Terre cuite",
               "decorated_pot": "Pot décoré", "painting": "Tableau", "statue": "Statue", "sawmill": "Scierie",
-              "dye_vat": "Cuve de teinture", "fish_trap": "Nasse"}
+              "dye_vat": "Cuve de teinture", "fish_trap": "Nasse", "snare": "Collet",
+              "thatch_roof": "Pente de chaume", "oak_stairs": "Escalier en chêne"}
     items = {"wooden_pickaxe": "Pioche en bois", "stone_pickaxe": "Pioche en pierre", "iron_pickaxe": "Pioche en fer",
              "wooden_axe": "Hache en bois", "stone_axe": "Hache en pierre", "iron_axe": "Hache en fer",
              "wooden_shovel": "Pelle en bois", "stone_shovel": "Pelle en pierre", "iron_shovel": "Pelle en fer",
              "wooden_hoe": "Houe en bois", "stone_hoe": "Houe en pierre", "iron_hoe": "Houe en fer",
              "flint_knife": "Couteau de silex", "iron_knife": "Couteau de fer", "fishing_rod": "Canne à pêche",
-             "bow": "Arc", "arrow": "Flèche", "hammer": "Marteau", "chisel": "Ciseau", "flute": "Flûte",
+             "bow": "Arc", "arrow": "Flèche", "hammer": "Marteau", "chisel": "Ciseau", "flute": "Flûte", "drum": "Tambour",
              "sweet_berries": "Baies", "wild_herbs": "Herbes sauvages", "wheat": "Blé", "wheat_seeds": "Graines de blé",
              "bread": "Pain", "flour": "Farine", "venison": "Venaison crue", "cooked_venison": "Venaison rôtie",
              "rabbit": "Lapin cru", "cooked_rabbit": "Lapin rôti", "trout": "Truite crue", "cooked_trout": "Truite grillée",
@@ -306,6 +326,9 @@ def items():
     im = img(); put(im, [(4 + i, 12 - i) for i in range(5)], stick); put(im, [(9 + i, 7 - i) for i in range(4)], mat["iron"]); shapes["chisel"] = im
     im = img(); put(im, [(2 + i, 13 - i) for i in range(12)] + [(3 + i, 13 - i) for i in range(11)], (180, 140, 80))
     put(im, [(5, 11), (7, 9), (9, 7)], (40, 25, 10)); shapes["flute"] = im
+    im = img(); put(im, [(x, y) for x in range(3, 13) for y in range(5, 13) if not (y > 10 and x in (3, 12))], (150, 95, 50))
+    put(im, [(x, y) for x in range(3, 13) for y in (5, 6)], (235, 220, 185)); put(im, [(x, 9) for x in range(3, 13, 2)], (90, 55, 30))
+    shapes["drum"] = im
     im = img(); put(im, [(3 + i, 13 - i) for i in range(11)], stick); shapes["stick"] = im
     food = {"apple": ((200, 30, 30), 5), "sweet_berries": ((190, 20, 50), 3.5), "wild_herbs": ((70, 150, 60), 5),
             "wheat": ((220, 190, 90), 5), "wheat_seeds": ((140, 160, 60), 3), "bread": ((190, 140, 70), 6),
@@ -377,6 +400,9 @@ def gen_data():
     shaped("flint_knife", ["F", "S"], {"F": "flint", "S": "stick"}, "flint_knife")
     shaped("arrow", ["F", "S", "P"], {"F": "flint", "S": "stick", "P": "plant_fiber"}, "arrow", 4, skill="hunting")
     shaped("string", ["PPP"], {"P": "plant_fiber"}, "string")
+    shaped("snare", ["F", "S"], {"F": "string", "S": "stick"}, "snare", skill="hunting")
+    shaped("thatch_roof", ["T  ", "TT "], {"T": "thatch"}, "thatch_roof", 4, skill="building")
+    shaped("oak_stairs", ["P  ", "PP ", "PPP"], {"P": "oak_planks"}, "oak_stairs", 4, skill="building")
     shaped("fish_trap", ["SFS", "F F", "SFS"], {"S": "stick", "F": "string"}, "fish_trap", skill="fishing")
     shaped("fishing_rod", ["  S", " SF", "S F"], {"S": "stick", "F": "string"}, "fishing_rod", skill="fishing")
     shaped("bow", [" SF", "S F", " SF"], {"S": "stick", "F": "string"}, "bow", skill="hunting", level=1)
@@ -438,6 +464,7 @@ def gen_data():
     process("painting", "crafting_table", [("canvas", 1), ("red_dye", 1), ("blue_dye", 1), ("yellow_dye", 1)], [("painting", 1)],
             "art", 20, level=1)
     process("statue", "crafting_table", [("stone", 2)], [("statue", 1)], "art", 30, level=2, tool="chisel")
+    process("drum", "crafting_table", [("leather", 1), ("oak_planks", 2)], [("drum", 1)], "music", 10, tool="knife")
     process("flute", "crafting_table", [("stick", 1)], [("flute", 1)], "music", 8, tool="knife")
     files = []
     for root, _, names in os.walk(DATA):

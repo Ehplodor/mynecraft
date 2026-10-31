@@ -477,7 +477,7 @@ Reste : flocons qui s'accumulent sur les blocs non cubiques (dalles), herbe enne
 
 ### ✅ M27 — Grammaire commune : fabriquer, prélever, apprendre (socle)
 Fait : **acteur** (`world/actor/Actor`) partagé par le joueur et les PNJ : inventaire, compétences, besoins, plans, foyer. **19 compétences** par la pratique (niveau = √(xp/5), jusqu'à 10 ; chacune entraîne deux des **7 capacités** ; ce qu'on n'exerce plus s'émousse de 1 %/jour après deux jours ; une leçon double la pratique un jour), **28 métiers** lus dans les combinaisons de compétences avec titres apprenti/compagnon/maître. **Grammaire de fabrication** unique (`RecipeBook.Rules` : poste, outil, compétence, niveau, durée, énergie chaleur/travail, déchets) : les recettes de grille la reçoivent (clés `mynecraft:skill/level/tool`), les recettes de poste ont leur type `mynecraft:process` ; `Workshop` les exécute pour tout acteur (combustible brûlé, cendres rendues, outil usé, compétence entraînée). **Flux de matières** (`Flows`) : registre par parcelle de 64 blocs de ce qui est pris (bois, pierre, terre, minerai, plantes, fruits, gibier, poissons, eau) et rendu (cendres, compost, scories, eaux usées), qui agit sur la parcelle de l'écologie (cueillir éclaircit, le compost nourrit le sol, les eaux usées troublent la vie aquatique). **Outils** : 18 outils (pioche, hache, pelle, houe en bois/pierre/fer, couteaux, canne, arc, marteau, ciseau, flûte) avec matériau, tier, vitesse, usure (l'outil se brise une fois usé) et réparation à la grille avec leur matériau ; le minage à la main est le cas « sans outil » (la pierre et les minerais ne donnent rien sans pioche, comme vanilla). Carnet page 3 : capacités, compétences, rôle, plans connus.
-Fait aussi : sprites 16×16 des 56 objets dans la barre. Reste : barre d'usure sur la barre d'objets, objets en JSON (data pack), qualité des objets fabriqués.
+Fait aussi : sprites 16×16 des objets dans la barre, barre d'usure sous chaque outil. Reste : objets en JSON (data pack), qualité des objets fabriqués.
 - **Grammaire de fabrication** : recette = entrées, poste, outil, compétence requise, durée, énergie,
   sorties et déchets ; établi et fabrication actuels migrés dessus ; format data pack étendu
 - **Flux de matières** : chaque prélèvement est retiré d'une parcelle de l'écologie (plantes, animaux,
@@ -490,7 +490,7 @@ Fait aussi : sprites 16×16 des 56 objets dans la barre. Reste : barre d'usure s
 
 ### ✅ M28 — Le corps et la boussole (socle)
 Fait : **besoins** (`Needs`) faim, soif, repos, chaleur ; le corps suit la température ressentie (air de l'atmosphère + abri + feu − pluie à découvert) ; jeûne, soif, froid ou chaud extrêmes blessent, on ne guérit que nourri ; la variété des repas (10 derniers, 5 groupes) rend plus nourrissant ; un état du corps ralentit tous les gestes. **Bien-être** (`Wellbeing`) mesuré autour du joueur : toit, murs, feu, lit, beauté (fleurs, draps, pots, tableaux, statues). **Boussole d'harmonie** (`Harmony`, carnet page 2) : avec la nature sur le territoire 3 × 3 parcelles autour du **foyer** (`H`) — végétation, sol, eaux, biodiversité, pression des prélèvements non rendus, animaux tués en saison des petits — et avec soi (besoins, lieu, variété des repas et activités, compagnie) ; flux de la parcelle listés. Jauges du corps au-dessus des cœurs. Rythme : `--needs off|slow|normal`.
-Fait aussi : rythme des besoins réglable au menu pause (normaux, lents, désactivés). Reste : effets visuels du froid, état d'équilibre de référence par parcelle (aujourd'hui des niveaux absolus).
+Fait aussi : rythme des besoins réglable au menu pause (normaux, lents, désactivés). Fait aussi : givre sur les bords de l'écran quand on a froid, voile rouge quand on a trop chaud. Reste : état d'équilibre de référence par parcelle (aujourd'hui des niveaux absolus).
 - Besoins : faim, soif, fatigue, chaleur (lit l'hiver de M26) ; repas plus nourrissants quand ils sont variés
 - Bien-être : abri, confort, beauté du lieu, repos, variété des activités
 - **Boussole d'harmonie** dans le carnet : nature (biodiversité, sol, eau, populations du territoire,
@@ -501,7 +501,7 @@ Fait aussi : rythme des besoins réglable au menu pause (normaux, lents, désact
 
 ### ✅ M29 — Cueillir, pêcher, chasser, cuisiner (socle)
 Fait : **cueillette** : buissons de baies (cueillis, ils repoussent en 3 jours de croissance du calendrier local), champignons des forêts, graines, herbes sauvages et fibres dans l'herbe, pommes et pousses dans les chênes, silex dans le gravier ; chaque prise passe au registre des flux. **Pêche** à la canne (clic droit sur l'eau) : la touche vient d'autant plus vite que la parcelle a de truites ; la truite est retirée des effectifs de l'écologie, la rivière vidée ne donne plus rien. **Chasse** : coups au couteau/à la hache, **arc** et flèches (précision selon la compétence) ; venaison, lapin, peau ; tuer en saison des petits est noté par la boussole. **Cuisine** au feu de camp (rôtir, griller aux herbes, fumer, pain) avec combustible. Manger et boire au clic droit.
-Fait aussi : nasse (posée dans l'eau, se remplit en un jour si la parcelle a des truites, relevée au clic droit). Reste : pièges à terre, conservation (sel, péremption), feu de camp à flammes animées.
+Fait aussi : nasse (posée dans l'eau, se remplit en un jour si la parcelle a des truites, relevée au clic droit). Fait aussi : collet à lapins (posé au sol, attrape en un jour si la parcelle a des lapins : lapin et peau). Reste : conservation (sel, péremption), feu de camp à flammes animées.
 - Cueillette : baies, champignons, herbes, fruits, graines, selon saison et calendrier local ; ce qui
   est cueilli manque à la parcelle et repousse
 - Pêche : canne, nasses ; poissons tirés des effectifs de la parcelle
@@ -513,7 +513,7 @@ Fait aussi : nasse (posée dans l'eau, se remplit en un jour si la parcelle a de
 
 ### ✅ M30 — Bâtir (socle)
 Fait : **plans** (`build/Blueprint`) : `K` marque deux coins, `P` trace un plan (JSON dans `<monde>/blueprints`), `O` pose le plan suivant connu à l'endroit visé ; le prochain bloc est encadré, la liste des matériaux manquants affichée, chaque bloc posé au bon endroit entraîne la construction. Un plan est un savoir (nom) transmissible ; la « cabane » est connue de tous et les PNJ la bâtissent. **Créatif** : `G` remplit la sélection du bloc tenu, `L` bâtit le plan d'un coup, `Retour` annule. **Formes** : porte (ouvrir/fermer, ouverte = cadre franchissable), barrière, chaume, lit de paille. L'abri compte (toit, murs, feu) pour la chaleur et le bien-être.
-Reste : escaliers, murets, fenêtres, toits pentus et poutres (formes non cubiques au mailleur), symétrie, isolation fine, cave fraîche.
+Fait aussi : **pentes** au mailleur (`SHAPE_SLOPE`, quatre orientations, posées en montant devant soi) : pente de chaume pour les toits, escalier en chêne dessiné en rampe ; on y tient à mi-hauteur et l'on gravit une rampe d'un bloc ; une pente compte comme toit. Reste : escaliers à marches, murets, fenêtres, poutres, symétrie, isolation fine, cave fraîche.
 - Formes : escaliers, barrières, murets, portes, fenêtres, toits, poutres, `uvlock`, modèles non cubiques
 - Architecture qui compte : isolation (chaleur), lumière, toit contre la pluie, cave fraîche pour les
   réserves, beauté du lieu dans le bien-être
@@ -525,7 +525,7 @@ Reste : escaliers, murets, fenêtres, toits pentus et poutres (formes non cubiqu
 
 ### ✅ M31 — Premiers habitants (socle)
 Fait : **hameau** fondé près du point d'apparition : Anselme l'ermite herboriste dans sa cabane, et une famille (Berthe la bâtisseuse, Corentin le pêcheur, Daphné la cueilleuse) dont la bâtisseuse élève sa cabane bloc à bloc avec le plan de M30. Les **PNJ sont des acteurs** (mêmes besoins, compétences, recettes, flux) : ils cueillent les vrais buissons, pêchent dans les effectifs de la parcelle, cuisinent au feu, mangent au garde-manger commun, dorment la nuit et rentrent sous la pluie. **Chemins** A* dans les voxels (marches, descentes, portes ouvertes au passage, gué). **Dialogues** au clic droit (besoins, conseils, travail), **transmission** : un maître donne une leçon par jour (pratique doublée), et apprend du joueur plus habile. La compagnie compte dans la boussole. Dessinés en personnages animés.
-Fait aussi : la bâtisseuse assemble ses matériaux par recettes et va abattre, tailler ou cueillir la vraie source à 24 blocs (repli sur le compte de la parcelle) ; chasseur Edmond, qui épargne la saison des naissances et les petites hardes. Reste : commandes et échanges, plus de hameaux.
+Fait aussi : la bâtisseuse assemble ses matériaux par recettes et va abattre, tailler ou cueillir la vraie source à 24 blocs (repli sur le compte de la parcelle) ; chasseur Edmond, qui épargne la saison des naissances et les petites hardes. Fait aussi : **échanges** : parler à un habitant en tenant ce dont son métier a besoin (bois et chaume pour la bâtisseuse, ficelle pour le pêcheur, flèches pour le chasseur, pain pour les cueilleurs) le donne au hameau contre ce qu'il produit. Reste : commandes, plus de hameaux.
 - PNJ acteurs : mêmes besoins, capacités, compétences, outils, recettes et flux que le joueur
 - Déplacement dans le monde voxel (recherche de chemin, portes, escaliers, eau), maison, emploi du
   temps selon le jour et la saison, abri de la pluie, feu l'hiver
@@ -539,7 +539,7 @@ Fait aussi : la bâtisseuse assemble ses matériaux par recettes et va abattre, 
 
 ### ✅ M32 — Cultiver et élever (socle)
 Fait : **houe** → terre labourée, **semis** de blé (graines trouvées dans l'herbe sauvage : domestication), quatre âges dont la croissance suit le calendrier local de la parcelle, l'eau à 4 blocs ou la pluie, et le sol (la récolte y puise, le **compost** le restaure, et fait gagner un âge) ; **composteur** ; **pousses de chêne** plantées qui deviennent des arbres (`Growth`). Métiers paysan, jardinier.
-Reste : élevage doux (poules, chèvres, moutons, abeilles), vergers et haies, associations de cultures et jachère, champs des PNJ.
+Fait aussi : **champ du hameau** (4 × 3 au sud de la maison de la famille) que Daphné défriche, sème avec les graines sauvages et moissonne ; ce que les habitants cueillent ou sèment repousse comme pour le joueur. Reste : élevage doux (poules, chèvres, moutons, abeilles), vergers et haies, associations de cultures et jachère.
 - Cultures à plusieurs âges selon sol, humidité et calendrier local ; semences sauvages domestiquées
 - Arrosage et irrigation par l'eau du simulateur ; compost et fumure (cycle des nutriments)
 - Vergers, haies, plantation d'arbres, succession végétale ; associations de cultures et jachère
@@ -548,7 +548,7 @@ Reste : élevage doux (poules, chèvres, moutons, abeilles), vergers et haies, a
 
 ### ✅ M33 — Énergie et flux de matières (socle)
 Fait : **énergie** (`Power`) : la **roue à aubes** tourne avec l'eau courante et le débit réel du bassin versant (`Hydrology.flow`), le **moulin à vent** avec le vent de l'atmosphère s'il est dégagé ; à défaut, les bras (trois fois plus lent, fatigant). **Transformations** : meule (farine, gravier, sable), scierie (6 planches par bûche), four (fer, verre, pierre, terre cuite, charbon de bois, pain, tarte), enclume (outils de fer au marteau), cuve de tannage. **Déchets** : cendres et scories au sol, eaux usées de la tannerie et de la teinture qui troublent la vie aquatique de la parcelle (les truites en pâtissent).
-Reste : logistique (canaux, goulottes, charrettes), force animale, recul de la forêt par le bois de chauffe à grande échelle, pollution qui descend la rivière.
+Fait aussi : les **eaux usées descendent la rivière** (trois parcelles en aval, moitié moins à chaque fois, l'amont épargné). Reste : logistique (canaux, goulottes, charrettes), force animale, recul de la forêt par le bois de chauffe à grande échelle.
 - Énergie : roue à aubes au débit réel de la rivière, moulin à vent selon le vent de l'atmosphère,
   force animale, bois de chauffe (forêt qui recule si on abat trop)
 - Transformations : meule, four, boulangerie, scierie, forge, fonderie, tannerie, verrerie
@@ -559,7 +559,7 @@ Reste : logistique (canaux, goulottes, charrettes), force animale, recul de la f
 
 ### ✅ M34 — Créer (socle)
 Fait : **teintures** des fleurs (coquelicot, gentiane, edelweiss) et des herbes, **métier à tisser** (fil de fibres, toile, draps, toile à peindre), **cuve de teinture** (draps rouges, bleus, jaunes), **poterie** (terre cuite au four, pots décorés au tour), **tableau** et **statue** (au ciseau) faits à l'établi (`Tab`), **flûte** dont on joue des phrases pentatoniques synthétisées. Chaque œuvre ajoute à la **beauté du lieu** (bien-être). Argile dans le lit des eaux peu profondes.
-Reste : sculpture et peinture libres, autres instruments, œuvres des PNJ.
+Fait aussi : **tambour** (rythme synthétisé de huit temps), premier **ouvrage d'un PNJ** : la bâtisseuse orne la maison finie d'un pot décoré. Reste : sculpture et peinture libres, musique et œuvres régulières des PNJ.
 - Teintures tirées des plantes et des minéraux, peinture, sculpture, poterie, tissage, instruments
   et musique jouée ; décoration qui nourrit le bien-être et la beauté du lieu
 - Métiers : potier, tisserand, teinturier, artiste, musicien ; œuvres des PNJ dans les hameaux

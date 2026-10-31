@@ -16,9 +16,9 @@ public final class Items {
         CATEGORY_ART = 4;
     public static final byte TOOL_NONE = 0, TOOL_PICKAXE = Blocks.TOOL_PICKAXE, TOOL_AXE = Blocks.TOOL_AXE,
         TOOL_SHOVEL = Blocks.TOOL_SHOVEL, TOOL_HOE = 4, TOOL_KNIFE = 5, TOOL_ROD = 6, TOOL_BOW = 7, TOOL_HAMMER = 8,
-        TOOL_CHISEL = 9, TOOL_FLUTE = 10;
+        TOOL_CHISEL = 9, TOOL_FLUTE = 10, TOOL_DRUM = 11;
     public static final String[] TOOL_NAMES = {"", "pickaxe", "axe", "shovel", "hoe", "knife", "rod", "bow", "hammer",
-        "chisel", "flute"};
+        "chisel", "flute", "drum"};
     public static final byte GROUP_NONE = 0, GROUP_FRUIT = 1, GROUP_VEGETABLE = 2, GROUP_GRAIN = 3, GROUP_MEAT = 4,
         GROUP_FISH = 5;
     public static final String[] GROUP_NAMES = {"", "fruits", "légumes et herbes", "céréales", "viande", "poisson"};
@@ -31,7 +31,7 @@ public final class Items {
         SWEET_BERRIES, WILD_HERBS, WHEAT, WHEAT_SEEDS, BREAD, FLOUR, VENISON, COOKED_VENISON, RABBIT, COOKED_RABBIT,
         TROUT, COOKED_TROUT, SMOKED_MEAT, ROASTED_MUSHROOM, HERB_TROUT, BERRY_TART,
         CHARCOAL, IRON_INGOT, HIDE, LEATHER, PLANT_FIBER, STRING, CLOTH, CLAY_BALL, ASH, COMPOST, SLAG,
-        RED_DYE, BLUE_DYE, WHITE_DYE, YELLOW_DYE, CANVAS;
+        RED_DYE, BLUE_DYE, WHITE_DYE, YELLOW_DYE, CANVAS, DRUM;
     public static final int COUNT;
     /** Largest stack per item (1 for tools, 64 for most). */
     public static final byte[] MAX_STACK;
@@ -102,6 +102,7 @@ public final class Items {
         WHITE_DYE = pure("white_dye");
         YELLOW_DYE = pure("yellow_dye");
         CANVAS = pure("canvas");
+        DRUM = pure("drum");
         REGISTRY.freeze();
         COUNT = REGISTRY.size();
         MAX_STACK = new byte[COUNT];
@@ -129,6 +130,8 @@ public final class Items {
         tool(CHISEL, TOOL_CHISEL, 3, 150, IRON_INGOT);
         tool(FLUTE, TOOL_FLUTE, 1, 0, Blocks.AIR);
         CATEGORY[FLUTE] = CATEGORY_ART;
+        tool(DRUM, TOOL_DRUM, 1, 0, Blocks.AIR);
+        CATEGORY[DRUM] = CATEGORY_ART;
         food(APPLE, GROUP_FRUIT, 4, 1);
         food(SWEET_BERRIES, GROUP_FRUIT, 2, 1);
         food(Blocks.BROWN_MUSHROOM, GROUP_VEGETABLE, 1, 0);

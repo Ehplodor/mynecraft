@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "minecraft:block/oak_stairs"
+    },
+    "facing=south": {
+      "model": "minecraft:block/oak_stairs"
+    },
+    "facing=west": {
+      "model": "minecraft:block/oak_stairs"
+    },
+    "facing=east": {
+      "model": "minecraft:block/oak_stairs"
+    }
+  }
+}

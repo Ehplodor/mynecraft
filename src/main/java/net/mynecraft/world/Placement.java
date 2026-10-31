@@ -34,6 +34,11 @@ public final class Placement {
                 state = Blocks.OAK_SLAB_DOUBLE;
                 there = Blocks.AIR;
             }
+        } else if (Blocks.SHAPE[selected & 0xFFFF] == Blocks.SHAPE_SLOPE) {
+            // Roofs and stairs rise away from the player, like vanilla stairs.
+            double dx = px + 0.5 - player.x, dz = pz + 0.5 - player.z;
+            int base = selected - Blocks.FACING[selected & 0xFFFF];
+            state = (short) (base + (Math.abs(dz) >= Math.abs(dx) ? (dz < 0 ? 0 : 1) : (dx < 0 ? 2 : 3)));
         } else if (Blocks.logStates(selected) != null) {
             short[] axes = Blocks.logStates(selected); // y, x, z
             state = hit.nx() != 0 ? axes[1] : hit.nz() != 0 ? axes[2] : axes[0];

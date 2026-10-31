@@ -407,6 +407,30 @@ public final class Synth {
         return level(space(s, 0.3), BIRD);
     }
 
+    /**
+     * A frame drum's rhythm (M34): eight beats, strong and light, each a low thud whose pitch falls
+     * fast under a slap of noise on the skin.
+     */
+    public static float[] drum(long seed) {
+        SplittableRandom r = new SplittableRandom(seed);
+        double beat = 0.24;
+        float[] s = new float[samples(8 * beat + 0.5)];
+        for (int k = 0; k < 8; k++) {
+            if (k > 0 && r.nextDouble() < 0.2) continue; // a rest
+            boolean strong = k % 4 == 0 || r.nextDouble() < 0.2;
+            double f0 = strong ? 90 : 140;
+            float[] hit = new float[samples(0.3)];
+            double phase = 0;
+            for (int i = 0; i < hit.length; i++) {
+                double t = i / (double) RATE, env = Math.exp(-t * (strong ? 12 : 20));
+                phase += 2 * Math.PI * f0 * (1 + 1.5 * Math.exp(-t * 30)) / RATE;
+                hit[i] = (float) (env * (Math.sin(phase) + white(r) * 0.25 * Math.exp(-t * 60)));
+            }
+            mix(s, hit, samples(k * beat), strong ? 0.9 : 0.55);
+        }
+        return level(space(s, 0.25), BIRD);
+    }
+
     private static float[] song(SplittableRandom r, int notes, double f0, double slide, double length, double gap) {
         float[] s = new float[samples(notes * (length + gap) + 0.1)];
         double f = f0 * (0.9 + r.nextDouble() * 0.2);

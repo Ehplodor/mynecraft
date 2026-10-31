@@ -767,7 +767,7 @@ public final class Main {
                 -Math.cos(cam.yaw) * cp, hit == null ? REACH : Math.sqrt(Math.pow(hit.x() + 0.5 - cam.pos.x, 2)
                     + Math.pow(hit.y() + 0.5 - cam.pos.y, 2) + Math.pow(hit.z() + 0.5 - cam.pos.z, 2)));
             if (aimedVillager != null) {
-                if (input.placeRequested && !screenOpen && !paused) liv.talk(aimedVillager);
+                if (input.placeRequested && !screenOpen && !paused) liv.talk(aimedVillager, input.slot);
                 input.placeRequested = false;
                 aimed = null;
                 hit = null;
@@ -817,7 +817,7 @@ public final class Main {
             }
             short aimedBlock = hit == null ? Blocks.AIR : world.get(hit.x(), hit.y(), hit.z());
             boolean interactive = aimedBlock == Blocks.OAK_DOOR || aimedBlock == Blocks.OAK_DOOR_OPEN || aimedBlock == Blocks.BERRY_BUSH
-                || aimedBlock == Blocks.STRAW_BED || aimedBlock == Blocks.FISH_TRAP_FULL;
+                || aimedBlock == Blocks.STRAW_BED || aimedBlock == Blocks.FISH_TRAP_FULL || aimedBlock == Blocks.SNARE_FULL;
             short heldItem = inventory.id(input.slot);
             boolean used = false;
             if (input.placeRequested && !screenOpen && !paused && hit != null && !creative && !input.shiftDown()
@@ -881,6 +881,21 @@ public final class Main {
                     n++;
                     while (!world.isSolid(x, y, z) && y > 0) y--;
                     demoSet(world, renderer, x, y + 1, z, b);
+                }
+                // A gable of thatch on plank walls, and a flight of oak stairs beside it.
+                int gx = ox + 17, gz = oz - 2, gy = (int) Math.floor(player.y) + 4;
+                while (!world.isSolid(gx, gy, gz) && gy > 0) gy--;
+                for (int dz = 0; dz < 4; dz++) {
+                    for (int dx = 0; dx < 4; dx++) demoSet(world, renderer, gx + dx, gy + 1, gz - dz, dz == 0 || dz == 3 || dx == 0 || dx == 3 ? Blocks.OAK_PLANKS : Blocks.AIR);
+                    for (int r = 0; r < 3; r++) { // three courses: slopes on the outside, thatch filling the inside
+                        demoSet(world, renderer, gx - 1 + r, gy + 2 + r, gz - dz, (short) (Blocks.THATCH_ROOF + 3));
+                        demoSet(world, renderer, gx + 4 - r, gy + 2 + r, gz - dz, (short) (Blocks.THATCH_ROOF + 2));
+                        for (int x = gx + r; x <= gx + 3 - r && r < 2; x++) demoSet(world, renderer, x, gy + 2 + r, gz - dz, Blocks.THATCH);
+                    }
+                }
+                for (int i = 0; i < 3; i++) {
+                    demoSet(world, renderer, gx - 3, gy + 1 + i, gz + 1 - i, (short) (Blocks.OAK_STAIRS));
+                    for (int j = 0; j < i; j++) demoSet(world, renderer, gx - 3, gy + 1 + j, gz + 1 - i, Blocks.OAK_PLANKS);
                 }
             }
             if (editDemo && streamer.settled()) {

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "F",
+    "S"
+  ],
+  "key": {
+    "F": "minecraft:string",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "minecraft:snare",
+    "count": 1
+  },
+  "mynecraft:skill": "hunting"
+}

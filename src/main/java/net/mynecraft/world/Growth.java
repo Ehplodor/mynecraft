@@ -69,14 +69,16 @@ public final class Growth {
                         it.remove();
                     }
                 }
-            } else if (b == Blocks.FISH_TRAP) { // a fish trap fills in about a day, if the stream holds trout
+            } else if (b == Blocks.FISH_TRAP || b == Blocks.SNARE) { // a trap catches in about a day, if the patch has the prey
+                boolean fish = b == Blocks.FISH_TRAP;
+                var prey = fish ? net.mynecraft.world.life.Species.TROUT : net.mynecraft.world.life.Species.RABBIT;
                 e.getValue()[0] += days / TRAP_DAYS;
                 if (e.getValue()[0] >= 1) {
                     e.getValue()[0] = 0;
-                    if (patch.pop[net.mynecraft.world.life.Species.TROUT.ordinal()] >= 1) {
-                        ecology.died(net.mynecraft.world.life.Species.TROUT, p[0], p[2]);
-                        if (flows != null) flows.take(net.mynecraft.world.actor.Matter.FISH, 1, p[0], p[2]);
-                        w.set(p[0], p[1], p[2], Blocks.FISH_TRAP_FULL);
+                    if (patch.pop[prey.ordinal()] >= 1) {
+                        ecology.died(prey, p[0], p[2]);
+                        if (flows != null) flows.take(fish ? net.mynecraft.world.actor.Matter.FISH : net.mynecraft.world.actor.Matter.GAME, 1, p[0], p[2]);
+                        w.set(p[0], p[1], p[2], fish ? Blocks.FISH_TRAP_FULL : Blocks.SNARE_FULL);
                         changed.add(p);
                         it.remove();
                     }

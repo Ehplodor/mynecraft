@@ -170,7 +170,7 @@ public final class Hamlet {
             case BUILDER -> {
                 int[] a = huts.size() > 1 ? huts.get(1) : null;
                 int[] step = a == null ? null : hut.next(w, a[0], a[1], a[2]);
-                if (step == null) { cook(v, recipes, flows); return; }
+                if (step == null) { decorate(v, w, a); cook(v, recipes, flows); return; }
                 if (v.workAt != null) { fetch(v, w, flows); return; } // on the way to a tree, a rock, a tuft of grass
                 if (dist(v, step[0] + 0.5, step[2] + 0.5) > 7) { go(v, w, a[0] + 2, a[1] + 1, a[2] + 6); return; } // works from the yard
                 v.state = Villager.State.WORK;
@@ -218,6 +218,7 @@ public final class Hamlet {
                 v.skills.practice(Skill.HUNTING, 2);
             }
             default -> { // gatherers and the herbalist
+                if (v.job == Job.GATHERER && v.workAt == null && tendField(v, w, flows)) return;
                 if (v.workAt == null || v.stateTime > 60) {
                     v.stateTime = 0;
                     v.workAt = bush(w, (int) Math.floor(v.homeX), (int) Math.floor(v.homeY), (int) Math.floor(v.homeZ));
@@ -241,6 +242,57 @@ public final class Hamlet {
             }
         }
     }
+
+    /**
+     * The family's field, 4 x 3 south of their hut: tilled from the grass, sown with the store's seeds,
+     * harvested ripe (and sown again). Returns whether the gatherer worked it this time.
+     */
+    private boolean tendField(Villager v, World w, Flows flows) {
+        if (huts.size() < 2) return false;
+        int[] h = huts.get(1);
+        for (int dz = 0; dz < 3; dz++)
+            for (int dx = 0; dx < 4; dx++) {
+                int x = h[0] + dx, z = h[2] + 9 + dz, y = h[1] + 4;
+                while (y > h[1] - 5 && !Blocks.isSolid(w.get(x, y, z)) && !Blocks.isPlant(w.get(x, y, z))) y--;
+                short b = w.get(x, y, z), above = w.get(x, y + 1, z);
+                boolean ripe = b == Blocks.WHEAT_7, sow = b == Blocks.FARMLAND && above == Blocks.AIR && store.count(Items.WHEAT_SEEDS) > 0;
+                boolean till = (b == Blocks.GRASS || b == Blocks.DIRT) && (above == Blocks.AIR || above == Blocks.SHORT_GRASS);
+                if (!ripe && !sow && !till) continue;
+                if (dist(v, x + 0.5, z + 0.5) > 2.5) { go(v, w, x, y + (ripe ? 0 : 1), z); return true; }
+                v.state = Villager.State.WORK;
+                if (v.workTimer < 3 / v.efficiency(Skill.FARMING)) return true;
+                v.workTimer = 0;
+                if (ripe) {
+                    set(w, x, y, z, Blocks.WHEAT_0); // harvested and sown again from the same ear
+                    store.add(Items.WHEAT, 1);
+                    store.add(Items.WHEAT_SEEDS, 1);
+                    flows.take(Matter.PLANTS, 1, x, z);
+                    say(v, "Le blé est mûr !");
+                } else if (sow) {
+                    store.remove(Items.WHEAT_SEEDS, 1);
+                    set(w, x, y + 1, z, Blocks.WHEAT_0);
+                } else {
+                    if (above == Blocks.SHORT_GRASS) { set(w, x, y + 1, z, Blocks.AIR); store.add(Items.WHEAT_SEEDS, 1); } // wild seeds
+                    set(w, x, y, z, Blocks.FARMLAND);
+                }
+                v.skills.practice(Skill.FARMING, 1);
+                return true;
+            }
+        return false;
+    }
+
+    /** A finished home gets a decorated pot by its bed: the hamlet's first work of art. */
+    private void decorate(Villager v, World w, int[] a) {
+        int x = a[0] + 3, y = a[1] + 1, z = a[2] + 1;
+        if (w.get(x, y, z) != Blocks.AIR || decorated) return;
+        set(w, x, y, z, Blocks.DECORATED_POT);
+        decorated = true;
+        v.skills.practice(Skill.POTTERY, 2);
+        say(v, "Un pot décoré, pour que la maison soit belle.");
+    }
+
+    /** Whether the builder has decorated the finished home (saved). */
+    public boolean decorated;
 
     /** Cooks what is raw in the store at the campfire (same recipes as the player). */
     private void cook(Villager v, RecipeBook recipes, Flows flows) {
@@ -453,6 +505,43 @@ public final class Hamlet {
         return v.name + " : " + s;
     }
 
+    /**
+     * Exchanges: holding what an inhabitant's trade needs and talking to them gives one of it to the
+     * hamlet for one of what they make, taken from the common store (null: no exchange).
+     */
+    public String trade(Villager v, Actor player, int slot, java.util.function.IntFunction<String> names) {
+        short held = player.inventory.id(slot);
+        if (held == Blocks.AIR || player.inventory.counts[slot] <= 0) return null;
+        short[] wants = switch (v.job) {
+            case BUILDER -> new short[] {Blocks.OAK_LOG, Blocks.OAK_PLANKS, Blocks.COBBLESTONE, Blocks.THATCH, Blocks.GLASS};
+            case FISHER -> new short[] {Items.STRING, Items.STICK, Items.BREAD};
+            case HUNTER -> new short[] {Items.ARROW, Items.FLINT, Items.BREAD};
+            default -> new short[] {Items.BREAD, Items.COOKED_TROUT, Items.COOKED_VENISON, Blocks.CLAY};
+        };
+        short[] gives = switch (v.job) {
+            case BUILDER -> new short[] {Blocks.STRAW_BED, Blocks.THATCH, Blocks.OAK_PLANKS};
+            case FISHER -> new short[] {Items.COOKED_TROUT, Items.TROUT};
+            case HUNTER -> new short[] {Items.HIDE, Items.VENISON, Items.SMOKED_MEAT};
+            default -> new short[] {Items.SWEET_BERRIES, Items.WILD_HERBS, Items.PLANT_FIBER};
+        };
+        boolean wanted = false;
+        for (short w : wants) wanted |= w == held;
+        if (!wanted) return null;
+        for (short g : gives) {
+            if (store.count(g) == 0) continue;
+            store.remove(g, 1);
+            player.inventory.remove(held, 1);
+            store.add(held, 1);
+            player.inventory.add(g, 1);
+            String s = "Marché conclu : " + names.apply(held).toLowerCase() + " contre " + names.apply(g).toLowerCase() + ".";
+            say(v, s);
+            return v.name + " : " + s;
+        }
+        String s = "Volontiers, mais je n'ai rien à te donner en échange pour l'instant.";
+        say(v, s);
+        return v.name + " : " + s;
+    }
+
     /** The world last ticked (for talking). */
     public World lastWorld;
 
@@ -462,6 +551,7 @@ public final class Hamlet {
         JsonObject o = new JsonObject();
         o.addProperty("founded", founded);
         o.addProperty("clock", clock);
+        o.addProperty("decorated", decorated);
         JsonArray hs = new JsonArray();
         for (int[] h : huts) { JsonArray a = new JsonArray(); for (int v : h) a.add(v); hs.add(a); }
         o.add("huts", hs);
@@ -489,6 +579,7 @@ public final class Hamlet {
         JsonObject o = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
         founded = o.get("founded").getAsBoolean();
         clock = o.get("clock").getAsDouble();
+        decorated = o.has("decorated") && o.get("decorated").getAsBoolean();
         for (var h : o.getAsJsonArray("huts")) {
             JsonArray a = h.getAsJsonArray();
             huts.add(new int[] {a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt()});

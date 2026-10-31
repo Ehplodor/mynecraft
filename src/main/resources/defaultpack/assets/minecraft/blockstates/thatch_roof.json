@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "minecraft:block/thatch_roof"
+    },
+    "facing=south": {
+      "model": "minecraft:block/thatch_roof"
+    },
+    "facing=west": {
+      "model": "minecraft:block/thatch_roof"
+    },
+    "facing=east": {
+      "model": "minecraft:block/thatch_roof"
+    }
+  }
+}

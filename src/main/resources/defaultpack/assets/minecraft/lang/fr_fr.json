@@ -124,5 +124,9 @@
   "item.minecraft.white_dye": "Teinture blanche",
   "item.minecraft.yellow_dye": "Teinture jaune",
   "item.minecraft.canvas": "Toile à peindre",
-  "block.minecraft.fish_trap": "Nasse"
+  "block.minecraft.fish_trap": "Nasse",
+  "block.minecraft.snare": "Collet",
+  "block.minecraft.thatch_roof": "Pente de chaume",
+  "block.minecraft.oak_stairs": "Escalier en chêne",
+  "item.minecraft.drum": "Tambour"
 }

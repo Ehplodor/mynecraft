@@ -124,6 +124,7 @@ final class SoundEngine {
         m.put("splash", variants(Synth::splash));
         m.put("click", new float[][] {Synth.click(1)});
         m.put("flute", variants(Synth::flute));
+        m.put("drum", variants(Synth::drum));
         for (Synth.Material mat : Synth.Material.values()) {
             String n = mat.name().toLowerCase();
             m.put("step_" + n, variants(4, s -> Synth.step(mat, s)));
@@ -372,6 +373,11 @@ final class SoundEngine {
 
     void splash(double x, double y, double z) {
         play("splash", x, y, z, 0.8f, 0.9f + random.nextFloat() * 0.2f, 24);
+    }
+
+    /** A rhythm on the drum (M34). */
+    void drum(double x, double y, double z) {
+        play("drum", x, y, z, 0.9f, 1, 40);
     }
 
     /** A phrase on the flute (M34). */

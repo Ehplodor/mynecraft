@@ -49,7 +49,9 @@ public final class Player {
     /** Retries the blocked rest of a horizontal move from up to STEP_HEIGHT higher; undone if it gains nothing. */
     private void stepUp(World world, double restX, double restZ) {
         double sx = x, sy = y, sz = z;
-        double up = sweep(world, 1, STEP_HEIGHT);
+        // On a ramp (stairs, roof) the next one is a whole block up: climb it as a step.
+        short under = world.get(fl(x), fl(y - 0.01), fl(z));
+        double up = sweep(world, 1, Blocks.SHAPE[under & 0xFFFF] == Blocks.SHAPE_SLOPE ? 1.05 : STEP_HEIGHT);
         double ax = sweep(world, 0, restX), az = sweep(world, 2, restZ);
         sweep(world, 1, -up);
         if (Math.abs(ax) + Math.abs(az) > EPS) {
