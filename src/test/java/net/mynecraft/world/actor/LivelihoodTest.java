@@ -155,4 +155,32 @@ class LivelihoodTest {
         assertTrue(path.stream().anyMatch(c -> c[1] == 11), "climbs the step");
         assertTrue(path.stream().anyMatch(c -> Math.abs(c[2]) >= 6), "goes round the wall");
     }
+
+    @Test
+    void roofsRiseAwayFromThePlayerAndRampsAreClimbed() {
+        World w = flat();
+        net.mynecraft.world.Player pl = new net.mynecraft.world.Player();
+        pl.x = 0.5; pl.y = 10; pl.z = 0.5;
+        int[] at = net.mynecraft.world.Placement.place(w, pl, new net.mynecraft.world.Raycast.Hit(0, 9, 3, 0, 1, 0), 1, Blocks.THATCH_ROOF);
+        assertNotNull(at);
+        assertEquals(Blocks.THATCH_ROOF + 1, w.get(0, 10, 3)); // high side to the south, away from the player
+        assertEquals(Blocks.THATCH_ROOF, Blocks.DROP[w.get(0, 10, 3)]);
+        assertEquals(8, w.collisionBox(0, 10, 3) >> 8); // half a block to stand on
+    }
+
+    @Test
+    void wastewaterTroublesTheRiverDownstream() {
+        var col = new net.mynecraft.world.Landscape.Column(60, (byte) 0, 64, 1, 12f);
+        var eco = new net.mynecraft.world.life.Ecology(42, new net.mynecraft.world.life.Ecosystem(), (x, z) -> col);
+        Flows f = new Flows(eco);
+        f.river = (x, z) -> Math.abs(z) < 8 ? 60 - x / 64.0 : Double.NaN; // a river flowing east
+        var here = eco.at(10, 0);
+        var down = eco.at(74, 0);
+        var up = eco.at(-54, 0);
+        double h = here.aquatic, d = down.aquatic, u = up.aquatic;
+        f.give(Matter.WASTEWATER, 4, 10, 0);
+        assertTrue(here.aquatic < h);
+        assertTrue(down.aquatic < d && d - down.aquatic < h - here.aquatic);
+        assertEquals(u, up.aquatic, 1e-9);
+    }
 }

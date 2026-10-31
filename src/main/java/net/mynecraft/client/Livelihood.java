@@ -166,8 +166,9 @@ final class Livelihood {
             } else actor.skills.practice(Skill.HUNTING, 0.3);
             return Gestures.Use.NONE;
         }
-        if (kind == Items.TOOL_FLUTE) {
-            sound.flute(actor.x, actor.y + 1.5, actor.z);
+        if (kind == Items.TOOL_FLUTE || kind == Items.TOOL_DRUM) {
+            if (kind == Items.TOOL_FLUTE) sound.flute(actor.x, actor.y + 1.5, actor.z);
+            else sound.drum(actor.x, actor.y + 1.5, actor.z);
             actor.skills.practice(Skill.MUSIC, 1);
             company = Math.min(1, company + 0.05); // music is shared
             return Gestures.Use.NONE;
@@ -266,10 +267,18 @@ final class Livelihood {
             making = null;
         }
         // The hamlet: founded near the spawn once its land is loaded.
+        if (flows.river == null && w.generator != null) { // wastewater goes down the river
+            var hydrology = w.generator.landscape().hydrology();
+            flows.river = (x, z) -> { float[] r = hydrology.water(x, z); return r == null ? Double.NaN : r[0]; };
+        }
         if (!hamlet.founded) foundHamlet(w);
         if (hamlet.founded) {
             hamlet.tick(dt, w, flows, life.ecology, recipes, daylight, raining, day);
-            for (int[] e; (e = hamlet.edits.poll()) != null; ) changed.add(e);
+            for (int[] e; (e = hamlet.edits.poll()) != null; ) {
+                changed.add(e);
+                short b = w.get(e[0], e[1], e[2]); // what the inhabitants picked or sowed grows back like the player's
+                if (b == Blocks.BERRY_BUSH_PICKED || b == Blocks.WHEAT_0 || b == Blocks.OAK_SAPLING) growth.planted(e[0], e[1], e[2]);
+            }
         }
         return changed;
     }
@@ -345,7 +354,7 @@ final class Livelihood {
 
     /** The block the player just placed may be the plan's next step. */
     void placed(World w, int x, int y, int z) {
-        if (w.get(x, y, z) == Blocks.FISH_TRAP) growth.planted(x, y, z);
+        if (w.get(x, y, z) == Blocks.FISH_TRAP || w.get(x, y, z) == Blocks.SNARE) growth.planted(x, y, z);
         if (activePlan == null) return;
         int ax = x - planAnchor[0], ay = y - planAnchor[1], az = z - planAnchor[2];
         if (ax >= 0 && ay >= 0 && az >= 0 && ax < activePlan.w && ay < activePlan.h && az < activePlan.d
@@ -413,8 +422,12 @@ final class Livelihood {
         return best;
     }
 
-    void talk(Villager v) {
-        say(hamlet.talk(v, actor));
+    /** French names of items, set by the first HUD draw. */
+    private ItemNames itemNames;
+
+    void talk(Villager v, int slot) {
+        String trade = hamlet.trade(v, actor, slot, id -> itemNames == null ? Items.name((short) id) : itemNames.name((short) id));
+        say(trade != null ? trade : hamlet.talk(v, actor));
         company = Math.min(1, company + 0.15);
     }
 
@@ -422,9 +435,23 @@ final class Livelihood {
 
     /** Four small gauges over the hotbar (hunger, thirst, rest, warmth), the message, the plan at hand. */
     float drawHud(Hud hud, float top, float left, float right, boolean creative, World w, ItemNames names) {
+        itemNames = names;
         float s = hud.scale, bw = (right - left - 9 * s) / 4, bh = 3 * s, y = top - bh - 2 * s;
         if (!creative && actor.needs.rate > 0) {
             var n = actor.needs;
+            // Cold creeps in from the screen's edges as frost, heat as a red haze.
+            float cold = (float) Math.max(0, (0.3 - n.warmth) / 0.3), hot = (float) Math.max(0, (n.warmth - 0.75) / 0.25);
+            if (cold > 0 || hot > 0) {
+                float r = cold > 0 ? 0.8f : 1, g = cold > 0 ? 0.9f : 0.35f, b = cold > 0 ? 1 : 0.15f, k = Math.max(cold, hot);
+                float W = hud.width(), H = hud.height();
+                for (int i = 0; i < 6; i++) {
+                    float d = (i + 1) * 0.025f * k * Math.min(W, H), a = 0.07f * k;
+                    hud.rect(0, 0, W, d, r, g, b, a);
+                    hud.rect(0, H - d, W, d, r, g, b, a);
+                    hud.rect(0, d, d, H - 2 * d, r, g, b, a);
+                    hud.rect(W - d, d, d, H - 2 * d, r, g, b, a);
+                }
+            }
             double[] v = {n.food / 20, n.water / 20, n.rest, 1 - 2 * Math.abs(n.warmth - 0.5)};
             float[][] c = {{0.85f, 0.55f, 0.25f}, {0.3f, 0.6f, 0.95f}, {0.7f, 0.7f, 0.85f}, n.warmth < 0.5 ? new float[] {0.5f, 0.8f, 1}
                 : new float[] {1, 0.5f, 0.3f}};

@@ -22,8 +22,9 @@ public final class Blocks {
         OAK_FENCE = 81, THATCH = 82, STRAW_BED = 83, COMPOSTER = 84, MILLSTONE = 85, ANVIL = 86, TANNING_VAT = 87,
         LOOM = 88, POTTERS_WHEEL = 89, WATER_WHEEL = 90, WINDMILL = 91, RED_WOOL = 92, BLUE_WOOL = 93, WHITE_WOOL = 94,
         YELLOW_WOOL = 95, TERRACOTTA = 96, DECORATED_POT = 97, PAINTING = 98, STATUE = 99, SAWMILL = 100, DYE_VAT = 101,
-        FISH_TRAP = 102, FISH_TRAP_FULL = 103;
-    public static final int COUNT = 104; // ids are shorts: up to 32 767 states
+        FISH_TRAP = 102, FISH_TRAP_FULL = 103,
+        THATCH_ROOF = 104, /* facing north, south, west, east */ OAK_STAIRS = 108, SNARE = 112, SNARE_FULL = 113;
+    public static final int COUNT = 114; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -40,7 +41,9 @@ public final class Blocks {
         "campfire", "furnace", "farmland", "wheat", "wheat", "wheat", "wheat", "sweet_berry_bush", "sweet_berry_bush",
         "brown_mushroom", "clay", "oak_sapling", "oak_door", "oak_door", "oak_fence", "thatch", "straw_bed", "composter",
         "millstone", "anvil", "tanning_vat", "loom", "potters_wheel", "water_wheel", "windmill", "red_wool", "blue_wool",
-        "white_wool", "yellow_wool", "terracotta", "decorated_pot", "painting", "statue", "sawmill", "dye_vat", "fish_trap", "fish_trap"};
+        "white_wool", "yellow_wool", "terracotta", "decorated_pot", "painting", "statue", "sawmill", "dye_vat", "fish_trap", "fish_trap",
+        "thatch_roof", "thatch_roof", "thatch_roof", "thatch_roof", "oak_stairs", "oak_stairs", "oak_stairs", "oak_stairs",
+        "snare", "snare"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
@@ -49,11 +52,14 @@ public final class Blocks {
         "level=0", "level=2", "level=4", "level=6", "level=8", "", "", "", "", "",
         "layers=1", "layers=2", "layers=3", "layers=4", "layers=5", "layers=6", "layers=7", "layers=8", "", "",
         "", "", "", "age=0", "age=2", "age=5", "age=7", "age=3", "age=1", "", "", "", "open=false", "open=true", "", "",
-        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "full=false", "full=true"};
+        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "full=false", "full=true",
+        "facing=north", "facing=south", "facing=west", "facing=east", "facing=north", "facing=south", "facing=west", "facing=east", "full=false", "full=true"};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
-        SHAPE_LAYER = 5;
+        SHAPE_LAYER = 5, SHAPE_SLOPE = 6;
+    /** High side of a slope (roof, ramp): 0 north, 1 south, 2 west, 3 east. */
+    public static final byte[] FACING = new byte[COUNT];
     public static final byte TINT_NONE = 0, TINT_GRASS = 1, TINT_FOLIAGE = 2, TINT_WATER = 3;
 
     // ---- fluids ----
@@ -122,10 +128,21 @@ public final class Blocks {
         cutout(OAK_FENCE, 0, false);
         cutout(FISH_TRAP, 0, false); // a wicker basket in the stream: water flows through
         cutout(FISH_TRAP_FULL, 0, false);
+        plant(SNARE);
+        plant(SNARE_FULL);
+        for (int f = 0; f < 4; f++) { // roofs and stairs: a ramp, half a block to stand on (more to climb, see Player)
+            for (short base : new short[] {THATCH_ROOF, OAK_STAIRS}) {
+                short id = (short) (base + f);
+                SHAPE[id] = SHAPE_SLOPE;
+                FACING[id] = (byte) f;
+                OPACITY[id] = 0;
+            }
+        }
         EMISSION[CAMPFIRE] = 14;
         EMISSION[FURNACE] = 7;
         for (int i = 0; i < COUNT; i++) FAMILY[i] = (short) i;
         FAMILY[OAK_DOOR_OPEN] = OAK_DOOR;
+        for (int f = 1; f < 4; f++) { FAMILY[THATCH_ROOF + f] = THATCH_ROOF; FAMILY[OAK_STAIRS + f] = OAK_STAIRS; }
         for (int i = WATER_FLOW_1 - 1; i <= WATER_FALLING; i++) {
             short w = (short) (i == WATER_FLOW_1 - 1 ? WATER : i);
             fluid(w, FLUID_WATER, LAYER_TRANSLUCENT, 1, w == WATER ? 0 : w == WATER_FALLING ? 8 : w - WATER_FLOW_1 + 1);
@@ -143,7 +160,7 @@ public final class Blocks {
         LAYER[ICE] = LAYER_TRANSLUCENT;
         OPACITY[ICE] = 2;
         CULLS_SELF[ICE] = true;
-        for (int i = 0; i < COUNT; i++) BOX_MAX[i] = 16;
+        for (int i = 0; i < COUNT; i++) BOX_MAX[i] = (byte) (SHAPE[i] == SHAPE_SLOPE ? 8 : 16);
         SHAPE[OAK_SLAB] = SHAPE_SLAB_BOTTOM;
         SHAPE[OAK_SLAB_TOP] = SHAPE_SLAB_TOP;
         OPACITY[OAK_SLAB] = OPACITY[OAK_SLAB_TOP] = 0;
@@ -206,6 +223,14 @@ public final class Blocks {
         DROP[FARMLAND] = DIRT;
         DROP[OAK_DOOR_OPEN] = OAK_DOOR;
         DROP[FISH_TRAP_FULL] = FISH_TRAP;
+        DROP[SNARE_FULL] = SNARE;
+        hardness(0f, SNARE, SNARE_FULL);
+        for (int f = 0; f < 4; f++) {
+            DROP[THATCH_ROOF + f] = THATCH_ROOF;
+            DROP[OAK_STAIRS + f] = OAK_STAIRS;
+            hardness(0.5f, (short) (THATCH_ROOF + f));
+            hardness(2f, (short) (OAK_STAIRS + f));
+        }
         hardness(0.6f, FISH_TRAP, FISH_TRAP_FULL);
         DROP[BERRY_BUSH_PICKED] = BERRY_BUSH;
         for (int a = 0; a < 4; a++) DROP[WHEAT_0 + a] = AIR; // harvests come from Drops
@@ -228,7 +253,7 @@ public final class Blocks {
         for (int i = 1; i < COUNT; i++) {
             String n = NAMES[i];
             if (FLUID[i] != FLUID_NONE) continue;
-            if (n.endsWith("_log") || n.endsWith("_planks") || n.endsWith("_slab") || n.endsWith("_sapling")) {
+            if (n.endsWith("_log") || n.endsWith("_planks") || n.endsWith("_slab") || n.endsWith("_stairs") || n.endsWith("_sapling")) {
                 MATTER[i] = M_WOOD;
                 TOOL[i] = TOOL_AXE;
             } else if (n.endsWith("_ore")) {

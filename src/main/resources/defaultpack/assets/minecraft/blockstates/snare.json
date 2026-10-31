@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "full=false": {
+      "model": "minecraft:block/snare"
+    },
+    "full=true": {
+      "model": "minecraft:block/snare_full"
+    }
+  }
+}

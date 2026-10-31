@@ -37,7 +37,7 @@ const float AO[4] = float[4](0.45, 0.65, 0.82, 1.0);
 // Corner (u, v) offsets in quad order.
 const ivec2 CORNER[4] = ivec2[4](ivec2(0, 0), ivec2(1, 0), ivec2(1, 1), ivec2(0, 1));
 
-// Surface height (sixteenths) at corner c of a SPECIAL_FLUID_CORNERS quad.
+// Surface height (sixteenths) at corner c of a SPECIAL_FLUID_CORNERS or SPECIAL_SLOPE quad.
 float cornerHeight(uvec4 q, int c) {
     uint word = c < 2 ? q.w : q.z;
     return float((word >> uint(24 + 4 * (c & 1))) & 15u) + 1.0;
@@ -70,7 +70,7 @@ void main() {
         bool top = d == 1 ? face == 3u : local.y == yMax;
         bool bottom = d == 1 ? face == 2u : local.y == yMin;
         if (special == 1u && top) local.y -= 1.0 - float((q.w >> 24) & 31u) / 16.0; // fluid surface
-        else if (special == 5u && top) local.y -= 1.0 - cornerHeight(q, c) / 16.0;  // sloping fluid
+        else if ((special == 5u || special == 6u) && top) local.y -= 1.0 - cornerHeight(q, c) / 16.0;  // sloping fluid, roof
         else if (special == 2u && top) local.y -= 0.5;     // bottom slab
         else if (special == 4u && bottom) local.y += 0.5;  // top slab
         k = c;
@@ -103,7 +103,7 @@ void main() {
 
     uint lightWord = k < 2 ? q.z : q.w;
     uint light = (lightWord >> uint((k & 1) * 12)) & 4095u;
-    uint ao = special == 5u ? 3u : (q.z >> uint(24 + 2 * k)) & 3u;
+    uint ao = special >= 5u ? 3u : (q.z >> uint(24 + 2 * k)) & 3u;
     // Smooth light: sums of the 4 cells around the vertex (0..60), averaged here.
     float sky = level(float(light & 63u) * 0.25) * uDaylight;
     float block = level(float((light >> 6) & 63u) * 0.25);

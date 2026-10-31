@@ -32,6 +32,14 @@ public final class Flows {
     /** Applies taking and returning to the living patches (null in tests of the ledger alone). */
     public Ecology ecology;
 
+    /** Where the rivers run (null: wastewater stays where it is poured). */
+    public RiverLevel river;
+
+    /** River surface at a column, or NaN where there is no river. */
+    public interface RiverLevel {
+        double at(int x, int z);
+    }
+
     public Flows(Ecology ecology) {
         this.ecology = ecology;
     }
@@ -74,9 +82,33 @@ public final class Flows {
             case ASH -> p.soil = Math.min(1, p.soil + 0.005 * amount);
             case PLANTS -> p.detritus += 0.002 * amount;
             case SLAG -> p.soil = Math.max(0, p.soil - 0.002 * amount);
-            case WASTEWATER -> p.aquatic = Math.max(0, p.aquatic - 0.03 * amount); // a tannery upstream clouds the trout's water
+            case WASTEWATER -> { // a tannery upstream clouds the trout's water, and downstream too, less and less
+                p.aquatic = Math.max(0, p.aquatic - 0.03 * amount);
+                double cx = x, cz = z, k = 0.5;
+                for (int hop = 0; hop < 3 && river != null; hop++, k /= 2) {
+                    double[] next = downstream(cx, cz);
+                    if (next == null) break;
+                    cx = next[0];
+                    cz = next[1];
+                    Ecology.Patch d = ecology.existing(cx, cz);
+                    if (d != null && d != p) d.aquatic = Math.max(0, d.aquatic - 0.03 * k * amount);
+                }
+            }
             default -> { }
         }
+    }
+
+    /** The river's lowest point about a patch away from (x, z), lower than the river there; null if none. */
+    private double[] downstream(double x, double z) {
+        double here = river.at((int) Math.floor(x), (int) Math.floor(z)), best = Double.isNaN(here) ? Double.MAX_VALUE : here;
+        double[] at = null;
+        for (int a = 0; a < 16; a++)
+            for (int r = 32; r <= 64; r += 16) {
+                double px = x + r * Math.cos(a * Math.PI / 8), pz = z + r * Math.sin(a * Math.PI / 8);
+                double l = river.at((int) Math.floor(px), (int) Math.floor(pz));
+                if (!Double.isNaN(l) && l < best) { best = l; at = new double[] {px, pz}; }
+            }
+        return at;
     }
 
     public void offSeasonKill(double x, double z) {

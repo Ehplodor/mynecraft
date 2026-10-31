@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "P  ",
+    "PP ",
+    "PPP"
+  ],
+  "key": {
+    "P": "minecraft:oak_planks"
+  },
+  "result": {
+    "id": "minecraft:oak_stairs",
+    "count": 4
+  },
+  "mynecraft:skill": "building"
+}

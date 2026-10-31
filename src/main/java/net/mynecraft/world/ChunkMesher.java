@@ -37,7 +37,7 @@ public final class ChunkMesher {
     private static final int CROSS_FACE = 6;
     /** Vertex adjustments applied by the shader (3-bit field). */
     public static final int SPECIAL_NONE = 0, SPECIAL_FLUID = 1, SPECIAL_SLAB_BOTTOM = 2, SPECIAL_OVERLAY = 3,
-        SPECIAL_SLAB_TOP = 4, SPECIAL_FLUID_CORNERS = 5;
+        SPECIAL_SLAB_TOP = 4, SPECIAL_FLUID_CORNERS = 5, SPECIAL_SLOPE = 6;
 
     /**
      * Mesh of one section; {@link #data} holds the layers back to back. {@link #visibility} says which
@@ -136,6 +136,7 @@ public final class ChunkMesher {
         meshCrosses();
         meshSlabs();
         meshLayers();
+        meshSlopes();
         int vis = visibility.compute(section);
         int total = count[0] + count[1] + count[2];
         if (total == 0) return new Result(new int[0], 0, 0, 0, vis);
@@ -331,6 +332,11 @@ public final class ChunkMesher {
 
     /** One fluid cell face with per-corner surface heights (see SPECIAL_FLUID_CORNERS). */
     private void emitFluidCell(int d, int u, int v, int plane, int i, int j, int face, short b, boolean positive, long light) {
+        emitCornerCell(d, u, v, plane, i, j, face, b, positive, light, SPECIAL_FLUID_CORNERS);
+    }
+
+    private void emitCornerCell(int d, int u, int v, int plane, int i, int j, int face, short b, boolean positive, long light,
+                                int special) {
         int[] p = new int[3];
         p[d] = plane;
         p[u] = i;
@@ -344,7 +350,7 @@ public final class ChunkMesher {
         }
         int l0 = (int) light & 0xFFF, l1 = (int) (light >> 12) & 0xFFF, l2 = (int) (light >> 24) & 0xFFF, l3 = (int) (light >>> 36) & 0xFFF;
         int info = faceInfo[(b & 0xFFFF) * 6 + face];
-        put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], face, 0, 0, SPECIAL_FLUID_CORNERS, false, info,
+        put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], face, 0, 0, special, false, info,
             l0 | l1 << 12 | (nib[2] | nib[3] << 4) << 24, l2 | l3 << 12 | (nib[0] | nib[1] << 4) << 24);
     }
 
@@ -486,6 +492,34 @@ public final class ChunkMesher {
                         if (positive) p[d]++;
                         put(Blocks.LAYER[b & 0xFFFF], p[0], p[1], p[2], f, 0, 0, SPECIAL_FLUID, false,
                             faceInfo[(b & 0xFFFF) * 6 + f], light[0], light[1] | 2 * layers << 24);
+                    }
+                }
+    }
+
+    /**
+     * Roofs and ramps: the cell's top slopes from 1/16 on the low side up to the full height on its
+     * high side (Blocks.FACING), drawn like a sloping fluid without the current; lit by its own cell.
+     */
+    private void meshSlopes() {
+        for (int y = 0; y < 16; y++)
+            for (int z = 0; z < 16; z++)
+                for (int x = 0; x < 16; x++) {
+                    int idx = pIndex(x, y, z);
+                    short b = padded[idx];
+                    if (Blocks.SHAPE[b & 0xFFFF] != Blocks.SHAPE_SLOPE) continue;
+                    int high = Blocks.FACING[b & 0xFFFF]; // 0 north, 1 south, 2 west, 3 east
+                    for (int oz = 0; oz < 2; oz++)
+                        for (int ox = 0; ox < 2; ox++)
+                            corner[ox + 2 * oz] = (high == 0 ? oz == 0 : high == 1 ? oz == 1 : high == 2 ? ox == 0 : ox == 1) ? 16 : 1;
+                    int l = paddedLight[idx] & 0xFF, c = (l >> 4) * 4 | (l & 15) * 4 << 6;
+                    long light = c | (long) c << 12 | (long) c << 24 | (long) c << 36;
+                    int[] p = {x, y, z};
+                    for (int f = 0; f < 6; f++) {
+                        int d = f >> 1, u = (d + 1) % 3, v = (d + 2) % 3;
+                        boolean positive = (f & 1) != 0;
+                        int n = idx + (positive ? STRIDE[d] : -STRIDE[d]);
+                        if (f != 3 && !Blocks.faceVisible(b, padded[n])) continue;
+                        emitCornerCell(d, u, v, p[d] + (positive ? 1 : 0), p[u], p[v], f, b, positive, light, SPECIAL_SLOPE);
                     }
                 }
     }

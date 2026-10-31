@@ -20,6 +20,7 @@ data/minecraft/recipe/cooked_trout.json
 data/minecraft/recipe/cooked_venison.json
 data/minecraft/recipe/crafting_table.json
 data/minecraft/recipe/decorated_pot.json
+data/minecraft/recipe/drum.json
 data/minecraft/recipe/dye_vat.json
 data/minecraft/recipe/fish_trap.json
 data/minecraft/recipe/fishing_rod.json
@@ -45,6 +46,7 @@ data/minecraft/recipe/oak_fence.json
 data/minecraft/recipe/oak_planks.json
 data/minecraft/recipe/oak_planks_sawn.json
 data/minecraft/recipe/oak_slab.json
+data/minecraft/recipe/oak_stairs.json
 data/minecraft/recipe/packed_ice.json
 data/minecraft/recipe/painting.json
 data/minecraft/recipe/potters_wheel.json
@@ -55,6 +57,7 @@ data/minecraft/recipe/sand.json
 data/minecraft/recipe/sawmill.json
 data/minecraft/recipe/smoked_meat.json
 data/minecraft/recipe/smooth_stone.json
+data/minecraft/recipe/snare.json
 data/minecraft/recipe/spruce_planks.json
 data/minecraft/recipe/spruce_planks_sawn.json
 data/minecraft/recipe/statue.json
@@ -68,6 +71,7 @@ data/minecraft/recipe/string.json
 data/minecraft/recipe/tanning_vat.json
 data/minecraft/recipe/terracotta.json
 data/minecraft/recipe/thatch.json
+data/minecraft/recipe/thatch_roof.json
 data/minecraft/recipe/water_wheel.json
 data/minecraft/recipe/white_dye.json
 data/minecraft/recipe/white_wool.json

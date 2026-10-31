@@ -1,0 +1,24 @@
+{
+  "type": "mynecraft:process",
+  "station": "crafting_table",
+  "ingredients": [
+    {
+      "item": "minecraft:leather",
+      "count": 1
+    },
+    {
+      "item": "minecraft:oak_planks",
+      "count": 2
+    }
+  ],
+  "skill": "music",
+  "level": 0,
+  "seconds": 10,
+  "results": [
+    {
+      "id": "minecraft:drum",
+      "count": 1
+    }
+  ],
+  "tool": "knife"
+}
