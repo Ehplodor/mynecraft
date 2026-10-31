@@ -25,6 +25,9 @@ final class Hud {
     private static final String[] SPRITES = {"hud/heart/container", "hud/heart/full", "hud/heart/half", "hud/air", "hud/air_empty"};
     static final int HEART_CONTAINER = 0, HEART_FULL = 1, HEART_HALF = 2, AIR = 3, AIR_EMPTY = 4;
     private int spriteCell = 9;
+    /** Cells of the sprite strip: the HUD sprites, then one per pure item (textures/item/<name>.png). */
+    private static final int ITEMS = net.mynecraft.world.Items.COUNT - Blocks.COUNT, CELLS = 5 + ITEMS;
+    private final boolean[] itemIcon = new boolean[ITEMS];
     private final int[] faceInfo;
     private final FontLoader font;
     private final FloatBuffer data = BufferUtils.createFloatBuffer(MAX_QUADS * 6 * FLOATS_PER_VERTEX);
@@ -61,17 +64,19 @@ final class Hud {
     }
 
     private int uploadSprites(net.mynecraft.resource.ResourceManager resources) {
-        java.awt.image.BufferedImage[] imgs = new java.awt.image.BufferedImage[SPRITES.length];
-        for (int i = 0; i < SPRITES.length; i++) {
-            byte[] png = resources.read("assets/minecraft/textures/gui/sprites/" + SPRITES[i] + ".png");
+        java.awt.image.BufferedImage[] imgs = new java.awt.image.BufferedImage[CELLS];
+        for (int i = 0; i < CELLS; i++) {
+            byte[] png = resources.read(i < SPRITES.length ? "assets/minecraft/textures/gui/sprites/" + SPRITES[i] + ".png"
+                : "assets/minecraft/textures/item/" + net.mynecraft.world.Items.name((short) (Blocks.COUNT + i - SPRITES.length)) + ".png");
             try {
                 imgs[i] = png == null ? null : javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
             } catch (java.io.IOException e) {
                 imgs[i] = null;
             }
             if (imgs[i] != null) spriteCell = Math.max(spriteCell, imgs[i].getWidth());
+            if (imgs[i] != null && i >= SPRITES.length) itemIcon[i - SPRITES.length] = true;
         }
-        int w = spriteCell * SPRITES.length, h = spriteCell;
+        int w = spriteCell * CELLS, h = spriteCell;
         ByteBuffer px = BufferUtils.createByteBuffer(w * h * 4);
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
@@ -91,7 +96,7 @@ final class Hud {
 
     /** Draws HUD sprite {@code index} at (x, y), 9 GUI pixels square like vanilla. */
     void sprite(int index, float x, float y) {
-        float n = SPRITES.length, s = 9 * scale;
+        float n = CELLS, s = 9 * scale;
         quad(x, y, s, s, index / n, 0, (index + 1) / n, 1, -3, 1, 1, 1, 1);
     }
 
@@ -259,7 +264,11 @@ final class Hud {
     /** Block icon centred on (cx, cy), {@code size} pixels wide. */
     void item(short block, float cx, float cy, float size) {
         if (net.mynecraft.world.Items.isBlock(block)) icon(block, cx, cy, size);
-        else if (block != Blocks.AIR) { // pure item: a flat token with its initial until item sprites land
+        else if (block != Blocks.AIR && itemIcon[block - Blocks.COUNT]) { // pure item: its sprite
+            int i = SPRITES.length + block - Blocks.COUNT;
+            float h = size * 0.45f;
+            quad(cx - h, cy - h, 2 * h, 2 * h, i / (float) CELLS, 0, (i + 1) / (float) CELLS, 1, -3, 1, 1, 1, 1);
+        } else if (block != Blocks.AIR) { // pure item without a sprite: a flat token with its initial
             rect(cx - size * 0.35f, cy - size * 0.35f, size * 0.7f, size * 0.7f, 0.55f, 0.42f, 0.25f, 1);
             String t = net.mynecraft.world.Items.name(block).substring(0, 1).toUpperCase();
             text(t, cx - textWidth(t) / 2, cy - 4 * scale, 1, 1, 1);

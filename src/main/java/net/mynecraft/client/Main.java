@@ -309,6 +309,7 @@ public final class Main {
         creatureRenderer.people = liv.hamlet.villagers;
         String needsRate = option(args, "--needs", null); // off / slow / normal
         if (needsRate != null) liv.actor.needs.rate = needsRate.equals("off") ? 0 : needsRate.equals("slow") ? 0.5 : 1;
+        pauseMenu.needs = liv.actor.needs.rate;
         StationScreen stationScreen = new StationScreen();
         boolean stationOpen = false;
         int[] tableAt = null;
@@ -658,6 +659,11 @@ public final class Main {
                                 System.err.println("[options] cannot save: " + e.getMessage());
                             }
                         }
+                        case NEEDS -> { // normal, slow, off, normal...
+                            double r = liv.actor.needs.rate;
+                            liv.actor.needs.rate = r >= 1 ? 0.5 : r > 0 ? 0 : 1;
+                            pauseMenu.needs = liv.actor.needs.rate;
+                        }
                         case RELOAD -> restart = relaunchArgs(args, worldDir, null);
                         case NEW_RANDOM -> restart = relaunchArgs(args, pauseMenu.newWorldDir(), new java.util.Random().nextLong());
                         case NEW_SAME_SEED -> restart = relaunchArgs(args, pauseMenu.newWorldDir(), storage.seed);
@@ -811,7 +817,7 @@ public final class Main {
             }
             short aimedBlock = hit == null ? Blocks.AIR : world.get(hit.x(), hit.y(), hit.z());
             boolean interactive = aimedBlock == Blocks.OAK_DOOR || aimedBlock == Blocks.OAK_DOOR_OPEN || aimedBlock == Blocks.BERRY_BUSH
-                || aimedBlock == Blocks.STRAW_BED;
+                || aimedBlock == Blocks.STRAW_BED || aimedBlock == Blocks.FISH_TRAP_FULL;
             short heldItem = inventory.id(input.slot);
             boolean used = false;
             if (input.placeRequested && !screenOpen && !paused && hit != null && !creative && !input.shiftDown()

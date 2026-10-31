@@ -13,7 +13,7 @@ import java.util.List;
  * Starting another world relaunches the game with the new arguments (see {@link Main}).
  */
 final class PauseMenu {
-    enum Action { NONE, RESUME, VOLUME_UP, VOLUME_DOWN, RESPAWN, RELOAD, NEW_RANDOM, NEW_SAME_SEED, NEW_TYPED_SEED, OPEN_WORLD, QUIT }
+    enum Action { NONE, RESUME, VOLUME_UP, VOLUME_DOWN, NEEDS, RESPAWN, RELOAD, NEW_RANDOM, NEW_SAME_SEED, NEW_TYPED_SEED, OPEN_WORLD, QUIT }
 
     private record Button(String label, Action action) {}
 
@@ -26,6 +26,8 @@ final class PauseMenu {
     boolean typing;
     /** Master volume shown on its button (percent). */
     int volume = 60;
+    /** Pace of the body's needs shown on its button: 1 normal, 0.5 slow, 0 off. */
+    double needs = 1;
 
     PauseMenu(Path current, long seed) {
         this.current = current;
@@ -45,6 +47,7 @@ final class PauseMenu {
         List<Button> b = new ArrayList<>();
         b.add(new Button("Reprendre", Action.RESUME));
         b.add(new Button("Volume : " + volume + " %   (clic gauche : plus, clic droit : moins)", Action.VOLUME_UP));
+        b.add(new Button("Besoins du corps : " + (needs >= 1 ? "normaux" : needs > 0 ? "lents" : "désactivés"), Action.NEEDS));
         b.add(new Button("Réapparaître au point de départ", Action.RESPAWN));
         b.add(new Button("Recharger ce monde (" + current.getFileName() + ")", Action.RELOAD));
         b.add(new Button("Nouveau monde : graine aléatoire", Action.NEW_RANDOM));

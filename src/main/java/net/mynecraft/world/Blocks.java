@@ -21,8 +21,9 @@ public final class Blocks {
         BERRY_BUSH_PICKED = 75, BROWN_MUSHROOM = 76, CLAY = 77, OAK_SAPLING = 78, OAK_DOOR = 79, OAK_DOOR_OPEN = 80,
         OAK_FENCE = 81, THATCH = 82, STRAW_BED = 83, COMPOSTER = 84, MILLSTONE = 85, ANVIL = 86, TANNING_VAT = 87,
         LOOM = 88, POTTERS_WHEEL = 89, WATER_WHEEL = 90, WINDMILL = 91, RED_WOOL = 92, BLUE_WOOL = 93, WHITE_WOOL = 94,
-        YELLOW_WOOL = 95, TERRACOTTA = 96, DECORATED_POT = 97, PAINTING = 98, STATUE = 99, SAWMILL = 100, DYE_VAT = 101;
-    public static final int COUNT = 102; // ids are shorts: up to 32 767 states
+        YELLOW_WOOL = 95, TERRACOTTA = 96, DECORATED_POT = 97, PAINTING = 98, STATUE = 99, SAWMILL = 100, DYE_VAT = 101,
+        FISH_TRAP = 102, FISH_TRAP_FULL = 103;
+    public static final int COUNT = 104; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -39,7 +40,7 @@ public final class Blocks {
         "campfire", "furnace", "farmland", "wheat", "wheat", "wheat", "wheat", "sweet_berry_bush", "sweet_berry_bush",
         "brown_mushroom", "clay", "oak_sapling", "oak_door", "oak_door", "oak_fence", "thatch", "straw_bed", "composter",
         "millstone", "anvil", "tanning_vat", "loom", "potters_wheel", "water_wheel", "windmill", "red_wool", "blue_wool",
-        "white_wool", "yellow_wool", "terracotta", "decorated_pot", "painting", "statue", "sawmill", "dye_vat"};
+        "white_wool", "yellow_wool", "terracotta", "decorated_pot", "painting", "statue", "sawmill", "dye_vat", "fish_trap", "fish_trap"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
@@ -48,7 +49,7 @@ public final class Blocks {
         "level=0", "level=2", "level=4", "level=6", "level=8", "", "", "", "", "",
         "layers=1", "layers=2", "layers=3", "layers=4", "layers=5", "layers=6", "layers=7", "layers=8", "", "",
         "", "", "", "age=0", "age=2", "age=5", "age=7", "age=3", "age=1", "", "", "", "open=false", "open=true", "", "",
-        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""};
+        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "full=false", "full=true"};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
@@ -119,6 +120,8 @@ public final class Blocks {
         cutout(OAK_DOOR_OPEN, 0, false);
         SOLID[OAK_DOOR_OPEN] = false; // an open door is a frame one walks through
         cutout(OAK_FENCE, 0, false);
+        cutout(FISH_TRAP, 0, false); // a wicker basket in the stream: water flows through
+        cutout(FISH_TRAP_FULL, 0, false);
         EMISSION[CAMPFIRE] = 14;
         EMISSION[FURNACE] = 7;
         for (int i = 0; i < COUNT; i++) FAMILY[i] = (short) i;
@@ -202,6 +205,8 @@ public final class Blocks {
         hardness(5f, ANVIL);
         DROP[FARMLAND] = DIRT;
         DROP[OAK_DOOR_OPEN] = OAK_DOOR;
+        DROP[FISH_TRAP_FULL] = FISH_TRAP;
+        hardness(0.6f, FISH_TRAP, FISH_TRAP_FULL);
         DROP[BERRY_BUSH_PICKED] = BERRY_BUSH;
         for (int a = 0; a < 4; a++) DROP[WHEAT_0 + a] = AIR; // harvests come from Drops
         hardness(-1f, BEDROCK);

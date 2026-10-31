@@ -21,6 +21,7 @@ data/minecraft/recipe/cooked_venison.json
 data/minecraft/recipe/crafting_table.json
 data/minecraft/recipe/decorated_pot.json
 data/minecraft/recipe/dye_vat.json
+data/minecraft/recipe/fish_trap.json
 data/minecraft/recipe/fishing_rod.json
 data/minecraft/recipe/flint_knife.json
 data/minecraft/recipe/flour.json
