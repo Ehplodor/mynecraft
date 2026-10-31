@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SPS",
+    "PLP",
+    "SPS"
+  ],
+  "key": {
+    "S": "minecraft:stick",
+    "P": "#minecraft:planks",
+    "L": "#minecraft:logs"
+  },
+  "result": {
+    "id": "minecraft:water_wheel",
+    "count": 1
+  },
+  "mynecraft:skill": "building",
+  "mynecraft:level": 2
+}

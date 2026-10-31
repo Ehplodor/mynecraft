@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "campfire",
+  "ingredients": [
+    {
+      "item": "minecraft:flour",
+      "count": 2
+    }
+  ],
+  "skill": "cooking",
+  "level": 1,
+  "seconds": 10,
+  "results": [
+    {
+      "id": "minecraft:bread",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 2
+  }
+}

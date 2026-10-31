@@ -1,0 +1,28 @@
+{
+  "type": "mynecraft:process",
+  "station": "anvil",
+  "ingredients": [
+    {
+      "item": "minecraft:iron_ingot",
+      "count": 3
+    },
+    {
+      "item": "minecraft:stick",
+      "count": 2
+    }
+  ],
+  "skill": "smithing",
+  "level": 1,
+  "seconds": 12,
+  "results": [
+    {
+      "id": "minecraft:iron_pickaxe",
+      "count": 1
+    }
+  ],
+  "tool": "hammer",
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "PPP"
+  ],
+  "key": {
+    "P": "minecraft:plant_fiber"
+  },
+  "result": {
+    "id": "minecraft:string",
+    "count": 1
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " C ",
+    "CLC",
+    " C "
+  ],
+  "key": {
+    "C": "minecraft:cobblestone",
+    "L": "#minecraft:logs"
+  },
+  "result": {
+    "id": "minecraft:millstone",
+    "count": 1
+  },
+  "mynecraft:skill": "building",
+  "mynecraft:level": 1
+}

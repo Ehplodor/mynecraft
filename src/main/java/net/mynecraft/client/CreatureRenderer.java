@@ -38,6 +38,8 @@ final class CreatureRenderer {
     private final float[] corner = new float[24];
     private final FrustumIntersection frustum = new FrustumIntersection();
     int drawn;
+    /** The inhabitants (M31), drawn as simple people with the creatures. */
+    java.util.List<net.mynecraft.world.people.Villager> people = java.util.List.of();
 
     CreatureRenderer() {
         shader = new Shader("/shaders/creature.vert", "/shaders/creature.frag");
@@ -81,6 +83,13 @@ final class CreatureRenderer {
             int light = world.getLight((int) Math.floor(c.x), (int) Math.floor(c.y + c.height() * 0.6), (int) Math.floor(c.z));
             float sky = level(light >> 4), block = level(light & 15);
             emit(c, ox, oy, oz, sky, block);
+            drawn++;
+        }
+        for (var p : people) {
+            float ox = (float) (p.x - px), oy = (float) (p.y - py), oz = (float) (p.z - pz);
+            if (ox * ox + oz * oz > RANGE * RANGE || !frustum.testSphere(ox, oy + 1, oz, 1.5f)) continue;
+            int light = world.getLight((int) Math.floor(p.x), (int) Math.floor(p.y + 1), (int) Math.floor(p.z));
+            emitPerson(p, ox, oy, oz, level(light >> 4), level(light & 15));
             drawn++;
         }
         data.flip();
@@ -174,6 +183,39 @@ final class CreatureRenderer {
             if (hurt > 0) { cr += (1 - cr) * hurt * 0.7f; cg *= 1 - hurt * 0.6f; cb *= 1 - hurt * 0.6f; }
             box(p.ox(), p.oy(), p.oz(), p.w(), p.h(), p.d(), cr, cg, cb, p.glow(), sky, block);
         }
+    }
+
+    /** A person: legs swinging as they walk, arms too, lying down asleep. */
+    private void emitPerson(net.mynecraft.world.people.Villager p, float ox, float oy, float oz, float sky, float block) {
+        float k = p.child ? 0.65f : 1;
+        boolean walking = p.state == net.mynecraft.world.people.Villager.State.WALK;
+        boolean asleep = p.state == net.mynecraft.world.people.Villager.State.SLEEP;
+        boolean working = p.state == net.mynecraft.world.people.Villager.State.WORK;
+        body.identity().translate(ox, oy + (asleep ? 0.25f : 0), oz).rotateY(p.yaw);
+        if (asleep) body.rotateX((float) (-Math.PI / 2)).translate(0, -0.9f * k, 0);
+        body.scale(k);
+        float swing = walking ? (float) Math.sin(p.gait) * 0.7f : 0;
+        float[] skin = rgb(0xd8b090), shirt = rgb(p.shirt), trousers = rgb(p.trousers), hair = rgb(0x4a3020);
+        for (int side = -1; side <= 1; side += 2) {
+            part.set(body).translate(side * 0.12f, 0.78f, 0).rotateX(side * swing);
+            box(-0.11f, -0.78f, -0.11f, 0.22f, 0.78f, 0.22f, trousers[0], trousers[1], trousers[2], 0, sky, block);
+            float arm = working ? -1.1f + (float) Math.sin(p.workTimer * 6) * 0.3f * (side + 1) / 2 : -side * swing;
+            part.set(body).translate(side * 0.31f, 1.45f, 0).rotateX(arm);
+            box(-0.08f, -0.62f, -0.08f, 0.16f, 0.62f, 0.16f, shirt[0], shirt[1], shirt[2], 0, sky, block);
+            part.translate(0, -0.62f, 0);
+            box(-0.07f, -0.1f, -0.07f, 0.14f, 0.1f, 0.14f, skin[0], skin[1], skin[2], 0, sky, block);
+        }
+        part.set(body);
+        box(-0.23f, 0.78f, -0.13f, 0.46f, 0.7f, 0.26f, shirt[0], shirt[1], shirt[2], 0, sky, block);
+        part.set(body).translate(0, 1.48f, 0);
+        box(-0.2f, 0, -0.2f, 0.4f, 0.4f, 0.4f, skin[0], skin[1], skin[2], 0, sky, block);
+        box(-0.21f, 0.28f, -0.21f, 0.42f, 0.14f, 0.42f, hair[0], hair[1], hair[2], 0, sky, block);
+        box(-0.12f, 0.16f, 0.2f, 0.07f, 0.06f, 0.01f, 0.1f, 0.1f, 0.1f, 0, sky, block); // eyes
+        box(0.05f, 0.16f, 0.2f, 0.07f, 0.06f, 0.01f, 0.1f, 0.1f, 0.1f, 0, sky, block);
+    }
+
+    private static float[] rgb(int c) {
+        return new float[] {((c >> 16) & 255) / 255f, ((c >> 8) & 255) / 255f, (c & 255) / 255f};
     }
 
     /** A sick animal's coat: greyer and darker. */

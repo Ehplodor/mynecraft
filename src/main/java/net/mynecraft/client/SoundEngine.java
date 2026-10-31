@@ -123,6 +123,7 @@ final class SoundEngine {
         m.put("thunder_far", variants(s -> Synth.thunder(false, s)));
         m.put("splash", variants(Synth::splash));
         m.put("click", new float[][] {Synth.click(1)});
+        m.put("flute", variants(Synth::flute));
         for (Synth.Material mat : Synth.Material.values()) {
             String n = mat.name().toLowerCase();
             m.put("step_" + n, variants(4, s -> Synth.step(mat, s)));
@@ -371,6 +372,11 @@ final class SoundEngine {
 
     void splash(double x, double y, double z) {
         play("splash", x, y, z, 0.8f, 0.9f + random.nextFloat() * 0.2f, 24);
+    }
+
+    /** A phrase on the flute (M34). */
+    void flute(double x, double y, double z) {
+        play("flute", x, y, z, 0.9f, 1, 40);
     }
 
     void click() {

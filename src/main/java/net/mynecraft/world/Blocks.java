@@ -15,8 +15,14 @@ public final class Blocks {
         WATER_FLOW_1 = 39, /* ... WATER_FLOW_7 = 45 */ WATER_FALLING = 46,
         LAVA = 47, LAVA_FLOW_2 = 48, LAVA_FLOW_4 = 49, LAVA_FLOW_6 = 50, LAVA_FALLING = 51, OBSIDIAN = 52,
         CRAFTING_TABLE = 53, SNOW_BLOCK = 54, ICE = 55, PACKED_ICE = 56,
-        SNOW_1 = 57, /* ... SNOW_8 = 64: snow layers, 2 to 16 sixteenths high */ GENTIAN = 65, EDELWEISS = 66;
-    public static final int COUNT = 67; // ids are shorts: up to 32 767 states
+        SNOW_1 = 57, /* ... SNOW_8 = 64: snow layers, 2 to 16 sixteenths high */ GENTIAN = 65, EDELWEISS = 66,
+        // M27..M34: stations, crops, building, energy, art
+        CAMPFIRE = 67, FURNACE = 68, FARMLAND = 69, WHEAT_0 = 70, /* age 2, 5 */ WHEAT_7 = 73, BERRY_BUSH = 74,
+        BERRY_BUSH_PICKED = 75, BROWN_MUSHROOM = 76, CLAY = 77, OAK_SAPLING = 78, OAK_DOOR = 79, OAK_DOOR_OPEN = 80,
+        OAK_FENCE = 81, THATCH = 82, STRAW_BED = 83, COMPOSTER = 84, MILLSTONE = 85, ANVIL = 86, TANNING_VAT = 87,
+        LOOM = 88, POTTERS_WHEEL = 89, WATER_WHEEL = 90, WINDMILL = 91, RED_WOOL = 92, BLUE_WOOL = 93, WHITE_WOOL = 94,
+        YELLOW_WOOL = 95, TERRACOTTA = 96, DECORATED_POT = 97, PAINTING = 98, STATUE = 99, SAWMILL = 100, DYE_VAT = 101;
+    public static final int COUNT = 102; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -29,14 +35,20 @@ public final class Blocks {
         "birch_leaves", "spruce_log", "spruce_log", "spruce_log", "spruce_planks", "spruce_leaves",
         "water", "water", "water", "water", "water", "water", "water", "water",
         "lava", "lava", "lava", "lava", "lava", "obsidian", "crafting_table", "snow_block", "ice", "packed_ice",
-        "snow", "snow", "snow", "snow", "snow", "snow", "snow", "snow", "gentian", "edelweiss"};
+        "snow", "snow", "snow", "snow", "snow", "snow", "snow", "snow", "gentian", "edelweiss",
+        "campfire", "furnace", "farmland", "wheat", "wheat", "wheat", "wheat", "sweet_berry_bush", "sweet_berry_bush",
+        "brown_mushroom", "clay", "oak_sapling", "oak_door", "oak_door", "oak_fence", "thatch", "straw_bed", "composter",
+        "millstone", "anvil", "tanning_vat", "loom", "potters_wheel", "water_wheel", "windmill", "red_wool", "blue_wool",
+        "white_wool", "yellow_wool", "terracotta", "decorated_pot", "painting", "statue", "sawmill", "dye_vat"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
         "", "axis=y", "axis=x", "axis=z", "", "",
         "level=1", "level=2", "level=3", "level=4", "level=5", "level=6", "level=7", "level=8",
         "level=0", "level=2", "level=4", "level=6", "level=8", "", "", "", "", "",
-        "layers=1", "layers=2", "layers=3", "layers=4", "layers=5", "layers=6", "layers=7", "layers=8", "", ""};
+        "layers=1", "layers=2", "layers=3", "layers=4", "layers=5", "layers=6", "layers=7", "layers=8", "", "",
+        "", "", "", "age=0", "age=2", "age=5", "age=7", "age=3", "age=1", "", "", "", "open=false", "open=true", "", "",
+        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
@@ -58,6 +70,14 @@ public final class Blocks {
     /** Item dropped when broken (a block id; AIR = nothing) and how many. */
     public static final short[] DROP = new short[COUNT];
     public static final byte[] DROP_COUNT = new byte[COUNT];
+
+    /** Matter a block is made of, for the ledger of flows (ordinal of actor.Matter, -1 = none). */
+    public static final byte[] MATTER = new byte[COUNT];
+    /** Tool that breaks it best (TOOL_*), and the tool tier needed for it to drop anything (0 = by hand). */
+    public static final byte[] TOOL = new byte[COUNT], TIER = new byte[COUNT];
+    public static final byte TOOL_NONE = 0, TOOL_PICKAXE = 1, TOOL_AXE = 2, TOOL_SHOVEL = 3;
+    /** What a block adds to the beauty of a place (flowers, cloth, pots, paintings, statues). */
+    public static final byte[] BEAUTY = new byte[COUNT];
 
     /** Families whose members hide faces between each other (each fluid, glass, each leaves). */
     private static final short[] FAMILY = new short[COUNT];
@@ -93,7 +113,16 @@ public final class Blocks {
         plant(POPPY);
         plant(GENTIAN);
         plant(EDELWEISS);
+        for (short p : new short[] {WHEAT_0, WHEAT_0 + 1, WHEAT_0 + 2, WHEAT_7, BERRY_BUSH, BERRY_BUSH_PICKED, BROWN_MUSHROOM,
+            OAK_SAPLING}) plant(p);
+        cutout(OAK_DOOR, 0, false);
+        cutout(OAK_DOOR_OPEN, 0, false);
+        SOLID[OAK_DOOR_OPEN] = false; // an open door is a frame one walks through
+        cutout(OAK_FENCE, 0, false);
+        EMISSION[CAMPFIRE] = 14;
+        EMISSION[FURNACE] = 7;
         for (int i = 0; i < COUNT; i++) FAMILY[i] = (short) i;
+        FAMILY[OAK_DOOR_OPEN] = OAK_DOOR;
         for (int i = WATER_FLOW_1 - 1; i <= WATER_FALLING; i++) {
             short w = (short) (i == WATER_FLOW_1 - 1 ? WATER : i);
             fluid(w, FLUID_WATER, LAYER_TRANSLUCENT, 1, w == WATER ? 0 : w == WATER_FALLING ? 8 : w - WATER_FLOW_1 + 1);
@@ -161,6 +190,20 @@ public final class Blocks {
         hardness(0f, GENTIAN, EDELWEISS);
         hardness(0.5f, ICE, PACKED_ICE);
         DROP[ICE] = AIR; // vanilla: ice breaks into nothing (water in survival, simplified)
+        hardness(0f, WHEAT_0, (short) (WHEAT_0 + 1), (short) (WHEAT_0 + 2), WHEAT_7, BROWN_MUSHROOM, OAK_SAPLING);
+        hardness(0.2f, BERRY_BUSH, BERRY_BUSH_PICKED, STRAW_BED);
+        hardness(0.6f, CLAY, FARMLAND);
+        hardness(0.5f, THATCH, DECORATED_POT);
+        hardness(0.8f, RED_WOOL, BLUE_WOOL, WHITE_WOOL, YELLOW_WOOL);
+        hardness(1.25f, TERRACOTTA);
+        hardness(2f, CAMPFIRE, OAK_FENCE, OAK_DOOR, OAK_DOOR_OPEN, COMPOSTER, LOOM, WATER_WHEEL, WINDMILL, SAWMILL, DYE_VAT,
+            TANNING_VAT, POTTERS_WHEEL, PAINTING);
+        hardness(3.5f, FURNACE, MILLSTONE, STATUE);
+        hardness(5f, ANVIL);
+        DROP[FARMLAND] = DIRT;
+        DROP[OAK_DOOR_OPEN] = OAK_DOOR;
+        DROP[BERRY_BUSH_PICKED] = BERRY_BUSH;
+        for (int a = 0; a < 4; a++) DROP[WHEAT_0 + a] = AIR; // harvests come from Drops
         hardness(-1f, BEDROCK);
         DROP[STONE] = COBBLESTONE;
         DROP[GRASS] = DIRT;
@@ -169,6 +212,68 @@ public final class Blocks {
         for (int i = 1; i < COUNT; i++) {
             if (FLUID[i] != FLUID_NONE) { DROP[i] = AIR; HARDNESS[i] = -1; }
         }
+        initMatter();
+    }
+
+    // Matter ordinals (actor.Matter): kept as numbers so this table does not depend on the actor package.
+    private static final byte M_WOOD = 0, M_STONE = 1, M_SOIL = 2, M_ORE = 3, M_PLANTS = 4, M_FRUIT = 5, M_WATER = 8;
+
+    private static void initMatter() {
+        java.util.Arrays.fill(MATTER, (byte) -1);
+        for (int i = 1; i < COUNT; i++) {
+            String n = NAMES[i];
+            if (FLUID[i] != FLUID_NONE) continue;
+            if (n.endsWith("_log") || n.endsWith("_planks") || n.endsWith("_slab") || n.endsWith("_sapling")) {
+                MATTER[i] = M_WOOD;
+                TOOL[i] = TOOL_AXE;
+            } else if (n.endsWith("_ore")) {
+                MATTER[i] = M_ORE;
+                TOOL[i] = TOOL_PICKAXE;
+                TIER[i] = 1;
+            } else if (n.endsWith("_leaves") || isPlant((short) i) || n.equals("brown_mushroom") || n.equals("wheat")) {
+                MATTER[i] = M_PLANTS;
+            }
+        }
+        for (short s : new short[] {STONE, COBBLESTONE, GRANITE, DIORITE, ANDESITE, DEEPSLATE, OBSIDIAN, GLOWSTONE, FURNACE,
+            MILLSTONE, ANVIL, STATUE, TERRACOTTA}) {
+            MATTER[s] = M_STONE;
+            TOOL[s] = TOOL_PICKAXE;
+            TIER[s] = 1;
+        }
+        TIER[GLOWSTONE] = TIER[TERRACOTTA] = 0;
+        TIER[IRON_ORE] = 2;
+        TIER[GOLD_ORE] = TIER[DIAMOND_ORE] = TIER[OBSIDIAN] = 3;
+        TOOL[ANVIL] = TOOL_PICKAXE;
+        for (short s : new short[] {DIRT, GRASS, SAND, GRAVEL, CLAY, FARMLAND}) {
+            MATTER[s] = M_SOIL;
+            TOOL[s] = TOOL_SHOVEL;
+        }
+        for (short s : new short[] {SNOW_BLOCK, ICE, PACKED_ICE}) MATTER[s] = M_WATER;
+        for (int n = 0; n < 8; n++) { MATTER[SNOW_1 + n] = M_WATER; TOOL[SNOW_1 + n] = TOOL_SHOVEL; }
+        TOOL[SNOW_BLOCK] = TOOL_SHOVEL;
+        MATTER[BERRY_BUSH] = MATTER[BERRY_BUSH_PICKED] = M_FRUIT;
+        for (short s : new short[] {CRAFTING_TABLE, OAK_FENCE, OAK_DOOR, OAK_DOOR_OPEN, COMPOSTER, LOOM, WATER_WHEEL,
+            WINDMILL, SAWMILL, DYE_VAT, TANNING_VAT, POTTERS_WHEEL, PAINTING, CAMPFIRE}) TOOL[s] = TOOL_AXE;
+        BEAUTY[POPPY] = BEAUTY[GENTIAN] = BEAUTY[EDELWEISS] = 2;
+        BEAUTY[RED_WOOL] = BEAUTY[BLUE_WOOL] = BEAUTY[WHITE_WOOL] = BEAUTY[YELLOW_WOOL] = 1;
+        BEAUTY[TERRACOTTA] = BEAUTY[GLASS] = 1;
+        BEAUTY[DECORATED_POT] = 3;
+        BEAUTY[PAINTING] = BEAUTY[STATUE] = 5;
+    }
+
+    /** Workstations (their name is the recipe's station). */
+    public static boolean isStation(short id) {
+        return switch (id) {
+            case CRAFTING_TABLE, CAMPFIRE, FURNACE, COMPOSTER, MILLSTONE, ANVIL, TANNING_VAT, LOOM, POTTERS_WHEEL, SAWMILL,
+                 DYE_VAT -> true;
+            default -> false;
+        };
+    }
+
+    /** Wheat growth stage 0..3, or -1. */
+    public static int wheatAge(short id) {
+        int a = (id & 0xFFFF) - WHEAT_0;
+        return a >= 0 && a < 4 ? a : -1;
     }
 
     private static void hardness(float h, short... ids) {

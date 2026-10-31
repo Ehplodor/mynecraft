@@ -1,0 +1,19 @@
+{
+  "type": "mynecraft:process",
+  "station": "composter",
+  "ingredients": [
+    {
+      "tag": "minecraft:compostable",
+      "count": 4
+    }
+  ],
+  "skill": "farming",
+  "level": 0,
+  "seconds": 10,
+  "results": [
+    {
+      "id": "minecraft:compost",
+      "count": 1
+    }
+  ]
+}

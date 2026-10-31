@@ -38,6 +38,14 @@ hiver, migrations, hibernation, populations qui suivent la nourriture, les préd
 carnet du naturaliste : la parcelle où l'on se trouve vue par le modèle écologique (végétation, fleurs, sol,
 détritus, vie aquatique, populations et tendances, interactions à l'œuvre).
 
+Vivre de la nature (M27 à M34, socle) : compétences et métiers appris par la pratique, outils qui s'usent et se
+réparent, faim, soif, repos et chaleur, boussole d'harmonie (carnet `N`, pages 2 et 3) sur le territoire du foyer (`H`),
+flux de matières par parcelle, cueillette, pêche, arc, cuisine au feu de camp, postes de travail (clic droit : feu, four,
+meule, scierie, enclume, cuve de tannage, métier à tisser, tour de potier, cuve de teinture ; `Tab` à l'établi), roue à
+aubes et moulin à vent, semis et compost, plans de bâtiments (`K` deux coins, `P` tracer, `O` poser ; créatif : `G`
+remplir, `L` bâtir, `Retour` annuler), et un hameau de quatre habitants qui vivent selon les mêmes règles (clic droit :
+parler, apprendre). `--needs off|slow` règle le rythme des besoins.
+
 `E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
 `E` ouvre la palette de tous les blocs.
 
@@ -56,6 +64,10 @@ Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `
 | `client/Waypoints`, `world/ExploredMap` | Repères nommés (`waypoints.json`) et chunks explorés (`explored.bin`), sauvegardés avec le monde |
 | `client/SoundEngine`, `client/sound/*` | Sons synthétisés (aucun fichier) et mixés selon lieu, heure, météo ; réverbération EFX ; voir docs/ROADMAP M18 bis |
 | `client/WeatherRenderer` | Nuages en blocs depuis le champ nuageux, précipitations abritées par les toits, éclairs |
+| `world/actor/*` | Acteur (joueur ou PNJ) : compétences, capacités, métiers, besoins, bien-être, boussole, flux de matières, gestes |
+| `world/crafting/RecipeBook`, `Workshop` | Grammaire de fabrication unique (poste, outil, compétence, durée, énergie, déchets), exécutée pour tout acteur |
+| `world/build/Blueprint`, `world/people/*` | Plans de bâtiments ; hameau, villageois, recherche de chemin A* |
+| `world/Growth`, `world/Power`, `world/Drops` | Cultures et repousses selon le calendrier local, énergie des roues et moulins, ce que donne un bloc |
 | `world/Player`, `Raycast` | Physique AABB par balayage d'axe sur les vraies boîtes (dalles), montée de marche 0,6, raycast DDA |
 | `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |
 | `world/storage/*` | NBT, fichiers région Anvil `.mca`, codec de chunk 1.16+/1.18+, `level.dat` |

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "III",
+    " I ",
+    "III"
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot"
+  },
+  "result": {
+    "id": "minecraft:anvil",
+    "count": 1
+  },
+  "mynecraft:skill": "smithing",
+  "mynecraft:level": 1
+}

@@ -169,10 +169,13 @@ public final class TerrainGenerator {
             for (int x = 0; x < 16; x++) {
                 int h = heights[z * 16 + x];
                 short ground = c.get(x, h, z);
+                int r = hash((cx << 4) + x, (cz << 4) + z);
+                // Clay in the beds of shallow waters (the potter's earth, M34).
+                if ((ground == Blocks.SAND || ground == Blocks.DIRT || ground == Blocks.GRAVEL) && r % 23 == 0
+                    && Blocks.FLUID[c.get(x, h + 1, z) & 0xFFFF] == Blocks.FLUID_WATER) c.set(x, h, z, Blocks.CLAY);
                 if (ground != Blocks.GRASS && ground != Blocks.SNOW_BLOCK) continue;
                 if (c.get(x, h + 1, z) != Blocks.AIR) continue;
                 short biome = biomes[z * 16 + x];
-                int r = hash((cx << 4) + x, (cz << 4) + z);
                 int trees = switch (biome) {
                     case Landscape.DARK_FOREST -> 140;
                     case Landscape.FOREST, Landscape.BIRCH_FOREST -> 70;
@@ -204,6 +207,9 @@ public final class TerrainGenerator {
                 int grass = biome == Landscape.PLAINS || biome == Landscape.DRY_PLAINS ? 250 : 120;
                 if (r >= 300 && r < 300 + grass) c.set(x, h + 1, z, Blocks.SHORT_GRASS);
                 else if (r >= 700 && r < (biome == Landscape.PLAINS ? 730 : 712)) c.set(x, h + 1, z, Blocks.POPPY);
+                else if (r >= 800 && r < 806 && biome != Landscape.DRY_PLAINS) c.set(x, h + 1, z, Blocks.BERRY_BUSH); // wild berries
+                else if (r >= 820 && r < (biome == Landscape.DARK_FOREST || biome == Landscape.FOREST ? 834 : 821))
+                    c.set(x, h + 1, z, Blocks.BROWN_MUSHROOM);
             }
         }
     }

@@ -1,0 +1,25 @@
+{
+  "type": "mynecraft:process",
+  "station": "tanning_vat",
+  "ingredients": [
+    {
+      "item": "minecraft:hide",
+      "count": 1
+    }
+  ],
+  "skill": "tanning",
+  "level": 0,
+  "seconds": 30,
+  "results": [
+    {
+      "id": "minecraft:leather",
+      "count": 1
+    }
+  ],
+  "waste": [
+    {
+      "matter": "wastewater",
+      "amount": 1
+    }
+  ]
+}

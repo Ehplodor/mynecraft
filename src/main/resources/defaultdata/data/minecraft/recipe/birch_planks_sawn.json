@@ -1,0 +1,29 @@
+{
+  "type": "mynecraft:process",
+  "station": "sawmill",
+  "ingredients": [
+    {
+      "item": "minecraft:birch_log",
+      "count": 1
+    }
+  ],
+  "skill": "woodcutting",
+  "level": 0,
+  "seconds": 4,
+  "results": [
+    {
+      "id": "minecraft:birch_planks",
+      "count": 6
+    }
+  ],
+  "energy": {
+    "kind": "work",
+    "amount": 3
+  },
+  "waste": [
+    {
+      "matter": "plants",
+      "amount": 0.5
+    }
+  ]
+}

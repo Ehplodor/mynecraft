@@ -385,6 +385,28 @@ public final class Synth {
         return out;
     }
 
+    /**
+     * A wooden flute's phrase (M34): six to nine notes of a D pentatonic scale, a breathy tone (a
+     * sine with a little second and third harmonic, a wisp of filtered noise), gentle vibrato.
+     */
+    public static float[] flute(long seed) {
+        SplittableRandom r = new SplittableRandom(seed);
+        double[] scale = {587.3, 659.3, 740.0, 880.0, 987.8, 1174.7};
+        int notes = 6 + r.nextInt(4), step = r.nextInt(scale.length);
+        double len = 0.32;
+        float[] s = new float[samples(notes * len + 0.6)];
+        for (int k = 0; k < notes; k++) {
+            step = Math.max(0, Math.min(scale.length - 1, step + r.nextInt(-2, 3)));
+            double f = scale[step], l = k == notes - 1 ? len * 2.5 : len * (r.nextDouble() < 0.25 ? 2 : 1);
+            float[] tone = note(r, t -> f * (1 + 0.006 * Math.sin(2 * Math.PI * 5.5 * t)), l, 0.25);
+            float[] breath = new float[tone.length];
+            for (int i = 0; i < tone.length; i++) breath[i] = (float) (white(r) * 0.04 * Math.sin(Math.PI * i / tone.length));
+            mix(tone, breath, 0, 1);
+            mix(s, tone, samples(k * len), 0.7);
+        }
+        return level(space(s, 0.3), BIRD);
+    }
+
     private static float[] song(SplittableRandom r, int notes, double f0, double slide, double length, double gap) {
         float[] s = new float[samples(notes * (length + gap) + 0.1)];
         double f = f0 * (0.9 + r.nextDouble() * 0.2);

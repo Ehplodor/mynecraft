@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "millstone",
+  "ingredients": [
+    {
+      "item": "minecraft:wheat",
+      "count": 2
+    }
+  ],
+  "skill": "milling",
+  "level": 0,
+  "seconds": 6,
+  "results": [
+    {
+      "id": "minecraft:flour",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "work",
+    "amount": 2
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "age=3": {
+      "model": "minecraft:block/sweet_berry_bush_stage3"
+    },
+    "age=1": {
+      "model": "minecraft:block/sweet_berry_bush_stage1"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "MM",
+    " S",
+    " S"
+  ],
+  "key": {
+    "M": "#minecraft:stone_tool_materials",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "minecraft:stone_hoe",
+    "count": 1
+  },
+  "mynecraft:skill": "crafting",
+  "mynecraft:level": 1
+}

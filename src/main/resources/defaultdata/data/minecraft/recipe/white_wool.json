@@ -1,0 +1,19 @@
+{
+  "type": "mynecraft:process",
+  "station": "loom",
+  "ingredients": [
+    {
+      "item": "minecraft:cloth",
+      "count": 2
+    }
+  ],
+  "skill": "weaving",
+  "level": 0,
+  "seconds": 8,
+  "results": [
+    {
+      "id": "minecraft:white_wool",
+      "count": 1
+    }
+  ]
+}

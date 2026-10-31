@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "furnace",
+  "ingredients": [
+    {
+      "item": "minecraft:clay_ball",
+      "count": 4
+    }
+  ],
+  "skill": "pottery",
+  "level": 0,
+  "seconds": 8,
+  "results": [
+    {
+      "id": "minecraft:terracotta",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 2
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "millstone",
+  "ingredients": [
+    {
+      "item": "minecraft:cobblestone",
+      "count": 1
+    }
+  ],
+  "skill": "milling",
+  "level": 0,
+  "seconds": 6,
+  "results": [
+    {
+      "id": "minecraft:gravel",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "work",
+    "amount": 3
+  }
+}

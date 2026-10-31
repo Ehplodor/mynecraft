@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "P P",
+    "PKP",
+    "PPP"
+  ],
+  "key": {
+    "P": "#minecraft:planks",
+    "K": "minecraft:clay_ball"
+  },
+  "result": {
+    "id": "minecraft:dye_vat",
+    "count": 1
+  }
+}

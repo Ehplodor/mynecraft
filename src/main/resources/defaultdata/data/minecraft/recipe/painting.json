@@ -1,0 +1,31 @@
+{
+  "type": "mynecraft:process",
+  "station": "crafting_table",
+  "ingredients": [
+    {
+      "item": "minecraft:canvas",
+      "count": 1
+    },
+    {
+      "item": "minecraft:red_dye",
+      "count": 1
+    },
+    {
+      "item": "minecraft:blue_dye",
+      "count": 1
+    },
+    {
+      "item": "minecraft:yellow_dye",
+      "count": 1
+    }
+  ],
+  "skill": "art",
+  "level": 1,
+  "seconds": 20,
+  "results": [
+    {
+      "id": "minecraft:painting",
+      "count": 1
+    }
+  ]
+}
