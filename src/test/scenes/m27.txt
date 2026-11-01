@@ -4,3 +4,4 @@ skills --seed 7 --time 6000 --life-demo --notebook-page 2 --view 0,-20
 campfire --seed 7 --time 6000 --life-demo --station campfire --view 0,-20
 blocks --seed 7 --time 6000 --pos -40,~5,30 --view 0,-35 --blocks-demo
 hamlet --seed 7 --time 6000 --pos 27,~4,16 --view 0,-15 --life-seconds 25
+shapes --seed 7 --time 6000 --pos -40,~4,30 --view 0,-25 --shapes-demo

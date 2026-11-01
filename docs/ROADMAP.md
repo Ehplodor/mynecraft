@@ -89,7 +89,7 @@
 - Bûches orientées (`axis`), dalles bas/haut/double (`type`), lues et écrites dans les sauvegardes ;
   les familles vanilla gardent leurs propriétés (`birch_log[axis=x]` → bûche horizontale)
 - Collisions AABB sur les boîtes réelles + montée automatique de 0,6 bloc ; règles de pose vanilla
-- Reste à faire : escaliers, `uvlock`
+- Reste à faire : `uvlock` (escaliers : voir M30)
 
 ## ✅ M8 — Mesure, visée précise, nouveaux blocs
 - Mode `--benchmark N` : vol scripté à 20 blocs/s, FPS, percentiles de temps d'image, temps GPU
@@ -513,7 +513,8 @@ Fait aussi : nasse (posée dans l'eau, se remplit en un jour si la parcelle a de
 
 ### ✅ M30 — Bâtir (socle)
 Fait : **plans** (`build/Blueprint`) : `K` marque deux coins, `P` trace un plan (JSON dans `<monde>/blueprints`), `O` pose le plan suivant connu à l'endroit visé ; le prochain bloc est encadré, la liste des matériaux manquants affichée, chaque bloc posé au bon endroit entraîne la construction. Un plan est un savoir (nom) transmissible ; la « cabane » est connue de tous et les PNJ la bâtissent. **Créatif** : `G` remplit la sélection du bloc tenu, `L` bâtit le plan d'un coup, `Retour` annule. **Formes** : porte (ouvrir/fermer, ouverte = cadre franchissable), barrière, chaume, lit de paille. L'abri compte (toit, murs, feu) pour la chaleur et le bien-être.
-Fait aussi : **pentes** au mailleur (`SHAPE_SLOPE`, quatre orientations, posées en montant devant soi) : pente de chaume pour les toits, escalier en chêne dessiné en rampe ; on y tient à mi-hauteur et l'on gravit une rampe d'un bloc ; une pente compte comme toit. Reste : escaliers à marches, murets, fenêtres, poutres, symétrie, isolation fine, cave fraîche.
+Fait aussi : **pentes** au mailleur (`SHAPE_SLOPE`, quatre orientations, posées en montant devant soi) : pente de chaume pour les toits, escalier en chêne dessiné en rampe ; on y tient à mi-hauteur et l'on gravit une rampe d'un bloc ; une pente compte comme toit.
+Fait aussi : **blocs en boîtes** (`world/Shapes`, `SPECIAL_BOX` au mailleur : chaque face d'une boîte au seizième, avec collisions, visée et contour sur les boîtes réelles). **Escaliers à marches** en chêne et en pierre : une dalle et une marche, posés en montant devant soi, à l'envers sous un plafond ou dans le haut d'une face ; ils tournent les coins comme vanilla (coins extérieurs et intérieurs selon l'escalier voisin, sans état en plus) ; on les monte sans sauter. **Muret de pierre** : poteau aux bouts, angles et croisements, bras vers les murets et blocs pleins voisins, pleine hauteur sous un bloc ; il se saute, ne s'enjambe pas. **Fenêtre en chêne** : vitre au milieu de l'épaisseur du mur, cadre en chêne et croisillon ; le cadre s'efface vers la fenêtre voisine du même plan (une rangée ou un carré de fenêtres = un seul vitrage encadré). Icônes dessinées d'après les boîtes. Reste : barrières reliées, poutres, symétrie, isolation fine, cave fraîche.
 - Formes : escaliers, barrières, murets, portes, fenêtres, toits, poutres, `uvlock`, modèles non cubiques
 - Architecture qui compte : isolation (chaleur), lumière, toit contre la pluie, cave fraîche pour les
   réserves, beauté du lieu dans le bien-être

@@ -53,12 +53,17 @@ final class Overlay {
      *                 lo/hi = vertical extent of the block's shape (0..1).
      */
     void outline(Matrix4f viewProj, float ox, float oy, float oz, float lo, float hi) {
+        outline(viewProj, ox, oy, oz, 0, lo, 0, 1, hi, 1);
+    }
+
+    /** Outline of the box [x0, x1] x [y0, y1] x [z0, z1] of a block (0..1 inside the cell). */
+    void outline(Matrix4f viewProj, float ox, float oy, float oz, float x0, float y0, float z0, float x1, float y1, float z1) {
         glUseProgram(shader.program);
         glUniformMatrix4fv(uMvp, false, viewProj.get(matrixBuf));
-        // The unit outline spans -E..1+E: scale and shift it onto [lo, hi] vertically.
-        float sy = (hi - lo + 2 * E) / (1 + 2 * E);
-        glUniform3f(uScale, 1, sy, 1);
-        glUniform3f(uOffset, ox, oy + lo - E + E * sy, oz);
+        // The unit outline spans -E..1+E: scale and shift it onto the box.
+        float sx = (x1 - x0 + 2 * E) / (1 + 2 * E), sy = (y1 - y0 + 2 * E) / (1 + 2 * E), sz = (z1 - z0 + 2 * E) / (1 + 2 * E);
+        glUniform3f(uScale, sx, sy, sz);
+        glUniform3f(uOffset, ox + x0 - E + E * sx, oy + y0 - E + E * sy, oz + z0 - E + E * sz);
         glUniform4f(uColor, 0, 0, 0, 1);
         glBindVertexArray(vao);
         glDrawArrays(GL_LINES, 0, 24);

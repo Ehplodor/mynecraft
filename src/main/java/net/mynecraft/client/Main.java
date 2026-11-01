@@ -147,6 +147,86 @@ public final class Main {
         if (world.set(x, y, z, b)) renderer.blockChanged(x, y, z);
     }
 
+    /**
+     * Scripted shot of the shaped blocks, on a levelled lawn before the eyes: a cottage with a row of
+     * windows, a glazing of four panes and an oak stair roof; a stone stepped pyramid (outer corners),
+     * a flight turning into a corner (inner corners), upside-down stairs; a muret with corners, a
+     * crossing, an end post and a course under a block.
+     */
+    private static void shapesDemo(World world, WorldRenderer renderer, int px, int py, int pz) {
+        // Anchored to the player's chunk, so shots from other places in that chunk see the same scene.
+        int ox = Math.floorDiv(px, 16) * 16 - 1, oz = Math.floorDiv(pz, 16) * 16 + 5;
+        int gy = Chunk.MAX_Y - 1;
+        while (!Blocks.isOpaque(world.get(ox + 9, gy, oz + 9)) && gy > Chunk.MIN_Y) gy--;
+        for (int x = ox - 3; x <= ox + 19; x++)
+            for (int z = oz - 9; z <= oz + 5; z++) {
+                for (int y = gy - 3; y < gy; y++) demoSet(world, renderer, x, y, z, Blocks.DIRT);
+                demoSet(world, renderer, x, gy, z, Blocks.GRASS);
+                for (int y = gy + 1; y <= gy + 12; y++) demoSet(world, renderer, x, y, z, Blocks.AIR);
+            }
+        int y1 = gy + 1;
+        // The cottage: plank walls three high, windows in front, four panes on the side, a stair roof.
+        int cx = ox, cz = oz - 7; // north-west corner; front wall at cz + 4
+        for (int y = y1; y < y1 + 3; y++)
+            for (int x = cx; x <= cx + 5; x++)
+                for (int z = cz; z <= cz + 4; z++)
+                    if (x == cx || x == cx + 5 || z == cz || z == cz + 4) demoSet(world, renderer, x, y, z, Blocks.OAK_PLANKS);
+        for (int x = cx + 1; x <= cx + 4; x++) if (x != cx + 2) demoSet(world, renderer, x, y1 + 1, cz + 4, Blocks.OAK_WINDOW);
+        demoSet(world, renderer, cx + 2, y1, cz + 4, Blocks.AIR); // the doorway
+        demoSet(world, renderer, cx + 2, y1 + 1, cz + 4, Blocks.AIR);
+        for (int z = cz + 1; z <= cz + 2; z++)
+            for (int y = y1; y <= y1 + 1; y++) demoSet(world, renderer, cx + 5, y, z, (short) (Blocks.OAK_WINDOW + 1));
+        for (int x = cx - 1; x <= cx + 6; x++) {
+            for (int r = 0; r < 3; r++) {
+                demoSet(world, renderer, x, y1 + 3 + r, cz + 4 - r, Blocks.stair(Blocks.OAK_STAIRS, 0, false));
+                demoSet(world, renderer, x, y1 + 3 + r, cz + r, Blocks.stair(Blocks.OAK_STAIRS, 1, false));
+            }
+            demoSet(world, renderer, x, y1 + 5, cz + 2, Blocks.OAK_SLAB);
+        }
+        for (int z = cz + 1; z <= cz + 3; z++) demoSet(world, renderer, cx, y1 + 3, z, Blocks.OAK_PLANKS); // gables
+        for (int z = cz + 1; z <= cz + 3; z++) demoSet(world, renderer, cx + 5, y1 + 3, z, Blocks.OAK_PLANKS);
+        demoSet(world, renderer, cx, y1 + 4, cz + 2, Blocks.OAK_PLANKS);
+        demoSet(world, renderer, cx + 5, y1 + 4, cz + 2, Blocks.OAK_PLANKS);
+        // A step before the door, and upside-down stairs as a lintel over it.
+        demoSet(world, renderer, cx + 2, y1, cz + 5, Blocks.stair(Blocks.COBBLESTONE_STAIRS, 0, false));
+        demoSet(world, renderer, cx + 2, y1 + 2, cz + 5, Blocks.stair(Blocks.COBBLESTONE_STAIRS, 0, true));
+        // A stepped pyramid: rings of stairs climbing to the middle turn their outer corners.
+        int sx = ox + 9, sz = oz - 6;
+        for (int t = 0; t < 2; t++) {
+            int r = 2 - t, y = y1 + t;
+            for (int dx = -r; dx <= r; dx++)
+                for (int dz = -r; dz <= r; dz++) {
+                    short b;
+                    if (Math.abs(dx) < r && Math.abs(dz) < r) b = Blocks.COBBLESTONE;
+                    else if (dz == -r) b = Blocks.stair(Blocks.COBBLESTONE_STAIRS, 1, false);
+                    else if (dz == r) b = Blocks.stair(Blocks.COBBLESTONE_STAIRS, 0, false);
+                    else b = Blocks.stair(Blocks.COBBLESTONE_STAIRS, dx < 0 ? 3 : 2, false);
+                    demoSet(world, renderer, sx + dx, y, sz + dz, b);
+                }
+        }
+        demoSet(world, renderer, sx, y1 + 2, sz, Blocks.COBBLESTONE_WALL);
+        // Seats climbing into a corner (inner corners), against a stone bank.
+        int ix = ox + 14, iz = oz - 7;
+        for (int i = 0; i < 4; i++) {
+            demoSet(world, renderer, ix + i, y1, iz, Blocks.stair(Blocks.OAK_STAIRS, 0, false));
+            if (i > 0) demoSet(world, renderer, ix, y1, iz + i, Blocks.stair(Blocks.OAK_STAIRS, 2, false));
+            demoSet(world, renderer, ix + i, y1, iz - 1, Blocks.COBBLESTONE);
+            demoSet(world, renderer, ix - 1, y1, iz + i, Blocks.COBBLESTONE);
+        }
+        demoSet(world, renderer, ix - 1, y1, iz - 1, Blocks.COBBLESTONE);
+        // A muret round the garden: corners, a crossing, an end post, and a course under a block.
+        int wz = oz + 1;
+        for (int x = ox - 2; x <= ox + 17; x++) if (x != ox + 2) demoSet(world, renderer, x, y1, wz, Blocks.COBBLESTONE_WALL);
+        for (int z = wz - 3; z < wz; z++) {
+            demoSet(world, renderer, ox - 2, y1, z, Blocks.COBBLESTONE_WALL);
+            demoSet(world, renderer, ox + 17, y1, z, Blocks.COBBLESTONE_WALL);
+        }
+        for (int z = wz - 1; z <= wz + 1; z++) demoSet(world, renderer, ox + 7, y1, z, Blocks.COBBLESTONE_WALL);
+        demoSet(world, renderer, ox + 12, y1 + 1, wz, Blocks.COBBLESTONE);
+        demoSet(world, renderer, ox + 12, y1 + 2, wz, Blocks.stair(Blocks.COBBLESTONE_STAIRS, 1, false));
+        demoSet(world, renderer, ox + 4, y1 + 1, wz, Blocks.COBBLESTONE_WALL);
+    }
+
     public static void main(String[] args) {
         java.util.List<String> argv = java.util.Arrays.asList(args);
         boolean vsync = !argv.contains("--no-vsync") && !argv.contains("--benchmark");
@@ -228,7 +308,8 @@ public final class Main {
             });
 
         boolean editDemo = argv.contains("--edit-demo"), fluidDemo = argv.contains("--fluid-demo");
-        boolean blocksDemo = argv.contains("--blocks-demo"), herdDemo = argv.contains("--herd-demo");
+        boolean blocksDemo = argv.contains("--blocks-demo"), shapesDemo = argv.contains("--shapes-demo"),
+            herdDemo = argv.contains("--herd-demo");
         // Animals (M22): simulated around the player, drawn with the world and its shadows.
         Life life = new Life(world, world.seed);
         try { // the ecosystem's patches as they were left (else bootstrapped afresh)
@@ -901,7 +982,7 @@ public final class Main {
             if (blocksDemo && streamer.settled()) { // scripted shot: the blocks of M27..M34 in a row, on the ground before the eyes
                 blocksDemo = false;
                 int ox = (int) Math.floor(player.x) - 7, oz = (int) Math.floor(player.z) - 5, n = 0;
-                for (short b = Blocks.CAMPFIRE; b < Blocks.COUNT; b++) {
+                for (short b = Blocks.CAMPFIRE; b < Blocks.OAK_STAIRS_TOP; b++) {
                     if (b == Blocks.WHEAT_0 + 1 || b == Blocks.WHEAT_0 + 2 || b == Blocks.OAK_DOOR_OPEN || b == Blocks.BERRY_BUSH_PICKED) continue;
                     int x = ox + 2 * (n % 8), z = oz - 2 * (n / 8), y = (int) Math.floor(player.y) + 4;
                     n++;
@@ -923,6 +1004,14 @@ public final class Main {
                     demoSet(world, renderer, gx - 3, gy + 1 + i, gz + 1 - i, (short) (Blocks.OAK_STAIRS));
                     for (int j = 0; j < i; j++) demoSet(world, renderer, gx - 3, gy + 1 + j, gz + 1 - i, Blocks.OAK_PLANKS);
                 }
+            }
+            if (shapesDemo && streamer.settled()) {
+                shapesDemo = false;
+                shapesDemo(world, renderer, (int) Math.floor(player.x), (int) Math.floor(player.y), (int) Math.floor(player.z));
+                for (short b : new short[] {Blocks.OAK_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.COBBLESTONE_WALL, Blocks.OAK_WINDOW})
+                    inventory.add(b, 16); // and the new blocks in hand
+                if (creative) System.arraycopy(new short[] {Blocks.OAK_STAIRS, Blocks.COBBLESTONE_STAIRS, Blocks.COBBLESTONE_WALL,
+                    Blocks.OAK_WINDOW}, 0, input.hotbar, 1, 4);
             }
             if (editDemo && streamer.settled()) {
                 // Self-test for incremental remeshing and light: a pillar crossing a section border,
@@ -1004,8 +1093,13 @@ public final class Main {
                 float lo = Blocks.isSlab(target) ? Blocks.BOX_MIN[target & 0xFFFF] / 16f : 0;
                 int snow = Blocks.snowLayers(target); // the outline hugs a snow layer's visible top
                 float hi = Blocks.isSlab(target) ? Blocks.BOX_MAX[target & 0xFFFF] / 16f : snow > 0 ? snow / 8f : 1;
+                int box = Blocks.hasBoxes(target) // stairs, walls, windows: around all their boxes
+                    ? net.mynecraft.world.Shapes.bounds(net.mynecraft.world.Shapes.at(world, hit.x(), hit.y(), hit.z()))
+                    : net.mynecraft.world.Shapes.box(0, Math.round(lo * 16), 0, 16, Math.round(hi * 16), 16);
                 overlay.outline(renderer.viewProj(), (float) (hit.x() - cam.pos.x), (float) (hit.y() - cam.pos.y),
-                    (float) (hit.z() - cam.pos.z), lo, hi);
+                    (float) (hit.z() - cam.pos.z), net.mynecraft.world.Shapes.min(box, 0) / 16f, net.mynecraft.world.Shapes.min(box, 1) / 16f,
+                    net.mynecraft.world.Shapes.min(box, 2) / 16f, net.mynecraft.world.Shapes.max(box, 0) / 16f,
+                    net.mynecraft.world.Shapes.max(box, 1) / 16f, net.mynecraft.world.Shapes.max(box, 2) / 16f);
             }
             int[] step = liv.nextStep(world); // the plan's next block, and the corners marked
             if (step != null) overlay.outline(renderer.viewProj(), (float) (step[0] - cam.pos.x), (float) (step[1] - cam.pos.y),

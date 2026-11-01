@@ -1,6 +1,9 @@
 package net.mynecraft.world;
 
-/** Vanilla-like placement rules: block state from the clicked face, slabs merging into doubles. */
+/**
+ * Vanilla-like placement rules: block state from the clicked face and the player's position (logs,
+ * roofs, stairs, windows), slabs merging into doubles.
+ */
 public final class Placement {
     private Placement() {}
 
@@ -35,10 +38,18 @@ public final class Placement {
                 there = Blocks.AIR;
             }
         } else if (Blocks.SHAPE[selected & 0xFFFF] == Blocks.SHAPE_SLOPE) {
-            // Roofs and stairs rise away from the player, like vanilla stairs.
-            double dx = px + 0.5 - player.x, dz = pz + 0.5 - player.z;
+            // Roofs rise away from the player, like vanilla stairs.
             int base = selected - Blocks.FACING[selected & 0xFFFF];
-            state = (short) (base + (Math.abs(dz) >= Math.abs(dx) ? (dz < 0 ? 0 : 1) : (dx < 0 ? 2 : 3)));
+            state = (short) (base + away(player, px, pz));
+        } else if (Blocks.SHAPE[selected & 0xFFFF] == Blocks.SHAPE_STAIRS) {
+            // Stairs climb away from the player; against a ceiling or the upper half of a side they hang
+            // upside down (vanilla).
+            boolean upper = hit.ny() == -1 || (hit.ny() == 0 && hitY > 0.5);
+            state = Blocks.stair(selected, away(player, px, pz), upper);
+        } else if (Blocks.SHAPE[selected & 0xFFFF] == Blocks.SHAPE_WINDOW) {
+            // The pane faces the player: it runs across the line of sight.
+            int base = selected - Blocks.FACING[selected & 0xFFFF];
+            state = (short) (base + (away(player, px, pz) < 2 ? 0 : 1));
         } else if (Blocks.logStates(selected) != null) {
             short[] axes = Blocks.logStates(selected); // y, x, z
             state = hit.nx() != 0 ? axes[1] : hit.nz() != 0 ? axes[2] : axes[0];
@@ -46,5 +57,11 @@ public final class Placement {
         if (!replaceable(there)) return null;
         if (Blocks.isSolid(state) && player.intersects(px, py, pz)) return null;
         return world.set(px, py, pz, state) ? new int[] {px, py, pz} : null;
+    }
+
+    /** Horizontal direction from the player to the cell (0 north, 1 south, 2 west, 3 east), as Blocks.FACING. */
+    private static int away(Player player, int px, int pz) {
+        double dx = px + 0.5 - player.x, dz = pz + 0.5 - player.z;
+        return Math.abs(dz) >= Math.abs(dx) ? (dz < 0 ? 0 : 1) : (dx < 0 ? 2 : 3);
     }
 }

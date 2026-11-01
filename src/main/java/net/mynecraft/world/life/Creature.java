@@ -1,6 +1,7 @@
 package net.mynecraft.world.life;
 
 import net.mynecraft.world.Blocks;
+import net.mynecraft.world.Shapes;
 import net.mynecraft.world.World;
 
 /**
@@ -125,6 +126,7 @@ public final class Creature {
 
     /** True when the last move was stopped by a wall. */
     public boolean blocked;
+    private final short[] around = new short[6]; // neighbours of a shaped block being collided with
 
     private double sweep(World w, int axis, double d) {
         if (d == 0) return 0;
@@ -139,16 +141,18 @@ public final class Creature {
         for (int by = y0; by <= y1; by++)
             for (int bz = z0; bz <= z1; bz++)
                 for (int bx = x0; bx <= x1; bx++) {
-                    int box = w.collisionBox(bx, by, bz);
-                    if (box < 0) continue;
-                    double bminY = by + (box & 0xFF) / 16.0, bmaxY = by + (box >> 8) / 16.0;
-                    double[] bmin = {bx, bminY, bz}, bmax = {bx + 1, bmaxY, bz + 1};
-                    boolean overlaps = true;
-                    for (int a = 0; a < 3 && overlaps; a++)
-                        if (a != axis) overlaps = bmax[a] > min[a] + EPS && bmin[a] < max[a] - EPS;
-                    if (!overlaps) continue;
-                    if (d > 0 && bmin[axis] >= max[axis] - EPS) d = Math.min(d, bmin[axis] - max[axis]);
-                    else if (d < 0 && bmax[axis] <= min[axis] + EPS) d = Math.max(d, bmax[axis] - min[axis]);
+                    int[] boxes = w.collisionBoxes(bx, by, bz, around);
+                    if (boxes == null) continue;
+                    for (int box : boxes) {
+                        double[] bmin = {bx + Shapes.min(box, 0) / 16.0, by + Shapes.min(box, 1) / 16.0, bz + Shapes.min(box, 2) / 16.0};
+                        double[] bmax = {bx + Shapes.max(box, 0) / 16.0, by + Shapes.max(box, 1) / 16.0, bz + Shapes.max(box, 2) / 16.0};
+                        boolean overlaps = true;
+                        for (int a = 0; a < 3 && overlaps; a++)
+                            if (a != axis) overlaps = bmax[a] > min[a] + EPS && bmin[a] < max[a] - EPS;
+                        if (!overlaps) continue;
+                        if (d > 0 && bmin[axis] >= max[axis] - EPS) d = Math.min(d, bmin[axis] - max[axis]);
+                        else if (d < 0 && bmax[axis] <= min[axis] + EPS) d = Math.max(d, bmax[axis] - min[axis]);
+                    }
                 }
         if (axis == 0) x += d; else if (axis == 1) y += d; else z += d;
         return d;
