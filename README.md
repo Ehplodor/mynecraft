@@ -46,6 +46,13 @@ aubes et moulin à vent, semis et compost, plans de bâtiments (`K` deux coins, 
 remplir, `L` bâtir, `Retour` annuler), et un hameau de quatre habitants qui vivent selon les mêmes règles (clic droit :
 parler, apprendre). `--needs off|slow` règle le rythme des besoins.
 
+Élevage : mouflons (plateaux, plaines sèches) et chèvres sauvages (pentes rocheuses) s'apprivoisent en les nourrissant
+à la main (accroupi, blé, herbes ou fibres ; plusieurs fois) ; les poules viennent du hameau (œufs échangés contre du pain
+ou du blé, couvés dans un nid de paille). Les bêtes suivent la nourriture tenue ; deux adultes nourris à la main font un
+petit si leur enclos (barrières, portes fermées) a l'herbe pour un de plus. Clic droit : nourrir, tondre (cisailles ou
+couteau), traire (cruche), ou voir comment va la bête. Ruche près des fleurs : un essaim s'y installe, le miel se récolte
+(pas l'hiver). Démo : `--herd-demo`.
+
 `E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
 `E` ouvre la palette de tous les blocs.
 

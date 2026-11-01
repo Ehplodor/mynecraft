@@ -128,5 +128,19 @@
   "block.minecraft.snare": "Collet",
   "block.minecraft.thatch_roof": "Pente de chaume",
   "block.minecraft.oak_stairs": "Escalier en chêne",
-  "item.minecraft.drum": "Tambour"
+  "item.minecraft.drum": "Tambour",
+  "block.minecraft.nest": "Nid de paille",
+  "block.minecraft.beehive": "Ruche",
+  "item.minecraft.shears": "Cisailles",
+  "item.minecraft.fleece": "Toison",
+  "item.minecraft.jug": "Cruche",
+  "item.minecraft.milk": "Lait de chèvre",
+  "item.minecraft.cheese": "Fromage de chèvre",
+  "item.minecraft.egg": "Œuf",
+  "item.minecraft.cooked_egg": "Œuf cuit",
+  "item.minecraft.mutton": "Viande de mouton crue",
+  "item.minecraft.cooked_mutton": "Mouton rôti",
+  "item.minecraft.chicken": "Poulet cru",
+  "item.minecraft.cooked_chicken": "Poulet rôti",
+  "item.minecraft.honey": "Miel"
 }

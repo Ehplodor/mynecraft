@@ -38,6 +38,10 @@ public final class Growth {
         places.put(key(x, y, z), new double[] {0});
     }
 
+    /** Nests where a chick just hatched (x, y, z), for the caller to bring it to life. */
+    public final List<int[]> hatched = new ArrayList<>();
+    static final double HATCH_DAYS = 2, SWARM_DAYS = 1, HONEY_DAYS = 3;
+
     public int size() {
         return places.size();
     }
@@ -81,6 +85,38 @@ public final class Growth {
                         w.set(p[0], p[1], p[2], fish ? Blocks.FISH_TRAP_FULL : Blocks.SNARE_FULL);
                         changed.add(p);
                         it.remove();
+                    }
+                }
+            } else if (b == Blocks.NEST_EGG) { // brooded, an egg hatches in two days
+                e.getValue()[0] += days / HATCH_DAYS;
+                if (e.getValue()[0] >= 1) {
+                    w.set(p[0], p[1], p[2], Blocks.NEST);
+                    hatched.add(p);
+                    changed.add(p);
+                    it.remove();
+                }
+            } else if (b == Blocks.BEEHIVE || b == Blocks.BEEHIVE_BEES || b == Blocks.BEEHIVE_HONEY) {
+                // An empty hive draws a wild swarm where flowers are many (not in winter); a colony makes honey from
+                // the patch's flowers and pollinates them in return (mutualism, like the mist lanterns).
+                boolean winter = phase >= 0.75;
+                double bloom = Math.min(1, patch.flowers * 4);
+                if (b == Blocks.BEEHIVE) {
+                    if (!winter) e.getValue()[0] += days * bloom / SWARM_DAYS;
+                    if (e.getValue()[0] >= 1) {
+                        e.getValue()[0] = 0;
+                        w.set(p[0], p[1], p[2], Blocks.BEEHIVE_BEES);
+                        changed.add(p);
+                    }
+                } else {
+                    patch.flowers = Math.min(1, patch.flowers + 0.01 * days);
+                    patch.plants = Math.min(1.5, patch.plants + 0.002 * days);
+                    if (b == Blocks.BEEHIVE_BEES && !winter) {
+                        e.getValue()[0] += days * bloom / HONEY_DAYS;
+                        if (e.getValue()[0] >= 1) {
+                            e.getValue()[0] = 0;
+                            w.set(p[0], p[1], p[2], Blocks.BEEHIVE_HONEY);
+                            changed.add(p);
+                        }
                     }
                 }
             } else if (b == Blocks.BERRY_BUSH_PICKED || b == Blocks.OAK_SAPLING) {

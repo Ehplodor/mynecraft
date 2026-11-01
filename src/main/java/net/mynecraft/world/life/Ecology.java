@@ -187,6 +187,9 @@ public final class Ecology {
             case FROSTLING -> 4;
             case MOSSBACK -> 0.8f;
             case SKY_MANTA -> 0.6f;
+            case SHEEP -> 4;
+            case GOAT -> 3;
+            case HEN -> 0.05f; // only kept, never wild
         };
         return Math.max(0.05, base);
     }
@@ -254,6 +257,8 @@ public final class Ecology {
         intake[deer] = 0.006 * eat;
         intake[ibex] = 0.005 * p.plants / (p.plants + 0.25);
         intake[moss] = 0.008 * eat;
+        intake[Species.SHEEP.ordinal()] = 0.004 * eat;
+        intake[Species.GOAT.ordinal()] = 0.004 * p.plants / (p.plants + 0.25); // browses and paws like the ibex
         double grazed = 0;
         for (int s = 0; s < N; s++) grazed += intake[s] * n[s];
         p.plants = Math.max(0.01, p.plants + (growth - grazed) * dt);
@@ -276,8 +281,8 @@ public final class Ecology {
             if (n[s] <= 0 && p.dormant[s] <= 0) continue;
             Species sp = S[s];
             double food = switch (sp) {
-                case RABBIT, DEER, MOSSBACK -> satiety;
-                case IBEX -> pawing;
+                case RABBIT, DEER, MOSSBACK, SHEEP, HEN -> satiety;
+                case IBEX, GOAT -> pawing;
                 case TROUT -> troutFood;
                 case LANTERN -> p.flowers / (p.flowers + 0.15);
                 case FROSTLING -> cold * (0.3 + 0.7 * (n[deer] + n[ibex]) / (n[deer] + n[ibex] + 3)); // commensal
@@ -286,7 +291,7 @@ public final class Ecology {
             };
             double b = switch (sp) { // births per animal per day at the height of the breeding season
                 case RABBIT -> 0.3;
-                case DEER, IBEX -> 0.12;
+                case DEER, IBEX, SHEEP, GOAT -> 0.12;
                 case TROUT -> 0.3;
                 case LANTERN -> 0.5;
                 case MOSSBACK -> 0.02;
@@ -296,7 +301,8 @@ public final class Ecology {
             };
             double m = switch (sp) { // deaths per animal per day, well fed
                 case RABBIT -> 0.02;
-                case DEER, IBEX -> 0.008;
+                case DEER, IBEX, SHEEP, GOAT -> 0.008;
+                case HEN -> 0.05;
                 case TROUT -> 0.02;
                 case LANTERN -> 0.02;
                 case MOSSBACK -> 0.001;
@@ -361,7 +367,7 @@ public final class Ecology {
             case TROUT -> 0.65;        // autumn spawning
             case FROSTLING -> 0.85;    // breeds in deep winter
             case DEER -> 0.2;
-            case IBEX -> 0.28;
+            case IBEX, SHEEP, GOAT -> 0.28;
             case LANTERN, MOSSBACK, SKY_MANTA -> 0.35;
             default -> 0.15;           // rabbits, foxes, herons: spring
         };
@@ -373,7 +379,7 @@ public final class Ecology {
 
     private static double mass(Species s) {
         return switch (s) {
-            case DEER, IBEX -> 1;
+            case DEER, IBEX, SHEEP, GOAT -> 1;
             case MOSSBACK -> 2;
             case SKY_MANTA -> 1.5;
             case FOX, HERON -> 0.3;
@@ -388,7 +394,8 @@ public final class Ecology {
             rate[s] = switch (S[s]) {
                 case DEER, FOX, LANTERN, FROSTLING -> 0.06;
                 case RABBIT -> 0.03;
-                case IBEX -> 0.04;
+                case IBEX, SHEEP, GOAT -> 0.04;
+                case HEN -> 0;
                 case TROUT -> 0.03;
                 case HERON -> 0.2;
                 case SKY_MANTA -> 0.3;
@@ -428,6 +435,12 @@ public final class Ecology {
         if (p == null) return;
         p.pop[s.ordinal()] = Math.max(0, p.pop[s.ordinal()] - 1);
         p.detritus += mass(s) * 0.05;
+    }
+
+    /** A wild animal was taken alive (tamed): one less in its patch, nothing for the decomposers. */
+    public void taken(Species s, double x, double z) {
+        Patch p = existing(x, z);
+        if (p != null) p.pop[s.ordinal()] = Math.max(0, p.pop[s.ordinal()] - 1);
     }
 
     /** A visible grazer ate a tuft of grass: a little less plant biomass. */
@@ -510,6 +523,8 @@ public final class Ecology {
                     double a = in.readDouble(), b = in.readDouble(), c = in.readDouble();
                     if (s < N) { p.pop[s] = a; p.dormant[s] = b; p.sick[s] = c; }
                 }
+                for (int s = species; s < N; s++) // species added since the save: settled at half their room
+                    if (suitable(p, S[s])) p.pop[s] = 0.5 * ceiling(p, S[s]);
                 System.arraycopy(p.pop, 0, p.yesterday, 0, N);
                 patches.put(key(p.px, p.pz), p);
             }

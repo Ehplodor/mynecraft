@@ -40,7 +40,7 @@ public final class Gestures {
     }
 
     /** What a use of the right hand did (for sounds and messages); NONE if nothing. */
-    public enum Use { NONE, ATE, DRANK, PICKED, HOED, SOWED, PLANTED, COMPOSTED, DOOR, SLEPT }
+    public enum Use { NONE, ATE, DRANK, PICKED, HOED, SOWED, PLANTED, COMPOSTED, DOOR, SLEPT, HIVE_LOST }
 
     /**
      * The right hand on the block at (x, y, z) (or on nothing: x = Integer.MIN_VALUE) holding the item
@@ -48,6 +48,12 @@ public final class Gestures {
      */
     public static Use use(Actor a, World w, int slot, int x, int y, int z, boolean waterAimed, boolean night, Flows flows,
                           Growth growth, SplittableRandom rnd) {
+        return use(a, w, slot, x, y, z, waterAimed, night, flows, growth, rnd, 0.4);
+    }
+
+    /** As above, {@code season} the phase of the year (0..1, winter from 0.75: a hive's honey is the bees' own). */
+    public static Use use(Actor a, World w, int slot, int x, int y, int z, boolean waterAimed, boolean night, Flows flows,
+                          Growth growth, SplittableRandom rnd, double season) {
         short held = a.inventory.id(slot);
         boolean aimed = x != Integer.MIN_VALUE;
         short target = aimed ? w.get(x, y, z) : Blocks.AIR;
@@ -79,6 +85,29 @@ public final class Gestures {
             a.skills.practice(Skill.HUNTING, 1);
             return Use.PICKED;
         }
+        if (target == Blocks.NEST_EGG) { // an egg from the nest (left there, it would hatch)
+            w.set(x, y, z, Blocks.NEST);
+            a.inventory.add(Items.EGG, 1);
+            a.skills.practice(Skill.HUSBANDRY, 0.5);
+            return Use.PICKED;
+        }
+        if (held == Items.EGG && target == Blocks.NEST) { // to brood: a chick in two days
+            w.set(x, y, z, Blocks.NEST_EGG);
+            a.inventory.takeOne(slot);
+            if (growth != null) growth.planted(x, y, z);
+            a.skills.practice(Skill.HUSBANDRY, 0.5);
+            return Use.PLANTED;
+        }
+        if (target == Blocks.BEEHIVE_HONEY) { // honey; taken in winter, it is the colony's own store and the bees die
+            boolean winter = season >= 0.75;
+            w.set(x, y, z, winter ? Blocks.BEEHIVE : Blocks.BEEHIVE_BEES);
+            a.inventory.add(Items.HONEY, winter ? 3 : 2 + (rnd.nextDouble() < 0.1 * a.skills.level(Skill.HUSBANDRY) ? 1 : 0));
+            if (flows != null) flows.take(Matter.FRUIT, 0.5, x, z);
+            if (growth != null) growth.planted(x, y, z);
+            a.skills.practice(Skill.HUSBANDRY, 1);
+            a.skills.practice(Skill.FORAGING, 0.5);
+            return winter ? Use.HIVE_LOST : Use.PICKED;
+        }
         byte kind = Items.TOOL[held & 0xFFFF];
         if (kind == Items.TOOL_HOE && (target == Blocks.GRASS || target == Blocks.DIRT) && w.get(x, y + 1, z) == Blocks.AIR) {
             w.set(x, y, z, Blocks.FARMLAND);
@@ -108,9 +137,10 @@ public final class Gestures {
             a.skills.practice(Skill.FARMING, 0.5);
             return Use.COMPOSTED;
         }
-        if (Items.isFood(held) && a.needs.food < Needs.MAX - 0.5) {
+        if (Items.isFood(held) && (a.needs.food < Needs.MAX - 0.5 || held == Items.MILK && a.needs.water < Needs.MAX - 0.5)) {
             a.needs.eat(held);
             a.inventory.takeOne(slot);
+            if (held == Items.MILK) a.inventory.add(Items.JUG, 1); // the jug is kept
             return Use.ATE;
         }
         if (waterAimed && (held == Blocks.AIR || !Items.isBlock(held)) && a.needs.water < Needs.MAX - 0.5) {

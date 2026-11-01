@@ -228,7 +228,7 @@ public final class Main {
             });
 
         boolean editDemo = argv.contains("--edit-demo"), fluidDemo = argv.contains("--fluid-demo");
-        boolean blocksDemo = argv.contains("--blocks-demo");
+        boolean blocksDemo = argv.contains("--blocks-demo"), herdDemo = argv.contains("--herd-demo");
         // Animals (M22): simulated around the player, drawn with the world and its shadows.
         Life life = new Life(world, world.seed);
         try { // the ecosystem's patches as they were left (else bootstrapped afresh)
@@ -740,6 +740,7 @@ public final class Main {
                     life.showcase(player.x, player.y, player.z, cam.yaw);
                     showcase = false;
                 }
+                life.lure = inventory.id(input.slot); // kept animals follow the food in the hand
                 life.tick(dt, player.x, player.y, player.z, input.shiftDown());
                 for (int[] e : liv.tick(dt, world, player, weather, life, recipes, DayCycle.daylight(ticks), creative, survival,
                     miningProgress > 0)) {
@@ -773,6 +774,8 @@ public final class Main {
                 hit = null;
             }
             if (aimed != null) {
+                if (input.placeRequested && !screenOpen && !paused && !creative && liv.tend(aimed, input.slot, life))
+                    input.placeRequested = false; // fed, tamed, shorn or milked: the hand did its work
                 if (input.breakRequested && !screenOpen && !paused) {
                     short weapon = inventory.id(input.slot); // a knife or an axe strikes harder
                     byte wk = net.mynecraft.world.Items.TOOL[weapon & 0xFFFF];
@@ -871,6 +874,29 @@ public final class Main {
                     renderer.blockChanged(placed[0], placed[1], placed[2]);
                     fluids.blockChanged(placed[0], placed[1], placed[2]);
                 }
+            }
+            if (herdDemo && streamer.settled()) { // scripted shot: a pen of the herd before the eyes, a nest and a hive
+                herdDemo = false;
+                int cx = (int) Math.floor(player.x), cz = (int) Math.floor(player.z) - 9, gy = world.generator.column(cx, cz).height();
+                for (int dx = -8; dx <= 8; dx++)
+                    for (int dz = -6; dz <= 9; dz++) { // level ground at the feet: grass, the fence around
+                        int x = cx + dx, z = cz + dz;
+                        for (int y = gy - 6; y < gy; y++) if (!world.isSolid(x, y, z)) demoSet(world, renderer, x, y, z, Blocks.DIRT);
+                        demoSet(world, renderer, x, gy, z, Blocks.GRASS);
+                        for (int y = gy + 1; y <= gy + 12; y++) demoSet(world, renderer, x, y, z, Blocks.AIR);
+                        boolean edge = Math.abs(dx) == 5 && Math.abs(dz) <= 3 || Math.abs(dz) == 3 && Math.abs(dx) <= 5;
+                        if (edge) demoSet(world, renderer, x, gy + 1, z, dx == 0 && dz == 3 ? Blocks.OAK_DOOR : Blocks.OAK_FENCE);
+                    }
+                demoSet(world, renderer, cx + 4, gy + 1, cz - 2, Blocks.NEST_EGG);
+                demoSet(world, renderer, cx - 4, gy + 1, cz - 2, Blocks.NEST);
+                demoSet(world, renderer, cx + 6, gy + 1, cz + 3, Blocks.BEEHIVE_HONEY);
+                demoSet(world, renderer, cx - 6, gy + 1, cz + 3, Blocks.BEEHIVE_BEES);
+                double fy = gy + 1.01;
+                life.keepNew(net.mynecraft.world.life.Species.SHEEP, cx - 2.5, fy, cz + 0.5, "joueur", false);
+                life.keepNew(net.mynecraft.world.life.Species.SHEEP, cx - 0.5, fy, cz - 1.5, "joueur", false).shorn = true;
+                life.keepNew(net.mynecraft.world.life.Species.SHEEP, cx - 1.5, fy, cz + 1.5, "joueur", true);
+                life.keepNew(net.mynecraft.world.life.Species.GOAT, cx + 2.5, fy, cz + 0.5, "joueur", false);
+                for (int i = 0; i < 3; i++) life.keepNew(net.mynecraft.world.life.Species.HEN, cx + 1.5 + i, fy, cz - 1.5, "joueur", false);
             }
             if (blocksDemo && streamer.settled()) { // scripted shot: the blocks of M27..M34 in a row, on the ground before the eyes
                 blocksDemo = false;
@@ -1016,7 +1042,8 @@ public final class Main {
                     hud.textCentered(aimedVillager.saying, hud.width() / 2f, hud.height() / 2f + 3.3f * hud.lineHeight(), 0.85f, 0.95f, 1);
             }
             if (aimed != null && !screenOpen) { // the name of the animal under the crosshair
-                hud.textCentered(aimed.species.displayName + (aimed.adult() ? "" : " (jeune)"), hud.width() / 2f,
+                hud.textCentered(aimed.name() + (aimed.adult() ? "" : " (jeune)") + (aimed.tame ? "" : aimed.species.domestic()
+                    && aimed.trust > 0 ? String.format(" (confiance %.0f %%)", 100 * aimed.trust) : ""), hud.width() / 2f,
                     hud.height() / 2f + 2 * hud.lineHeight(), 1, 1, 0.85f);
             }
             if (now - blockShownAt < 2_000_000_000L) {

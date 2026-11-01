@@ -75,8 +75,11 @@ final class Livelihood {
     private int planIndex = -1;
     private final ArrayDeque<int[]> undo = new ArrayDeque<>(); // x, y, z, previous state
 
+    private final Life life;
+
     Livelihood(Path worldDir, Inventory inventory, Life life) {
         this.worldDir = worldDir;
+        this.life = life;
         actor = new Actor("Moi", inventory);
         flows = new Flows(life.ecology);
         plans = Blueprint.loadAll(worldDir.resolve("blueprints"));
@@ -85,6 +88,7 @@ final class Livelihood {
             flows.load(worldDir.resolve("flows.bin"));
             growth.load(worldDir.resolve("growth.txt"));
             hamlet.load(worldDir.resolve("hamlet.json"));
+            life.loadHerd(worldDir.resolve("herd.json"));
         } catch (IOException | RuntimeException e) {
             System.err.println("[life] cannot read the player's life: " + e.getMessage());
         }
@@ -97,6 +101,7 @@ final class Livelihood {
             flows.save(worldDir.resolve("flows.bin"));
             growth.save(worldDir.resolve("growth.txt"));
             hamlet.save(worldDir.resolve("hamlet.json"));
+            life.saveHerd(worldDir.resolve("herd.json"));
         } catch (IOException e) {
             System.err.println("[life] cannot save the player's life: " + e.getMessage());
         }
@@ -174,12 +179,13 @@ final class Livelihood {
             return Gestures.Use.NONE;
         }
         Gestures.Use u = block == null
-            ? Gestures.use(actor, w, slot, Integer.MIN_VALUE, 0, 0, waterAt != null, night, flows, growth, rnd)
-            : Gestures.use(actor, w, slot, block[0], block[1], block[2], waterAt != null, night, flows, growth, rnd);
+            ? Gestures.use(actor, w, slot, Integer.MIN_VALUE, 0, 0, waterAt != null, night, flows, growth, rnd, life.eco.season().phase())
+            : Gestures.use(actor, w, slot, block[0], block[1], block[2], waterAt != null, night, flows, growth, rnd, life.eco.season().phase());
         switch (u) {
             case ATE -> say(String.format("Miam. (faim %.0f/20, variété des repas %.0f %%)", actor.needs.food, 100 * actor.needs.variety()));
             case DRANK -> say("Vous buvez.");
             case SLEPT -> say("Vous dormez jusqu'au matin.");
+            case HIVE_LOST -> say("Du miel pris en hiver : c'était la réserve des abeilles, la colonie meurt.");
             default -> { }
         }
         return u;
@@ -188,11 +194,26 @@ final class Livelihood {
     /** After the player struck an animal: if it died, the hunter's share (meat, hide) and the ledger. */
     void struck(Creature c, Life life) {
         if (c.dying <= 0 || c.health > 0) return;
+        if (c.tame) { // one of the flock: the meat is the keeper's, nothing is taken from the wild
+            switch (c.species) {
+                case SHEEP -> { actor.inventory.add(Items.MUTTON, c.adult() ? 2 : 1); if (!c.shorn) actor.inventory.add(Items.FLEECE, 1); }
+                case GOAT -> { actor.inventory.add(Items.MUTTON, c.adult() ? 2 : 1); actor.inventory.add(Items.HIDE, 1); }
+                case HEN -> actor.inventory.add(Items.CHICKEN, 1);
+                default -> { }
+            }
+            actor.skills.practice(Skill.HUSBANDRY, 1);
+            if ("hameau".equals(c.owner)) {
+                company = Math.max(0, company - 0.3);
+                say("C'était une bête du hameau : ses gens ne l'oublieront pas.");
+            }
+            return;
+        }
         switch (c.species) {
             case DEER, IBEX -> { actor.inventory.add(Items.VENISON, 2); actor.inventory.add(Items.HIDE, 1); }
             case RABBIT -> { actor.inventory.add(Items.RABBIT, 1); if (rnd.nextBoolean()) actor.inventory.add(Items.HIDE, 1); }
             case TROUT -> actor.inventory.add(Items.TROUT, 1);
             case FOX -> actor.inventory.add(Items.HIDE, 1);
+            case SHEEP, GOAT -> { actor.inventory.add(Items.MUTTON, 2); actor.inventory.add(Items.HIDE, 1); }
             default -> { }
         }
         flows.take(c.species == Species.TROUT ? Matter.FISH : Matter.GAME, 1, c.x, c.z);
@@ -201,6 +222,78 @@ final class Livelihood {
             flows.offSeasonKill(c.x, c.z);
             say(c.species.displayName + " tué en pleine saison des petits : la boussole s'en souviendra.");
         }
+    }
+
+
+    // ---------------------------------------------------------------------------- the herd
+
+    /**
+     * The right hand on an animal (returns false if nothing came of it, so the hand does its usual
+     * work): taming a wild mouflon or goat with its food, feeding a kept one (fed by hand, an adult
+     * is ready to breed), shearing a sheep, milking a goat into a jug, or a look at how it fares.
+     */
+    boolean tend(Creature c, int slot, Life life) {
+        if (c.dying > 0) return false;
+        short held = actor.inventory.id(slot);
+        byte kind = Items.TOOL[held & 0xFFFF];
+        Species s = c.species;
+        String name = c.name();
+        if (!c.tame) {
+            if (!s.domestic() || !s.eats(held)) return false;
+            actor.inventory.takeOne(slot);
+            c.hunger = 0;
+            c.trust = Math.min(1, c.trust + 0.25 * actor.efficiency(Skill.HUSBANDRY));
+            actor.skills.practice(Skill.HUSBANDRY, 1);
+            if (c.trust >= 1) {
+                life.tame(c, "joueur");
+                flows.take(Matter.GAME, 1, c.x, c.z); // taken alive from the wild flock
+                actor.skills.practice(Skill.HUSBANDRY, 3);
+                say(s.displayName + " vous fait confiance : " + (s == Species.SHEEP ? "c'est désormais un mouton" : "elle est à vous")
+                    + ". Il suit la nourriture que vous tenez.");
+            } else say(String.format("%s mange dans votre main (confiance %.0f %%). Approchez accroupi.", s.displayName, 100 * c.trust));
+            return true;
+        }
+        if (s.eats(held)) {
+            boolean ready = c.adult() && c.breedCooldown <= 0;
+            if (c.hunger < 0.05 && !ready) { say(name + " n'a pas faim."); return true; }
+            actor.inventory.takeOne(slot);
+            c.hunger = 0;
+            if (ready) c.love = 30;
+            actor.skills.practice(Skill.HUSBANDRY, 0.5);
+            say(ready ? name + " est nourri : un autre adulte nourri tout près, et un petit naîtra." : name + " est nourri.");
+            return true;
+        }
+        if (s == Species.SHEEP && (kind == Items.TOOL_SHEARS || kind == Items.TOOL_KNIFE)) {
+            if (!c.adult() || c.shorn) { say(String.format("Sa toison repousse (%.0f %%).", 100 * c.produce)); return true; }
+            int n = kind == Items.TOOL_SHEARS ? 2 + (rnd.nextDouble() < 0.1 * actor.skills.level(Skill.HUSBANDRY) ? 1 : 0) : 1;
+            actor.inventory.add(Items.FLEECE, n);
+            actor.inventory.wearOut(slot);
+            c.shorn = true;
+            c.produce = 0;
+            actor.skills.practice(Skill.HUSBANDRY, 1.5);
+            say("Vous tondez le mouton : " + n + (n > 1 ? " toisons." : " toison") + (kind == Items.TOOL_KNIFE ? " (des cisailles en donneraient plus)." : "."));
+            return true;
+        }
+        if (s == Species.GOAT && held == Items.JUG) {
+            if (!c.adult() || c.produce < 1) { say(String.format("La chèvre n'a pas encore de lait (%.0f %%).", 100 * c.produce)); return true; }
+            actor.inventory.takeOne(slot);
+            actor.inventory.add(Items.MILK, 1);
+            c.produce = 0;
+            actor.skills.practice(Skill.HUSBANDRY, 1);
+            say("Vous trayez la chèvre : une cruche de lait.");
+            return true;
+        }
+        // A look at how it fares.
+        StringBuilder t = new StringBuilder(name).append(c.adult() ? "" : " (jeune)").append(" : ");
+        t.append(c.hunger < 0.3 ? "repu" : c.hunger < 0.7 ? "a un peu faim" : "a faim");
+        if (c.adult() && s == Species.SHEEP) t.append(c.shorn ? String.format(", toison %.0f %%", 100 * c.produce) : ", toison à tondre");
+        if (c.adult() && s == Species.GOAT) t.append(c.produce >= 1 ? ", lait à traire" : String.format(", lait %.0f %%", 100 * c.produce));
+        if (c.adult() && s == Species.HEN) t.append(String.format(", œuf %.0f %%", 100 * c.produce));
+        if (c.pen != null) t.append(String.format(", enclos de %d cases (herbe pour %d, %d demandées)", c.pen.cells(),
+            c.pen.grass(), life.demand(c.pen)));
+        else t.append(", en liberté");
+        say(t.toString());
+        return false;
     }
 
     // ---------------------------------------------------------------------------- every frame
@@ -271,7 +364,24 @@ final class Livelihood {
             var hydrology = w.generator.landscape().hydrology();
             flows.river = (x, z) -> { float[] r = hydrology.water(x, z); return r == null ? Double.NaN : r[0]; };
         }
+        // The herd: muck back to the soil, the hamlet's eggs into its store, chicks out of their eggs, news.
+        for (double[] d; (d = life.dung.poll()) != null; ) flows.give(Matter.COMPOST, d[2], d[0], d[1]);
+        for (Creature c : life.creatures) // the hamlet feeds its hens from the store when the grass is not enough
+            if (c.tame && "hameau".equals(c.owner) && c.hunger > 0.7 && !c.dead) {
+                short grain = hamlet.store.count(Items.WHEAT_SEEDS) > 0 ? Items.WHEAT_SEEDS : hamlet.store.count(Items.WHEAT) > 0 ? Items.WHEAT : 0;
+                if (grain != 0) { hamlet.store.remove(grain, 1); c.hunger = 0; }
+            }
+        if (life.hamletEggs > 0) { hamlet.store.add(Items.EGG, life.hamletEggs); life.hamletEggs = 0; }
+        for (int[] n : growth.hatched) { life.keepNew(Species.HEN, n[0] + 0.5, n[1] + 0.1, n[2] + 0.5, "joueur", true); say("Un poussin est éclos !"); }
+        growth.hatched.clear();
+        for (String note; (note = life.notes.poll()) != null; ) say(note);
         if (!hamlet.founded) foundHamlet(w);
+        if (hamlet.founded && !hamlet.hens && hamlet.huts.size() > 1) { // the family came with three hens
+            int[] hut = hamlet.huts.get(1);
+            for (int i = 0; i < 3; i++)
+                life.keepNew(Species.HEN, hut[0] + 1.5 + i, hut[1] + 1.2, hut[2] - 1.5, "hameau", false);
+            hamlet.hens = true;
+        }
         if (hamlet.founded) {
             hamlet.tick(dt, w, flows, life.ecology, recipes, daylight, raining, day);
             for (int[] e; (e = hamlet.edits.poll()) != null; ) {
@@ -354,7 +464,8 @@ final class Livelihood {
 
     /** The block the player just placed may be the plan's next step. */
     void placed(World w, int x, int y, int z) {
-        if (w.get(x, y, z) == Blocks.FISH_TRAP || w.get(x, y, z) == Blocks.SNARE) growth.planted(x, y, z);
+        short b = w.get(x, y, z);
+        if (b == Blocks.FISH_TRAP || b == Blocks.SNARE || b == Blocks.BEEHIVE) growth.planted(x, y, z);
         if (activePlan == null) return;
         int ax = x - planAnchor[0], ay = y - planAnchor[1], az = z - planAnchor[2];
         if (ax >= 0 && ay >= 0 && az >= 0 && ax < activePlan.w && ay < activePlan.h && az < activePlan.d

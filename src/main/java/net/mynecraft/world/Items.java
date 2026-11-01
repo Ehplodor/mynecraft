@@ -16,12 +16,13 @@ public final class Items {
         CATEGORY_ART = 4;
     public static final byte TOOL_NONE = 0, TOOL_PICKAXE = Blocks.TOOL_PICKAXE, TOOL_AXE = Blocks.TOOL_AXE,
         TOOL_SHOVEL = Blocks.TOOL_SHOVEL, TOOL_HOE = 4, TOOL_KNIFE = 5, TOOL_ROD = 6, TOOL_BOW = 7, TOOL_HAMMER = 8,
-        TOOL_CHISEL = 9, TOOL_FLUTE = 10, TOOL_DRUM = 11;
+        TOOL_CHISEL = 9, TOOL_FLUTE = 10, TOOL_DRUM = 11, TOOL_SHEARS = 12;
     public static final String[] TOOL_NAMES = {"", "pickaxe", "axe", "shovel", "hoe", "knife", "rod", "bow", "hammer",
-        "chisel", "flute", "drum"};
+        "chisel", "flute", "drum", "shears"};
     public static final byte GROUP_NONE = 0, GROUP_FRUIT = 1, GROUP_VEGETABLE = 2, GROUP_GRAIN = 3, GROUP_MEAT = 4,
-        GROUP_FISH = 5;
-    public static final String[] GROUP_NAMES = {"", "fruits", "légumes et herbes", "céréales", "viande", "poisson"};
+        GROUP_FISH = 5, GROUP_DAIRY = 6;
+    public static final String[] GROUP_NAMES = {"", "fruits", "légumes et herbes", "céréales", "viande", "poisson",
+        "lait, œufs et miel"};
 
     private static final Registry REGISTRY = new Registry("item");
     public static final short STICK, FLINT, COAL, APPLE,
@@ -31,7 +32,8 @@ public final class Items {
         SWEET_BERRIES, WILD_HERBS, WHEAT, WHEAT_SEEDS, BREAD, FLOUR, VENISON, COOKED_VENISON, RABBIT, COOKED_RABBIT,
         TROUT, COOKED_TROUT, SMOKED_MEAT, ROASTED_MUSHROOM, HERB_TROUT, BERRY_TART,
         CHARCOAL, IRON_INGOT, HIDE, LEATHER, PLANT_FIBER, STRING, CLOTH, CLAY_BALL, ASH, COMPOST, SLAG,
-        RED_DYE, BLUE_DYE, WHITE_DYE, YELLOW_DYE, CANVAS, DRUM;
+        RED_DYE, BLUE_DYE, WHITE_DYE, YELLOW_DYE, CANVAS, DRUM,
+        SHEARS, FLEECE, JUG, MILK, CHEESE, EGG, COOKED_EGG, MUTTON, COOKED_MUTTON, CHICKEN, COOKED_CHICKEN, HONEY;
     public static final int COUNT;
     /** Largest stack per item (1 for tools, 64 for most). */
     public static final byte[] MAX_STACK;
@@ -103,6 +105,18 @@ public final class Items {
         YELLOW_DYE = pure("yellow_dye");
         CANVAS = pure("canvas");
         DRUM = pure("drum");
+        SHEARS = pure("shears");
+        FLEECE = pure("fleece");
+        JUG = pure("jug");
+        MILK = pure("milk");
+        CHEESE = pure("cheese");
+        EGG = pure("egg");
+        COOKED_EGG = pure("cooked_egg");
+        MUTTON = pure("mutton");
+        COOKED_MUTTON = pure("cooked_mutton");
+        CHICKEN = pure("chicken");
+        COOKED_CHICKEN = pure("cooked_chicken");
+        HONEY = pure("honey");
         REGISTRY.freeze();
         COUNT = REGISTRY.size();
         MAX_STACK = new byte[COUNT];
@@ -147,6 +161,18 @@ public final class Items {
         food(ROASTED_MUSHROOM, GROUP_VEGETABLE, 3, 0);
         food(HERB_TROUT, GROUP_FISH, 7, 0);
         food(BERRY_TART, GROUP_GRAIN, 7, 1);
+        tool(SHEARS, TOOL_SHEARS, 3, 200, IRON_INGOT);
+        food(MILK, GROUP_DAIRY, 3, 5); // drunk from the jug, which is kept
+        food(CHEESE, GROUP_DAIRY, 6, 0);
+        food(EGG, GROUP_DAIRY, 2, 0);
+        food(COOKED_EGG, GROUP_DAIRY, 4, 0);
+        food(MUTTON, GROUP_MEAT, 3, 0);
+        food(COOKED_MUTTON, GROUP_MEAT, 7, 0);
+        food(CHICKEN, GROUP_MEAT, 2, 0);
+        food(COOKED_CHICKEN, GROUP_MEAT, 6, 0);
+        food(HONEY, GROUP_DAIRY, 3, 1);
+        MAX_STACK[MILK] = 1;
+        MAX_STACK[EGG] = 16;
         CATEGORY[Blocks.BROWN_MUSHROOM] = CATEGORY_FOOD;
         FUEL[COAL] = FUEL[CHARCOAL] = 8;
         for (short log : new short[] {Blocks.OAK_LOG, Blocks.BIRCH_LOG, Blocks.SPRUCE_LOG}) FUEL[log] = 4;

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "PPP",
+    "T T",
+    "PPP"
+  ],
+  "key": {
+    "P": "#minecraft:planks",
+    "T": "minecraft:thatch"
+  },
+  "result": {
+    "id": "minecraft:beehive",
+    "count": 1
+  },
+  "mynecraft:skill": "husbandry",
+  "mynecraft:level": 1
+}

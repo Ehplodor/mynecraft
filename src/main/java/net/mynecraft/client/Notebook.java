@@ -74,6 +74,26 @@ final class Notebook {
             hud.text(String.format("Animaux tués en saison des petits : %.0f", acc.offSeasonKills), left, y, 0.95f, 0.5f, 0.45f);
             y += line;
         }
+        // The herd: how many, how fed, and whether the pens hold them.
+        int[] mine = new int[Species.values().length];
+        int hungry = 0, crowded = 0, total = 0;
+        for (var c : life.kept()) {
+            if (!"joueur".equals(c.owner)) continue;
+            mine[c.species.ordinal()]++;
+            total++;
+            if (c.hunger > 0.7) hungry++;
+            if (life.overstocked(c)) crowded++;
+        }
+        if (total > 0) {
+            y += line * 0.3f;
+            StringBuilder t = new StringBuilder("Élevage :");
+            for (Species sp : Species.values()) if (mine[sp.ordinal()] > 0) t.append(' ').append(mine[sp.ordinal()]).append(' ').append(sp.tameName().toLowerCase()).append(',');
+            t.setLength(t.length() - 1);
+            if (hungry > 0) t.append(" | ").append(hungry).append(" affamé(s)");
+            if (crowded > 0) t.append(" | ").append(crowded).append(" dans un enclos surpâturé");
+            hud.text(t.toString(), left, y, hungry + crowded > 0 ? 0.95f : 0.8f, hungry + crowded > 0 ? 0.6f : 0.9f, 0.5f);
+            y += line;
+        }
         hud.text("N : page suivante", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
     }
 

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "full=false": {
+      "model": "minecraft:block/nest"
+    },
+    "full=true": {
+      "model": "minecraft:block/nest_egg"
+    }
+  }
+}
