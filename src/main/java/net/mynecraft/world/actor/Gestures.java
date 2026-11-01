@@ -40,7 +40,7 @@ public final class Gestures {
     }
 
     /** What a use of the right hand did (for sounds and messages); NONE if nothing. */
-    public enum Use { NONE, ATE, DRANK, PICKED, HOED, SOWED, PLANTED, COMPOSTED, DOOR, SLEPT, HIVE_LOST }
+    public enum Use { NONE, ATE, DRANK, PICKED, HOED, SOWED, PLANTED, COMPOSTED, DOOR, SLEPT, HIVE_LOST, SAT, RESTED, LIGHT }
 
     /**
      * The right hand on the block at (x, y, z) (or on nothing: x = Integer.MIN_VALUE) holding the item
@@ -57,9 +57,25 @@ public final class Gestures {
         short held = a.inventory.id(slot);
         boolean aimed = x != Integer.MIN_VALUE;
         short target = aimed ? w.get(x, y, z) : Blocks.AIR;
-        if (target == Blocks.OAK_DOOR || target == Blocks.OAK_DOOR_OPEN) {
-            w.set(x, y, z, target == Blocks.OAK_DOOR ? Blocks.OAK_DOOR_OPEN : Blocks.OAK_DOOR);
+        if (Blocks.isDoor(target)) { // both halves
+            net.mynecraft.world.Doors.toggle(w, x, y, z);
             return Use.DOOR;
+        }
+        if (target == Blocks.LANTERN || target == Blocks.LANTERN_OFF) {
+            w.set(x, y, z, target == Blocks.LANTERN ? Blocks.LANTERN_OFF : Blocks.LANTERN);
+            return Use.LIGHT;
+        }
+        if (Blocks.isChair(target)) { // a seat: the legs rest (the caller sits the body down)
+            a.needs.rest = Math.min(1, a.needs.rest + 0.02);
+            return Use.SAT;
+        }
+        if (target == Blocks.BARREL && a.needs.water < Needs.MAX - 0.5) { // the house's water, drawn from the well
+            a.needs.drink(6);
+            return Use.DRANK;
+        }
+        if (target == Blocks.STRAW_BED && !night) { // a nap: some rest, and the day goes on
+            a.needs.rest = Math.min(1, a.needs.rest + 0.15);
+            return Use.RESTED;
         }
         if (target == Blocks.BERRY_BUSH) {
             w.set(x, y, z, Blocks.BERRY_BUSH_PICKED);

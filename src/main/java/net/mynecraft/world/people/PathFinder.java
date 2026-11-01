@@ -18,14 +18,14 @@ public final class PathFinder {
     private PathFinder() {}
 
     static boolean free(short b) {
-        return !Blocks.isSolid(b) || b == Blocks.OAK_DOOR;
+        return !Blocks.isSolid(b) || Blocks.isDoor(b);
     }
 
     /** Can a person stand with their feet in (x, y, z)? */
     public static boolean standable(World w, int x, int y, int z) {
         short feet = w.get(x, y, z), head = w.get(x, y + 1, z), ground = w.get(x, y - 1, z);
         if (!free(feet) || !free(head) || Blocks.FLUID[feet & 0xFFFF] == Blocks.FLUID_LAVA) return false;
-        return (Blocks.isSolid(ground) && ground != Blocks.OAK_DOOR) || Blocks.FLUID[ground & 0xFFFF] == Blocks.FLUID_WATER
+        return (Blocks.isSolid(ground) && !Blocks.isDoor(ground) && !Blocks.isFurniture(ground)) || Blocks.FLUID[ground & 0xFFFF] == Blocks.FLUID_WATER
             && Blocks.isSolid(w.get(x, y - 2, z));
     }
 

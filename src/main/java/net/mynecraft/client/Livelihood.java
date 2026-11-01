@@ -185,6 +185,8 @@ final class Livelihood {
             case ATE -> say(String.format("Miam. (faim %.0f/20, variété des repas %.0f %%)", actor.needs.food, 100 * actor.needs.variety()));
             case DRANK -> say("Vous buvez.");
             case SLEPT -> say("Vous dormez jusqu'au matin.");
+            case RESTED -> say("Ce n'est pas l'heure de dormir : vous vous allongez un moment.");
+            case SAT -> say("Vous vous asseyez. (avancer pour vous lever)");
             case HIVE_LOST -> say("Du miel pris en hiver : c'était la réserve des abeilles, la colonie meurt.");
             default -> { }
         }
@@ -375,11 +377,14 @@ final class Livelihood {
         for (int[] n : growth.hatched) { life.keepNew(Species.HEN, n[0] + 0.5, n[1] + 0.1, n[2] + 0.5, "joueur", true); say("Un poussin est éclos !"); }
         growth.hatched.clear();
         for (String note; (note = life.notes.poll()) != null; ) say(note);
-        if (!hamlet.founded) foundHamlet(w);
-        if (hamlet.founded && !hamlet.hens && hamlet.huts.size() > 1) { // the family came with three hens
-            int[] hut = hamlet.huts.get(1);
+        if (!hamlet.founded) {
+            foundHamlet(w);
+            if (hamlet.founded && raiseHamlet) hamlet.raiseAll(w); // scripted shots: the hamlet as it will be
+        }
+        if (hamlet.founded && !hamlet.hens && hamlet.huts.size() > 1) { // the family came with three hens, to their run
+            int[] run = hamlet.henRun();
             for (int i = 0; i < 3; i++)
-                life.keepNew(Species.HEN, hut[0] + 1.5 + i, hut[1] + 1.2, hut[2] - 1.5, "hameau", false);
+                life.keepNew(Species.HEN, run[0] - 0.5 + i, run[1] + 0.2, run[2] + 0.5, "hameau", false);
             hamlet.hens = true;
         }
         if (hamlet.founded) {
@@ -387,19 +392,22 @@ final class Livelihood {
             for (int[] e; (e = hamlet.edits.poll()) != null; ) {
                 changed.add(e);
                 short b = w.get(e[0], e[1], e[2]); // what the inhabitants picked or sowed grows back like the player's
-                if (b == Blocks.BERRY_BUSH_PICKED || b == Blocks.WHEAT_0 || b == Blocks.OAK_SAPLING) growth.planted(e[0], e[1], e[2]);
+                if (b == Blocks.BERRY_BUSH_PICKED || b == Blocks.WHEAT_0 || b == Blocks.OAK_SAPLING || b == Blocks.BEEHIVE_BEES || b == Blocks.NEST_EGG)
+                    growth.planted(e[0], e[1], e[2]);
             }
         }
         return changed;
     }
 
     int[] spawn;
+    /** Scripted shots: every building of the hamlet raised at once when it is founded. */
+    boolean raiseHamlet;
 
     private void foundHamlet(World w) {
         if (spawn == null) return;
         int cx = spawn[0], cz = spawn[2];
-        for (int dx = 0; dx <= 32; dx += 16)
-            for (int dz = 0; dz <= 16; dz += 16)
+        for (int dx = -16; dx <= 48; dx += 16) // the hamlet's land, round its green (18, 10 from here), is loaded
+            for (int dz = -16; dz <= 32; dz += 16)
                 if (w.chunk((cx + dx) >> 4, (cz + dz) >> 4) == null) return;
         hamlet.found(w, cx, cz, (x, z) -> {
             for (int y = 140; y > 0; y--) {
@@ -409,8 +417,9 @@ final class Livelihood {
             return 64;
         });
         say("Un hameau vit non loin d'ici.");
-        System.out.printf("[hamlet] founded near %d, %d: huts at %s and %s%n", cx, cz, java.util.Arrays.toString(hamlet.huts.get(0)),
-            java.util.Arrays.toString(hamlet.huts.get(1)));
+        StringBuilder sites = new StringBuilder();
+        for (int i = 0; i < hamlet.huts.size(); i++) sites.append(' ').append(hamlet.plans.get(i)).append(java.util.Arrays.toString(hamlet.huts.get(i)));
+        System.out.printf("[hamlet] founded near %d, %d:%s%n", cx, cz, sites);
     }
 
     // ---------------------------------------------------------------------------- stations

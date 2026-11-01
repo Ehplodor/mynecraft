@@ -30,6 +30,8 @@ public final class Villager extends Actor {
     public double sayingUntil;
     /** Hamlet time of the last talk with the player (once a day a lesson). */
     public double lastLesson = -10;
+    /** A door it opened on its way, closed again behind it. */
+    public int[] doorOpened;
 
     public Villager(String name, Job job) {
         super(name, new Inventory());

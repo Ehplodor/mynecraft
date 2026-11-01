@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "P  ",
+    "PPP",
+    "S S"
+  ],
+  "key": {
+    "P": "#minecraft:planks",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "minecraft:oak_chair",
+    "count": 2
+  },
+  "mynecraft:skill": "building"
+}

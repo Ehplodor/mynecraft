@@ -145,5 +145,10 @@
   "item.minecraft.cooked_mutton": "Mouton rôti",
   "item.minecraft.chicken": "Poulet cru",
   "item.minecraft.cooked_chicken": "Poulet rôti",
-  "item.minecraft.honey": "Miel"
+  "item.minecraft.honey": "Miel",
+  "block.minecraft.oak_table": "Table en chêne",
+  "block.minecraft.oak_chair": "Chaise en chêne",
+  "block.minecraft.lantern": "Lanterne",
+  "block.minecraft.barrel": "Tonneau d'eau",
+  "block.minecraft.rug": "Tapis"
 }

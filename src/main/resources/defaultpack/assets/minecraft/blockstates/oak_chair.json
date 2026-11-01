@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "minecraft:block/oak_chair"
+    },
+    "facing=south": {
+      "model": "minecraft:block/oak_chair"
+    },
+    "facing=west": {
+      "model": "minecraft:block/oak_chair"
+    },
+    "facing=east": {
+      "model": "minecraft:block/oak_chair"
+    }
+  }
+}

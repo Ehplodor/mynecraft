@@ -1,0 +1,11 @@
+# The hamlet as it will stand (--hamlet-built): the green and its well, the cottage, the family's house, the hen-house, the apiary, the bake-house; inside, the furniture.
+vue --seed 7 --time 6000 --pos 34,96,26 --view 25,-42 --life-seconds 4 --hamlet-built
+chaumiere --seed 7 --time 6000 --pos 15.5,71.5,-1.5 --view 0,-8 --life-seconds 4 --hamlet-built
+chaumiere-dedans --seed 7 --time 6000 --pos 15.5,70,-9.6 --view 40,-28 --life-seconds 4 --hamlet-built
+maison --seed 7 --time 6000 --pos 27.5,77,3.5 --view -25,-15 --life-seconds 4 --hamlet-built
+maison-dedans --seed 7 --time 6000 --pos 34.5,74,-5.6 --view 50,-26 --life-seconds 4 --hamlet-built
+chambre --seed 7 --time 6000 --pos 36.5,74,-5.4 --view -15,-32 --life-seconds 4 --hamlet-built
+puits --seed 7 --time 6000 --pos 27.5,71.5,-1.5 --view 90,-15 --life-seconds 4 --hamlet-built
+poulailler --seed 7 --time 6000 --pos -0.5,73,28.5 --view 0,-25 --life-seconds 4 --hamlet-built
+rucher --seed 7 --time 6000 --pos 0.5,68,-7.5 --view 0,-15 --life-seconds 4 --hamlet-built
+fournil --seed 7 --time 6000 --pos 46.5,76,9.5 --view 0,-12 --life-seconds 4 --hamlet-built

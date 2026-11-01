@@ -150,33 +150,10 @@ def main():
     state("fish_trap", {"full=false": {"model": "minecraft:block/fish_trap"},
                         "full=true": {"model": "minecraft:block/fish_trap_full"}})
     # ---- building
-    def door(open_):
-        def px(x, y, r):
-            frame = x in (0, 1, 14, 15) or y in (0, 1)
-            if frame:
-                return wood(x, y, r, (120, 90, 52))
-            if open_:
-                return (0, 0, 0, 0)
-            if 4 <= x <= 11 and 3 <= y <= 6:
-                return (200, 225, 235, 140)
-            if x == 12 and y == 9:
-                return (60, 60, 60, 255)
-            return wood(x, y, r)
-        return px
-    save("oak_door", rgba(door(False), 116))
-    save("oak_door_open", rgba(door(True), 116))
-    for n in ("oak_door", "oak_door_open"):
-        write_json(f"models/block/{n}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{n}"}})
-    state("oak_door", {"open=false": {"model": "minecraft:block/oak_door"},
-                       "open=true": {"model": "minecraft:block/oak_door_open"}})
+    # the door (two halves) and the straw bed: see gen_home_pack.py
     save("oak_fence", rgba(lambda x, y, r: wood(x, y, r) if x in (6, 7, 8, 9) or y in (3, 4, 10, 11) else (0, 0, 0, 0), 117))
     save("thatch", rgba(lambda x, y, r: (clamp(200 + r.randint(-30, 20)), clamp(165 + r.randint(-30, 20)), 70, 255)
                         if (x + r.randint(0, 2)) % 3 else (150, 120, 50, 255), 118))
-    save("straw_bed_top", rgba(lambda x, y, r: (clamp(170 + r.randint(-15, 15)), 40, 40, 255) if y >= 5
-                               else (230, 225, 210, 255), 119))
-    save("straw_bed_side", rgba(lambda x, y, r: wood(x, y, r) if y >= 10 else
-                                (clamp(170 + r.randint(-15, 15)), 40, 40, 255), 120))
-    cube("straw_bed", "straw_bed_top", "oak_planks", "straw_bed_side")
     # ---- workshops
     save("composter", rgba(lambda x, y, r: wood(x, y, r, (130, 95, 55)) if x % 5 else (80, 60, 35, 255), 121))
     save("composter_top", rgba(lambda x, y, r: wood(x, y, r, (130, 95, 55)) if x in (0, 15) or y in (0, 15)

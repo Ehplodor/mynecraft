@@ -28,7 +28,7 @@ public record Wellbeing(double roof, double walls, double fire, boolean bed, dou
         for (int[] d : dirs)
             for (int s = 1; s <= 8; s++) {
                 short b = w.get(x + d[0] * s, y - 1, z + d[1] * s);
-                if (Blocks.isSolid(b) || b == Blocks.GLASS || b == Blocks.OAK_DOOR_OPEN) { walled++; break; }
+                if (Blocks.isSolid(b) || b == Blocks.GLASS || Blocks.isDoor(b)) { walled++; break; }
             }
         double fire = 0, beauty = 0;
         boolean bed = false;
