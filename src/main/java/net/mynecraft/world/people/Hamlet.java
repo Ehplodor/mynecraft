@@ -44,6 +44,8 @@ public final class Hamlet {
     /** Hut anchors (lowest north-west corner): [0] the hermit's, [1] the family's (being built). */
     public final List<int[]> huts = new ArrayList<>();
     public boolean founded;
+    /** Whether the family's hens have been brought (they live in the herd, see Life). */
+    public boolean hens;
     public double clock;
     private final SplittableRandom rnd = new SplittableRandom(7);
     private final Blueprint hut = Blueprint.hut();
@@ -516,13 +518,13 @@ public final class Hamlet {
             case BUILDER -> new short[] {Blocks.OAK_LOG, Blocks.OAK_PLANKS, Blocks.COBBLESTONE, Blocks.THATCH, Blocks.GLASS};
             case FISHER -> new short[] {Items.STRING, Items.STICK, Items.BREAD};
             case HUNTER -> new short[] {Items.ARROW, Items.FLINT, Items.BREAD};
-            default -> new short[] {Items.BREAD, Items.COOKED_TROUT, Items.COOKED_VENISON, Blocks.CLAY};
+            default -> new short[] {Items.BREAD, Items.COOKED_TROUT, Items.COOKED_VENISON, Blocks.CLAY, Items.WHEAT};
         };
         short[] gives = switch (v.job) {
             case BUILDER -> new short[] {Blocks.STRAW_BED, Blocks.THATCH, Blocks.OAK_PLANKS};
             case FISHER -> new short[] {Items.COOKED_TROUT, Items.TROUT};
             case HUNTER -> new short[] {Items.HIDE, Items.VENISON, Items.SMOKED_MEAT};
-            default -> new short[] {Items.SWEET_BERRIES, Items.WILD_HERBS, Items.PLANT_FIBER};
+            default -> new short[] {Items.EGG, Items.SWEET_BERRIES, Items.WILD_HERBS, Items.PLANT_FIBER}; // eggs of the family's hens
         };
         boolean wanted = false;
         for (short w : wants) wanted |= w == held;
@@ -552,6 +554,7 @@ public final class Hamlet {
         o.addProperty("founded", founded);
         o.addProperty("clock", clock);
         o.addProperty("decorated", decorated);
+        o.addProperty("hens", hens);
         JsonArray hs = new JsonArray();
         for (int[] h : huts) { JsonArray a = new JsonArray(); for (int v : h) a.add(v); hs.add(a); }
         o.add("huts", hs);
@@ -580,6 +583,7 @@ public final class Hamlet {
         founded = o.get("founded").getAsBoolean();
         clock = o.get("clock").getAsDouble();
         decorated = o.has("decorated") && o.get("decorated").getAsBoolean();
+        hens = o.has("hens") && o.get("hens").getAsBoolean();
         for (var h : o.getAsJsonArray("huts")) {
             JsonArray a = h.getAsJsonArray();
             huts.add(new int[] {a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt()});

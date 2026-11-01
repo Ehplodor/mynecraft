@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "block/beehive_bees",
+    "up": "block/beehive_top",
+    "down": "block/oak_planks",
+    "north": "block/beehive_bees",
+    "south": "block/beehive_bees",
+    "east": "block/beehive_bees",
+    "west": "block/beehive_bees"
+  }
+}

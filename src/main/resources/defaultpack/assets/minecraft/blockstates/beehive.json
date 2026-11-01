@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "state=empty": {
+      "model": "minecraft:block/beehive_empty"
+    },
+    "state=bees": {
+      "model": "minecraft:block/beehive_bees"
+    },
+    "state=honey": {
+      "model": "minecraft:block/beehive_honey"
+    }
+  }
+}

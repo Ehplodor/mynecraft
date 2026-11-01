@@ -1,0 +1,24 @@
+{
+  "type": "mynecraft:process",
+  "station": "anvil",
+  "ingredients": [
+    {
+      "item": "minecraft:iron_ingot",
+      "count": 2
+    }
+  ],
+  "skill": "smithing",
+  "level": 0,
+  "seconds": 8,
+  "results": [
+    {
+      "id": "minecraft:shears",
+      "count": 1
+    }
+  ],
+  "tool": "hammer",
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  }
+}

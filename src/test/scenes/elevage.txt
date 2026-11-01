@@ -1,0 +1,2 @@
+# Husbandry: a pen of the herd (sheep, one shorn, a lamb, a goat, hens), a nest with an egg, two hives.
+herd --seed 7 --time 6000 --pos -40,~7,30 --view 0,-35 --creative --herd-demo --life-seconds 4

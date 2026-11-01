@@ -146,6 +146,7 @@ final class CreatureRenderer {
             .translate(0, mid * scale, 0).rotateZ(roll).rotateX(c.pitch).scale(scale).translate(0, -mid, 0);
         float hurt = c.hurt > 0 ? Math.min(1, c.hurt * 3) : 0;
         for (Species.Part p : s.parts) {
+            if (p.wool() && c.shorn) continue; // shorn: the fleece grows back with the days
             part.set(body).translate(p.px(), p.py(), p.pz());
             switch (p.anim()) {
                 case LEG -> {

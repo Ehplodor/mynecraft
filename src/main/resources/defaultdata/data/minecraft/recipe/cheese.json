@@ -1,0 +1,27 @@
+{
+  "type": "mynecraft:process",
+  "station": "campfire",
+  "ingredients": [
+    {
+      "item": "minecraft:milk",
+      "count": 3
+    }
+  ],
+  "skill": "cooking",
+  "level": 1,
+  "seconds": 15,
+  "results": [
+    {
+      "id": "minecraft:cheese",
+      "count": 1
+    },
+    {
+      "id": "minecraft:jug",
+      "count": 3
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  }
+}

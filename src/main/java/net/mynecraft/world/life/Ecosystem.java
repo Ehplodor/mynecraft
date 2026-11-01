@@ -128,6 +128,9 @@ public final class Ecosystem {
             case LANTERN -> 7;
             case FROSTLING -> 4;
             case MOSSBACK, SKY_MANTA -> 1;
+            case SHEEP -> 5;
+            case GOAT -> 4;
+            case HEN -> 0;
         };
         float food = switch (s.diet) {
             case GRASS -> forage(biome);

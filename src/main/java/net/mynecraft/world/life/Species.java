@@ -49,7 +49,20 @@ public enum Species {
     /** Voilier des cimes: a huge manta of the sky circling slowly above the peaks. */
     SKY_MANTA("Voilier des cimes", Kind.FLY, Diet.NONE, Rhythm.DAY, Temper.CALM,
         1.2, 0.5, 6, 9, 0, 1, 1, 20, 0,
-        Habitat.of(0.0f, 0.8f, Landscape.STONY_PEAKS, Landscape.SNOWY_PEAKS, Landscape.PLATEAU, Landscape.GLACIER));
+        Habitat.of(0.0f, 0.8f, Landscape.STONY_PEAKS, Landscape.SNOWY_PEAKS, Landscape.PLATEAU, Landscape.GLACIER)),
+    // ---------------------------------------------------------------- the herd (appended: saves count species in order)
+    /** Mouflon: the wild sheep of dry hills and plateaus; patiently fed, it can be tamed into a sheep. */
+    SHEEP("Mouflon", Kind.GROUND, Diet.GRASS, Rhythm.DAY, Temper.SHY,
+        0.35, 1.0, 1.3, 5, 14, 2, 5, 10, 300,
+        Habitat.of(0.2f, 0.7f, Landscape.PLATEAU, Landscape.DRY_PLAINS, Landscape.PLAINS)),
+    /** Wild goat of the rocky slopes, bolder than the mouflon; tamed, it gives milk. */
+    GOAT("Chèvre sauvage", Kind.GROUND, Diet.GRASS, Rhythm.DAY, Temper.WARY,
+        0.3, 1.0, 1.4, 5.5, 10, 2, 4, 9, 280,
+        Habitat.of(0.1f, 0.65f, Landscape.PLATEAU, Landscape.STONY_PEAKS, Landscape.DRY_PLAINS)),
+    /** The hen: no wild flock here, only the ones people keep (the hamlet's, and their chicks). */
+    HEN("Poule", Kind.GROUND, Diet.GRASS, Rhythm.DAY, Temper.CALM,
+        0.17, 0.5, 1.1, 3.5, 0, 1, 1, 4, 200,
+        Habitat.of(0.0f, 1.0f));
 
     public enum Kind { GROUND, SWIM, WADER, FLY, FLOAT }
     public enum Diet { GRASS, MEAT, FISH, NONE }
@@ -106,10 +119,34 @@ public enum Species {
         this.parts = List.copyOf(model(this));
     }
 
+    /** Species that people keep (they can be tamed, fed, bred and penned). */
+    public boolean domestic() {
+        return this == SHEEP || this == GOAT || this == HEN;
+    }
+
+    /** The name of a tamed one (the mouflon becomes a sheep). */
+    public String tameName() {
+        return switch (this) {
+            case SHEEP -> "Mouton";
+            case GOAT -> "Chèvre";
+            default -> displayName;
+        };
+    }
+
+    /** What it takes from the hand (to tame it, to feed it, to bring it into breeding). */
+    public boolean eats(short item) {
+        return switch (this) {
+            case SHEEP, GOAT -> item == net.mynecraft.world.Items.WHEAT || item == net.mynecraft.world.Items.WILD_HERBS
+                || item == net.mynecraft.world.Items.PLANT_FIBER;
+            case HEN -> item == net.mynecraft.world.Items.WHEAT_SEEDS || item == net.mynecraft.world.Items.WHEAT;
+            default -> false;
+        };
+    }
+
     /** Who this species hunts. */
     public boolean hunts(Species prey) {
         return switch (this) {
-            case FOX -> prey == RABBIT;
+            case FOX -> prey == RABBIT || prey == HEN;
             case HERON -> prey == TROUT;
             default -> false;
         };
@@ -131,6 +168,9 @@ public enum Species {
             case FROSTLING -> 0xBFE6FF;
             case LANTERN -> 0x7FF0E0;
             case SKY_MANTA -> 0x3D4F7A;
+            case SHEEP -> 0x7A5236; // the mouflon's brown; the flock's lambs grow paler (see Life)
+            case GOAT -> 0x8C6A4A;
+            case HEN -> 0xB0602A;
         };
         if ((this == RABBIT || this == FOX) && snowCover > 0.5f) base = 0xEDEFF2;
         float k = (float) (1 + (variation - 0.5) * 0.18);
@@ -150,24 +190,30 @@ public enum Species {
      * self-lit; {@code coat} parts take the individual's coat colour (times {@code color} as a shade).
      */
     public record Part(Anim anim, float phase, float px, float py, float pz, float ox, float oy, float oz,
-                       float w, float h, float d, int color, float glow, boolean coat) {}
+                       float w, float h, float d, int color, float glow, boolean coat, boolean wool) {}
 
     private static final class B {
         final List<Part> out = new ArrayList<>();
 
         B box(Anim a, float phase, float px, float py, float pz, float ox, float oy, float oz, float w, float h, float d, int color) {
-            out.add(new Part(a, phase, px, py, pz, ox, oy, oz, w, h, d, color, 0, false));
+            out.add(new Part(a, phase, px, py, pz, ox, oy, oz, w, h, d, color, 0, false, false));
             return this;
         }
 
         /** A coat-coloured box, {@code shade} 0xRRGGBB multiplying the coat (0xFFFFFF: as is). */
         B coat(Anim a, float phase, float px, float py, float pz, float ox, float oy, float oz, float w, float h, float d, int shade) {
-            out.add(new Part(a, phase, px, py, pz, ox, oy, oz, w, h, d, shade, 0, true));
+            out.add(new Part(a, phase, px, py, pz, ox, oy, oz, w, h, d, shade, 0, true, false));
+            return this;
+        }
+
+        /** Fleece: coat-coloured, gone once the sheep is shorn (until it grows back). */
+        B wool(float px, float py, float pz, float ox, float oy, float oz, float w, float h, float d, int shade) {
+            out.add(new Part(Anim.BODY, 0, px, py, pz, ox, oy, oz, w, h, d, shade, 0, true, true));
             return this;
         }
 
         B glow(Anim a, float phase, float px, float py, float pz, float ox, float oy, float oz, float w, float h, float d, int color, float glow) {
-            out.add(new Part(a, phase, px, py, pz, ox, oy, oz, w, h, d, color, glow, false));
+            out.add(new Part(a, phase, px, py, pz, ox, oy, oz, w, h, d, color, glow, false, false));
             return this;
         }
 
@@ -314,6 +360,44 @@ public enum Species {
                 b.box(Anim.HEAD, 0, 0, 0.2f, 0.9f, -0.4f, 0, 0.18f, 0.12f, 0.14f, 0.22f, 0x2A3550); // cephalic lobes
                 b.box(Anim.HEAD, 0, 0, 0.2f, 0.9f, 0.28f, 0, 0.18f, 0.12f, 0.14f, 0.22f, 0x2A3550);
                 b.coat(Anim.TAIL, 0, 0, 0.3f, -0.9f, -0.04f, -0.04f, -2.2f, 0.08f, 0.08f, 2.2f, 0xC0C0C0);
+            }
+            case SHEEP -> {
+                b.legs(0.14f, 0.26f, -0.26f, 0.48f, 0.1f, 0x3A3028, false);
+                b.coat(Anim.BODY, 0, 0, 0.48f, 0, -0.2f, 0, -0.36f, 0.4f, 0.36f, 0.72f, 0xB8B0A8); // the body under the fleece
+                b.wool(0, 0.48f, 0, -0.27f, -0.06f, -0.42f, 0.54f, 0.5f, 0.84f, 0xFFFFFF);
+                b.wool(0, 0.48f, 0, -0.2f, 0.42f, -0.34f, 0.4f, 0.08f, 0.66f, 0xF4F4F4);
+                b.box(Anim.HEAD, 0, 0, 0.78f, 0.36f, -0.1f, -0.08f, -0.04f, 0.2f, 0.24f, 0.3f, 0x3A3028);
+                b.wool(0, 0.78f, 0.36f, -0.12f, 0.14f, -0.06f, 0.24f, 0.1f, 0.16f, 0xF0F0F0); // tuft between the ears
+                b.box(Anim.EAR, 0, -0.13f, 0.84f, 0.4f, -0.08f, 0, -0.02f, 0.08f, 0.05f, 0.05f, 0x3A3028);
+                b.box(Anim.EAR, PI, 0.13f, 0.84f, 0.4f, 0, 0, -0.02f, 0.08f, 0.05f, 0.05f, 0x3A3028);
+                b.box(Anim.HEAD, 0, 0, 0.78f, 0.36f, -0.16f, 0.06f, -0.04f, 0.06f, 0.14f, 0.12f, 0x8A7A62); // curled horns
+                b.box(Anim.HEAD, 0, 0, 0.78f, 0.36f, 0.1f, 0.06f, -0.04f, 0.06f, 0.14f, 0.12f, 0x8A7A62);
+                b.coat(Anim.TAIL, 0, 0, 0.8f, -0.4f, -0.05f, -0.16f, -0.05f, 0.1f, 0.16f, 0.07f, 0xFFFFFF);
+            }
+            case GOAT -> {
+                b.legs(0.13f, 0.24f, -0.24f, 0.5f, 0.09f, 0xC0C0C0, true);
+                b.coat(Anim.BODY, 0, 0, 0.5f, 0, -0.2f, 0, -0.36f, 0.4f, 0.38f, 0.72f, 0xFFFFFF);
+                b.box(Anim.BODY, 0, 0, 0.5f, 0, -0.03f, 0.37f, -0.34f, 0.06f, 0.03f, 0.6f, 0x3A3028); // dark stripe on the back
+                b.coat(Anim.HEAD, 0, 0, 0.8f, 0.34f, -0.09f, -0.04f, -0.06f, 0.18f, 0.28f, 0.18f, 0xFFFFFF);
+                b.coat(Anim.HEAD, 0, 0, 0.8f, 0.34f, -0.1f, 0.16f, -0.02f, 0.2f, 0.18f, 0.3f, 0xFFFFFF);
+                b.box(Anim.HEAD, 0, 0, 0.8f, 0.34f, -0.04f, 0.02f, 0.18f, 0.08f, 0.16f, 0.06f, 0x2E2620); // beard
+                b.box(Anim.HEAD, 0, 0, 0.8f, 0.34f, -0.09f, 0.32f, -0.04f, 0.05f, 0.16f, 0.06f, 0x5A5046); // short horns, swept back
+                b.box(Anim.HEAD, 0, 0, 0.8f, 0.34f, 0.04f, 0.32f, -0.04f, 0.05f, 0.16f, 0.06f, 0x5A5046);
+                b.coat(Anim.EAR, 0, -0.12f, 0.98f, 0.38f, -0.1f, 0, -0.02f, 0.1f, 0.04f, 0.06f, 0xD0D0D0);
+                b.coat(Anim.EAR, PI, 0.12f, 0.98f, 0.38f, 0, 0, -0.02f, 0.1f, 0.04f, 0.06f, 0xD0D0D0);
+                b.coat(Anim.TAIL, 0, 0, 0.86f, -0.36f, -0.04f, 0, -0.06f, 0.08f, 0.12f, 0.06f, 0xFFFFFF);
+            }
+            case HEN -> {
+                b.box(Anim.LEG, 0, -0.06f, 0.16f, 0, -0.015f, -0.16f, -0.015f, 0.03f, 0.16f, 0.03f, 0xE0B040);
+                b.box(Anim.LEG, PI, 0.06f, 0.16f, 0, -0.015f, -0.16f, -0.015f, 0.03f, 0.16f, 0.03f, 0xE0B040);
+                b.coat(Anim.BODY, 0, 0, 0.16f, 0, -0.12f, 0, -0.16f, 0.24f, 0.22f, 0.32f, 0xFFFFFF);
+                b.coat(Anim.WING, 0, -0.12f, 0.34f, 0, -0.3f, -0.02f, -0.12f, 0.3f, 0.03f, 0.24f, 0xD8D8D8);
+                b.coat(Anim.WING, PI, 0.12f, 0.34f, 0, 0, -0.02f, -0.12f, 0.3f, 0.03f, 0.24f, 0xD8D8D8);
+                b.coat(Anim.TAIL, 0, 0, 0.3f, -0.16f, -0.05f, 0, -0.1f, 0.1f, 0.18f, 0.1f, 0x707070);
+                b.coat(Anim.HEAD, 0, 0, 0.34f, 0.14f, -0.07f, 0, -0.05f, 0.14f, 0.16f, 0.13f, 0xFFFFFF);
+                b.box(Anim.HEAD, 0, 0, 0.34f, 0.14f, -0.02f, 0.16f, -0.04f, 0.04f, 0.06f, 0.12f, 0xD02020); // comb
+                b.box(Anim.HEAD, 0, 0, 0.34f, 0.14f, -0.02f, 0.02f, 0.06f, 0.04f, 0.05f, 0.05f, 0xD02020); // wattle
+                b.box(Anim.HEAD, 0, 0, 0.34f, 0.14f, -0.025f, 0.07f, 0.08f, 0.05f, 0.03f, 0.06f, 0xE8B030); // beak
             }
         }
         return b.out;

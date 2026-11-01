@@ -51,6 +51,30 @@ public final class Creature {
     /** Carries the disease of its herd (slower, dull coat). */
     public boolean sick;
 
+    /** Kept by people (tamed, or born in a flock): saved with the world, never left behind. */
+    public boolean tame;
+    /** Who keeps it: "joueur" or "hameau". */
+    public String owner = "";
+    /** 0..1: how much a wild one trusts the hand that feeds it (1: tamed). */
+    public double trust;
+    /** Seconds left ready to breed, after being fed from the hand. */
+    public double love;
+    /** 0..1 toward its yield: fleece grown back, milk in the udder, an egg to lay. */
+    public double produce;
+    /** A sheep whose fleece was taken (it grows back with {@link #produce}). */
+    public boolean shorn;
+    /** Its pen as last measured (null: in the open), and seconds until it is measured again. */
+    public Pasture.Pen pen;
+    double penClock;
+    /** Muck building up toward the next heap given back to the soil, and the nest a hen lays in (null: none found). */
+    double dung;
+    int[] nest;
+
+    /** The name shown: a tamed mouflon is a sheep. */
+    public String name() {
+        return tame ? species.tameName() : species.displayName;
+    }
+
     Creature(Species species, int id, double x, double y, double z) {
         this.species = species;
         this.id = id;

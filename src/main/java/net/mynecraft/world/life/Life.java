@@ -43,6 +43,16 @@ public final class Life {
     private double spawnClock;
     /** Counters for the debug screen. */
     public int born, eaten, spawned;
+    /** The item in the player's hand: kept animals follow the food they like. */
+    public short lure;
+    /** What the herd gives back to the soil: heaps of muck (x, z, amount) for the ledger of flows. */
+    public final java.util.ArrayDeque<double[]> dung = new java.util.ArrayDeque<>();
+    /** Eggs laid by the hamlet's hens since last asked (its keepers gather them into the store). */
+    public int hamletEggs;
+    /** What befell the player's animals (born, refused for lack of grass, starving...), for the messages. */
+    public final java.util.ArrayDeque<String> notes = new java.util.ArrayDeque<>();
+    private double herdDay = Double.NaN;
+    private boolean sneaking;
 
     public Life(World world, long seed) {
         this.world = world;
@@ -72,6 +82,7 @@ public final class Life {
      */
     public void tick(double dt, double px, double py, double pz, boolean sneaking) {
         dt = Math.min(dt, 0.1);
+        this.sneaking = sneaking;
         spawnClock += dt;
         // The ecosystem follows the calendar (a long gap, like a jump to another season, is not replayed).
         double gap = eco.day() - ecology.day();
@@ -95,10 +106,16 @@ public final class Life {
         boolean first = creatures.isEmpty();
         for (int i = 0; spawning && spawnClock >= 0.2 && i < (first ? 40 : 1); i++) trySpawn(px, pz, first ? 8 : SPAWN_MIN);
         if (spawnClock >= 0.2) spawnClock = 0;
+        double today = eco.day(), days = Double.isNaN(herdDay) ? 0 : Math.max(0, Math.min(1, today - herdDay));
+        herdDay = today;
         for (int i = 0; i < creatures.size(); i++) {
             Creature c = creatures.get(i);
             double dx = c.x - px, dz = c.z - pz;
-            if (dx * dx + dz * dz > KEEP * KEEP || c.y < Chunk.MIN_Y) c.dead = true;
+            if (c.tame) { // kept animals wait where they are while their land is not loaded
+                if (c.dying <= 0 && world.chunk(Creature.fl(c.x) >> 4, Creature.fl(c.z) >> 4) == null) continue;
+                if (c.y < Chunk.MIN_Y) c.dead = true;
+                if (!c.dead && c.dying <= 0) keep(c, dt, days);
+            } else if (dx * dx + dz * dz > KEEP * KEEP || c.y < Chunk.MIN_Y) c.dead = true;
             else if (world.chunk(Creature.fl(c.x) >> 4, Creature.fl(c.z) >> 4) == null) c.dead = true;
             if (!c.dead) {
                 live(c, dt, px, py, pz, sneaking);
@@ -123,7 +140,9 @@ public final class Life {
     }
 
     private void trySpawn(double px, double pz, double minDist) {
-        if (creatures.size() >= MAX_CREATURES) return;
+        int wild = 0;
+        for (Creature c : creatures) if (!c.tame) wild++;
+        if (wild >= MAX_CREATURES) return;
         double a = rng.nextDouble() * Math.PI * 2, r = minDist + rng.nextDouble() * (SPAWN_MAX - minDist);
         int wx = (int) Math.floor(px + Math.cos(a) * r), wz = (int) Math.floor(pz + Math.sin(a) * r);
         if (world.chunk(wx >> 4, wz >> 4) == null) return;
@@ -259,7 +278,7 @@ public final class Life {
                 case SWIM -> col.water() - 0.6;
                 default -> water ? col.water() + 1.0 : col.height() + 1.0;
             };
-            Creature c = add(s, sx, sy, sz, s.habitat.biomes()[0], (s.habitat.minTemp() + s.habitat.maxTemp()) / 2);
+            Creature c = add(s, sx, sy, sz, s.habitat.biomes().length > 0 ? s.habitat.biomes()[0] : Landscape.PLAINS, (s.habitat.minTemp() + s.habitat.maxTemp()) / 2);
             c.age = s.adultAge + 1;
             c.state = Creature.State.IDLE;
             c.stateTime = 6;
@@ -273,7 +292,7 @@ public final class Life {
     public int count(Species s, double x, double z, double radius) {
         int n = 0;
         for (Creature c : creatures) {
-            if (c.species != s || c.dead) continue;
+            if (c.species != s || c.dead || c.tame) continue; // the wild ones, what the land itself holds
             double dx = c.x - x, dz = c.z - z;
             if (dx * dx + dz * dz <= radius * radius) n++;
         }
@@ -348,7 +367,7 @@ public final class Life {
         }
         double notice = s.fleeRange * (sneaking ? 0.5 : 1) * (s.temper == Species.Temper.WARY ? 0.65 : 1);
         Creature predator = nearest(c, 12, o -> o.species.hunts(s) && o.dying <= 0);
-        boolean threatened = (dp < notice && s.fleeRange > 0) || predator != null || c.hurt > 0;
+        boolean threatened = (dp < notice && s.fleeRange > 0 && !c.tame && !tamingBy(c, dp)) || predator != null || c.hurt > 0;
         double speed = 0;
         if (threatened && s == Species.MOSSBACK) {
             c.state = Creature.State.SLEEP; // withdraws into its shell
@@ -394,7 +413,7 @@ public final class Life {
             c.vz = Math.cos(c.yaw) * v;
             // Rabbits and frostlings bound along; everyone jumps a one-block step.
             boolean hopper = s == Species.RABBIT || s == Species.FROSTLING;
-            if (c.onGround && (c.blocked || hopper && v > 0.3)) c.vy = c.blocked ? 8 : 4.5;
+            if (c.onGround && (c.blocked && !fenceAhead(c) || hopper && v > 0.3)) c.vy = c.blocked ? 8 : 4.5;
         } else {
             c.vx *= 0.6;
             c.vz *= 0.6;
@@ -410,6 +429,10 @@ public final class Life {
     /** What a calm ground animal does next: graze, hunt, follow its herd, play, wander or rest. Returns its speed. */
     private double decide(Creature c, double dt, double dp, double px, double py, double pz) {
         Species s = c.species;
+        if (c.tame) {
+            double v = herd(c, dt, dp, px, pz);
+            if (v >= 0) return v;
+        }
         // Hunting.
         if (s.diet == Species.Diet.MEAT && c.hunger > 0.4 && c.state != Creature.State.CHASE) {
             Creature prey = nearest(c, 24, o -> s.hunts(o.species) && o.dying <= 0);
@@ -427,7 +450,8 @@ public final class Life {
             c.goalZ = prey.z;
             if (Math.hypot(prey.x - c.x, prey.z - c.z) < c.halfWidth() + prey.halfWidth() + 0.4) {
                 prey.dying = 1.2f;
-                ecology.died(prey.species, prey.x, prey.z);
+                if (prey.tame) { if ("joueur".equals(prey.owner)) notes.add("Un renard a emporté une de vos poules."); }
+                else ecology.died(prey.species, prey.x, prey.z);
                 c.hunger = 0;
                 eaten++;
                 c.state = Creature.State.IDLE;
@@ -465,9 +489,14 @@ public final class Life {
                 if (c.state != Creature.State.GRAZE) { c.state = Creature.State.GRAZE; c.stateTime = 4 + rng.nextDouble() * 6; }
                 c.hunger = Math.max(0, c.hunger - dt / 25);
                 if (c.stateTime > 0 && c.hunger > 0.02) return 0;
-                if (at == Blocks.SHORT_GRASS && s != Species.RABBIT) { // the tuft is eaten
+                if (at == Blocks.SHORT_GRASS && s != Species.RABBIT && s != Species.HEN) { // the tuft is eaten
                     int bx = Creature.fl(c.x), by = Creature.fl(c.y), bz = Creature.fl(c.z);
                     if (world.set(bx, by, bz, Blocks.AIR)) edits.add(new int[] {bx, by, bz});
+                    ecology.grazed(c.x, c.z);
+                } else if (c.tame && under == Blocks.GRASS && overstocked(c) && rng.nextDouble() < 0.35) {
+                    // too many mouths for the pen: the sward is grazed down to bare earth
+                    int bx = Creature.fl(c.x), by = Creature.fl(c.y - 0.5), bz = Creature.fl(c.z);
+                    if (world.set(bx, by, bz, Blocks.DIRT)) edits.add(new int[] {bx, by, bz});
                     ecology.grazed(c.x, c.z);
                 }
                 c.state = Creature.State.IDLE;
@@ -475,8 +504,8 @@ public final class Life {
             }
         }
         // Breeding: a fed adult with a fed mate nearby, where the land can feed one more.
-        if (s.adultAge > 0 && Ecology.breeding(s, eco.season().phase()) > 0.3 && c.adult() && c.hunger < 0.3 && c.breedCooldown <= 0) {
-            Creature mate = nearest(c, 6, o -> o.species == s && o != c && o.adult() && o.breedCooldown <= 0 && o.hunger < 0.4);
+        if (!c.tame && s.adultAge > 0 && Ecology.breeding(s, eco.season().phase()) > 0.3 && c.adult() && c.hunger < 0.3 && c.breedCooldown <= 0) {
+            Creature mate = nearest(c, 6, o -> o.species == s && o != c && !o.tame && o.adult() && o.breedCooldown <= 0 && o.hunger < 0.4);
             Landscape.Column col = columns.apply(Creature.fl(c.x), Creature.fl(c.z));
             if (mate != null && count(s, c.x, c.z, 64) < ecology.expected(s, c.x, c.z) + 1) {
                 Creature young = add(s, (c.x + mate.x) / 2, Math.max(c.y, mate.y), (c.z + mate.z) / 2, col.biome(), col.temperature());
@@ -536,7 +565,7 @@ public final class Life {
         double sx = 0, sz = 0;
         int n = 0;
         for (Creature o : creatures) {
-            if (o == c || o.species != c.species || o.dying > 0) continue;
+            if (o == c || o.species != c.species || o.dying > 0 || o.tame != c.tame) continue;
             double d = Math.hypot(o.x - c.x, o.z - c.z);
             if (d > 32) continue;
             sx += o.x;
@@ -745,6 +774,237 @@ public final class Life {
         return best;
     }
 
+    // ------------------------------------------------------------------------------- the herd
+
+    /** Days for a kept animal's yield to come back, well fed: a fleece, a day's milk, an egg. */
+    public static double yieldDays(Species s) {
+        return switch (s) {
+            case SHEEP -> 3;
+            case GOAT -> 1;
+            default -> 1;
+        };
+    }
+
+    /** A wild one approached with its food in hand: it lets the player come (to feed it, to tame it). */
+    private boolean tamingBy(Creature c, double dp) {
+        return c.species.domestic() && c.species.eats(lure) && (sneaking || c.trust > 0) && dp > 1.2;
+    }
+
+    /** True if a fence or a door stands right ahead at the feet: kept and wild animals alike do not try to jump it. */
+    private boolean fenceAhead(Creature c) {
+        double reach = c.halfWidth() + 0.5;
+        int ax = Creature.fl(c.x + Math.sin(c.yaw) * reach), az = Creature.fl(c.z + Math.cos(c.yaw) * reach);
+        int fy = Creature.fl(c.y + 0.01);
+        return Pasture.barrier(world.get(ax, fy, az)) || Pasture.barrier(world.get(ax, fy - 1, az));
+    }
+
+    /** True if the animal's pen holds more mouths than its grass can feed. */
+    public boolean overstocked(Creature c) {
+        return c.pen != null && demand(c.pen) > c.pen.grass();
+    }
+
+    /** Grass cells the kept animals of a pen need between them. */
+    public int demand(Pasture.Pen pen) {
+        int need = 0;
+        for (Creature o : creatures) if (o.tame && !o.dead && o.dying <= 0 && o.pen != null && o.pen.id() == pen.id()) need += Pasture.need(o.species);
+        return need;
+    }
+
+    /**
+     * Upkeep of a kept animal, every step: its pen measured now and then, its yield coming back
+     * while it is fed, its muck going back to the soil, hunger that kills if nobody feeds it, and
+     * a pen with room to spare greening again.
+     */
+    private void keep(Creature c, double dt, double days) {
+        c.love = Math.max(0, c.love - dt);
+        if ((c.penClock -= dt) <= 0) {
+            c.penClock = 4 + rng.nextDouble() * 2;
+            c.pen = Pasture.measure(world, c.x, c.y, c.z);
+        }
+        if (days <= 0) return;
+        if (c.hunger < 0.6 && c.adult()) {
+            c.produce = Math.min(1, c.produce + days / yieldDays(c.species));
+            if (c.species == Species.SHEEP && c.produce >= 1) c.shorn = false; // the fleece has grown back
+        }
+        c.dung += days * (c.species == Species.HEN ? 0.2 : 0.6);
+        if (c.dung >= 0.25) { dung.add(new double[] {c.x, c.z, c.dung}); c.dung = 0; }
+        if (c.hunger >= 1) {
+            c.health -= (float) (days * 6); // a few days without food
+            if (c.health <= 0 && "joueur".equals(c.owner)) notes.add(c.name() + " est mort de faim.");
+        }
+        // Bare earth greens again in a pen that is not overstocked (about a cell a day for each animal).
+        if (c.pen != null && c.pen.bare() > 0 && !overstocked(c) && rng.nextDouble() < days * 2) {
+            int i = rng.nextInt(c.pen.cells());
+            int x = c.pen.xs()[i], y = c.pen.ys()[i], z = c.pen.zs()[i];
+            if (world.get(x, y, z) == Blocks.DIRT && world.get(x, y + 1, z) == Blocks.AIR && world.set(x, y, z, Blocks.GRASS)) edits.add(new int[] {x, y, z});
+        }
+    }
+
+    /**
+     * What a kept animal does of its own: follow the food in the player's hand, a hen going to her
+     * nest to lay, breeding when fed by hand. Returns its speed, or -1 to live like any animal
+     * (graze, keep with the flock, wander).
+     */
+    private double herd(Creature c, double dt, double dp, double px, double pz) {
+        Species s = c.species;
+        if (s.eats(lure) && dp < 10 && c.state != Creature.State.GRAZE) {
+            c.state = Creature.State.FOLLOW;
+            c.goalX = px;
+            c.goalZ = pz;
+            return dp > 2.2 ? s.walkSpeed * 1.3 : 0;
+        }
+        if (c.state == Creature.State.FOLLOW) { c.state = Creature.State.IDLE; c.stateTime = 1; }
+        // A hen with an egg to lay: the hamlet's are gathered by their keepers, the player's go to a nest.
+        if (s == Species.HEN && c.produce >= 1) {
+            if ("hameau".equals(c.owner)) { hamletEggs++; c.produce = 0; }
+            else {
+                if (c.nest == null || world.get(c.nest[0], c.nest[1], c.nest[2]) != Blocks.NEST) c.nest = findNest(c, 8);
+                if (c.nest != null) {
+                    double nx = c.nest[0] + 0.5, nz = c.nest[2] + 0.5;
+                    if (Math.hypot(nx - c.x, nz - c.z) < 0.8) {
+                        if (world.set(c.nest[0], c.nest[1], c.nest[2], Blocks.NEST_EGG)) edits.add(c.nest.clone());
+                        c.produce = 0;
+                        c.nest = null;
+                        c.state = Creature.State.IDLE;
+                        c.stateTime = 3;
+                        return 0;
+                    }
+                    c.goalX = nx;
+                    c.goalZ = nz;
+                    c.state = Creature.State.WANDER;
+                    return s.walkSpeed;
+                }
+            }
+        }
+        // Breeding: two adults fed from the hand, if their pen has the grass for one more.
+        if (c.love > 0 && c.adult() && c.breedCooldown <= 0) {
+            Creature mate = nearest(c, 6, o -> o.species == s && o != c && o.tame && o.love > 0 && o.adult() && o.breedCooldown <= 0);
+            if (mate != null) {
+                if (c.pen != null && demand(c.pen) + Pasture.need(s) > c.pen.grass()) {
+                    c.love = mate.love = 0;
+                    if ("joueur".equals(c.owner)) notes.add("L'enclos ne nourrirait pas un petit de plus : il manque de l'herbe.");
+                } else {
+                    Creature young = add(s, (c.x + mate.x) / 2, Math.max(c.y, mate.y), (c.z + mate.z) / 2, Landscape.PLAINS, 0.5f);
+                    young.coat = lighter(rng.nextBoolean() ? c.coat : mate.coat);
+                    young.age = 0;
+                    young.hunger = 0.1;
+                    young.tame = true;
+                    young.owner = c.owner;
+                    young.trust = 1;
+                    young.shorn = true;
+                    c.love = mate.love = 0;
+                    c.breedCooldown = mate.breedCooldown = s.adultAge * 1.5;
+                    born++;
+                    if ("joueur".equals(c.owner)) notes.add("Un petit est né : " + (s == Species.HEN ? "un poussin." : s == Species.SHEEP ? "un agneau." : "un chevreau."));
+                }
+            } else if (c.state != Creature.State.GRAZE) { // goes looking for a mate in the mood
+                Creature other = nearest(c, 16, o -> o.species == s && o != c && o.tame && o.love > 0 && o.adult());
+                if (other != null) {
+                    c.goalX = other.x;
+                    c.goalZ = other.z;
+                    c.state = Creature.State.WANDER;
+                    return s.walkSpeed;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /** The flock pales generation after generation: a lamb's coat is a little nearer to cream. */
+    static int lighter(int coat) {
+        int cream = 0xEEE8DA, out = 0;
+        for (int sh = 0; sh <= 16; sh += 8) {
+            int a = (coat >> sh) & 255, b = (cream >> sh) & 255;
+            out |= (a + (b - a) * 35 / 100) << sh;
+        }
+        return out;
+    }
+
+    private int[] findNest(Creature c, int r) {
+        int bx = Creature.fl(c.x), by = Creature.fl(c.y), bz = Creature.fl(c.z);
+        int[] best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int dy = -2; dy <= 2; dy++)
+            for (int dz = -r; dz <= r; dz++)
+                for (int dx = -r; dx <= r; dx++)
+                    if (world.get(bx + dx, by + dy, bz + dz) == Blocks.NEST) {
+                        double d = dx * dx + dz * dz + dy * dy;
+                        if (d < bestD) { bestD = d; best = new int[] {bx + dx, by + dy, bz + dz}; }
+                    }
+        return best;
+    }
+
+    /** A wild animal trusts the hand at last: from now on it is kept (taken out of its patch's numbers). */
+    public void tame(Creature c, String owner) {
+        if (c.tame) return;
+        if (c.species.habitat.biomes().length > 0) ecology.taken(c.species, c.x, c.z);
+        c.tame = true;
+        c.owner = owner;
+        c.trust = 1;
+        c.state = Creature.State.IDLE;
+        c.stateTime = 0;
+    }
+
+    /** A kept animal brought into the world (a chick hatched in a nest, the hamlet's hens). */
+    public Creature keepNew(Species s, double x, double y, double z, String owner, boolean young) {
+        Creature c = add(s, x, y, z, Landscape.PLAINS, 0.5f);
+        c.tame = true;
+        c.owner = owner;
+        c.trust = 1;
+        c.age = young ? 0 : s.adultAge + 1;
+        if (s == Species.SHEEP) c.coat = 0xE8E2D4;
+        return c;
+    }
+
+    /** The kept animals (saved with the world: they are the player's and the hamlet's, not the land's). */
+    public java.util.List<Creature> kept() {
+        java.util.List<Creature> out = new ArrayList<>();
+        for (Creature c : creatures) if (c.tame && !c.dead && c.dying <= 0) out.add(c);
+        return out;
+    }
+
+    public void saveHerd(java.nio.file.Path file) throws java.io.IOException {
+        com.google.gson.JsonArray all = new com.google.gson.JsonArray();
+        for (Creature c : kept()) {
+            com.google.gson.JsonObject o = new com.google.gson.JsonObject();
+            o.addProperty("species", c.species.name());
+            o.addProperty("owner", c.owner);
+            o.addProperty("x", c.x);
+            o.addProperty("y", c.y);
+            o.addProperty("z", c.z);
+            o.addProperty("age", c.age);
+            o.addProperty("hunger", c.hunger);
+            o.addProperty("health", c.health);
+            o.addProperty("coat", c.coat);
+            o.addProperty("size", c.size);
+            o.addProperty("produce", c.produce);
+            o.addProperty("shorn", c.shorn);
+            o.addProperty("breedCooldown", c.breedCooldown);
+            all.add(o);
+        }
+        java.nio.file.Files.createDirectories(file.getParent());
+        java.nio.file.Files.writeString(file, all.toString());
+    }
+
+    public void loadHerd(java.nio.file.Path file) throws java.io.IOException {
+        if (!java.nio.file.Files.exists(file)) return;
+        for (var e : com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(file)).getAsJsonArray()) {
+            var o = e.getAsJsonObject();
+            Species s;
+            try { s = Species.valueOf(o.get("species").getAsString()); } catch (IllegalArgumentException ex) { continue; }
+            Creature c = keepNew(s, o.get("x").getAsDouble(), o.get("y").getAsDouble(), o.get("z").getAsDouble(), o.get("owner").getAsString(), false);
+            c.age = o.get("age").getAsDouble();
+            c.hunger = o.get("hunger").getAsDouble();
+            c.health = o.get("health").getAsFloat();
+            c.coat = o.get("coat").getAsInt();
+            c.size = o.get("size").getAsFloat();
+            c.scale = c.size;
+            c.produce = o.get("produce").getAsDouble();
+            c.shorn = o.get("shorn").getAsBoolean();
+            c.breedCooldown = o.get("breedCooldown").getAsDouble();
+        }
+    }
+
     // ------------------------------------------------------------------------------- the player
 
     /** The creature the ray hits first within {@code maxDist}, or null. */
@@ -771,7 +1031,7 @@ public final class Life {
         c.stateTime = 0;
         if (c.health <= 0) {
             c.dying = 1.2f;
-            ecology.died(c.species, c.x, c.z);
+            if (!c.tame) ecology.died(c.species, c.x, c.z);
         }
     }
 

@@ -1,0 +1,23 @@
+{
+  "type": "mynecraft:process",
+  "station": "furnace",
+  "ingredients": [
+    {
+      "item": "minecraft:clay_ball",
+      "count": 2
+    }
+  ],
+  "skill": "pottery",
+  "level": 0,
+  "seconds": 6,
+  "results": [
+    {
+      "id": "minecraft:jug",
+      "count": 1
+    }
+  ],
+  "energy": {
+    "kind": "heat",
+    "amount": 1
+  }
+}

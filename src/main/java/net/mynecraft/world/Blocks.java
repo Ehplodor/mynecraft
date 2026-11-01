@@ -26,8 +26,10 @@ public final class Blocks {
         THATCH_ROOF = 104, /* facing north, south, west, east */ OAK_STAIRS = 108, SNARE = 112, SNARE_FULL = 113,
         // Stairs (facing north, south, west, east; upside down after), walls, windows (pane along x, along z)
         OAK_STAIRS_TOP = 114, COBBLESTONE_STAIRS = 118, COBBLESTONE_STAIRS_TOP = 122, COBBLESTONE_WALL = 126,
-        OAK_WINDOW = 127;
-    public static final int COUNT = 129; // ids are shorts: up to 32 767 states
+        OAK_WINDOW = 127,
+        // Husbandry: a straw nest (empty, an egg in it) and a beehive (empty, a colony, honey to take)
+        NEST = 129, NEST_EGG = 130, BEEHIVE = 131, BEEHIVE_BEES = 132, BEEHIVE_HONEY = 133;
+    public static final int COUNT = 134; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -49,7 +51,7 @@ public final class Blocks {
         "snare", "snare", "oak_stairs", "oak_stairs", "oak_stairs", "oak_stairs",
         "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs",
         "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs",
-        "cobblestone_wall", "oak_window", "oak_window"};
+        "cobblestone_wall", "oak_window", "oak_window", "nest", "nest", "beehive", "beehive", "beehive"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
@@ -65,7 +67,7 @@ public final class Blocks {
         "facing=north,half=top", "facing=south,half=top", "facing=west,half=top", "facing=east,half=top",
         "facing=north,half=bottom", "facing=south,half=bottom", "facing=west,half=bottom", "facing=east,half=bottom",
         "facing=north,half=top", "facing=south,half=top", "facing=west,half=top", "facing=east,half=top",
-        "", "axis=x", "axis=z"};
+        "", "axis=x", "axis=z", "full=false", "full=true", "state=empty", "state=bees", "state=honey"};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
@@ -147,6 +149,8 @@ public final class Blocks {
         cutout(FISH_TRAP_FULL, 0, false);
         plant(SNARE);
         plant(SNARE_FULL);
+        plant(NEST);
+        plant(NEST_EGG);
         for (int f = 0; f < 4; f++) { // roofs: a ramp, half a block to stand on (more to climb, see Player)
             SHAPE[THATCH_ROOF + f] = SHAPE_SLOPE;
             FACING[THATCH_ROOF + f] = (byte) f;
@@ -193,6 +197,7 @@ public final class Blocks {
         OPACITY[ICE] = 2;
         CULLS_SELF[ICE] = true;
         for (int i = 0; i < COUNT; i++) BOX_MAX[i] = (byte) (SHAPE[i] == SHAPE_SLOPE ? 8 : 16);
+        BOX_MAX[OAK_FENCE] = 24; // a fence stands a block and a half: neither animals nor people jump it
         SHAPE[OAK_SLAB] = SHAPE_SLAB_BOTTOM;
         SHAPE[OAK_SLAB_TOP] = SHAPE_SLAB_TOP;
         OPACITY[OAK_SLAB] = OPACITY[OAK_SLAB_TOP] = 0;
@@ -257,6 +262,10 @@ public final class Blocks {
         DROP[FISH_TRAP_FULL] = FISH_TRAP;
         DROP[SNARE_FULL] = SNARE;
         hardness(0f, SNARE, SNARE_FULL);
+        hardness(0.2f, NEST, NEST_EGG);
+        DROP[NEST_EGG] = NEST;
+        hardness(1f, BEEHIVE, BEEHIVE_BEES, BEEHIVE_HONEY);
+        DROP[BEEHIVE_BEES] = DROP[BEEHIVE_HONEY] = BEEHIVE;
         for (int f = 0; f < 4; f++) {
             DROP[THATCH_ROOF + f] = THATCH_ROOF;
             hardness(0.5f, (short) (THATCH_ROOF + f));
@@ -323,7 +332,8 @@ public final class Blocks {
         TOOL[SNOW_BLOCK] = TOOL_SHOVEL;
         MATTER[BERRY_BUSH] = MATTER[BERRY_BUSH_PICKED] = M_FRUIT;
         for (short s : new short[] {CRAFTING_TABLE, OAK_FENCE, OAK_DOOR, OAK_DOOR_OPEN, COMPOSTER, LOOM, WATER_WHEEL,
-            WINDMILL, SAWMILL, DYE_VAT, TANNING_VAT, POTTERS_WHEEL, PAINTING, CAMPFIRE}) TOOL[s] = TOOL_AXE;
+            WINDMILL, SAWMILL, DYE_VAT, TANNING_VAT, POTTERS_WHEEL, PAINTING, CAMPFIRE, BEEHIVE, BEEHIVE_BEES, BEEHIVE_HONEY})
+            TOOL[s] = TOOL_AXE;
         BEAUTY[POPPY] = BEAUTY[GENTIAN] = BEAUTY[EDELWEISS] = 2;
         BEAUTY[RED_WOOL] = BEAUTY[BLUE_WOOL] = BEAUTY[WHITE_WOOL] = BEAUTY[YELLOW_WOOL] = 1;
         BEAUTY[TERRACOTTA] = BEAUTY[GLASS] = BEAUTY[OAK_WINDOW] = BEAUTY[OAK_WINDOW + 1] = 1;
