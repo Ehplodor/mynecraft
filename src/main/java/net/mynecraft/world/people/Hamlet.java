@@ -14,7 +14,9 @@ import net.mynecraft.world.actor.Gestures;
 import net.mynecraft.world.actor.Job;
 import net.mynecraft.world.actor.Matter;
 import net.mynecraft.world.actor.Skill;
+import net.mynecraft.world.Doors;
 import net.mynecraft.world.build.Blueprint;
+import net.mynecraft.world.build.Site;
 import net.mynecraft.world.crafting.RecipeBook;
 import net.mynecraft.world.crafting.Workshop;
 import net.mynecraft.world.life.Ecology;
@@ -29,8 +31,10 @@ import java.util.List;
 import java.util.SplittableRandom;
 
 /**
- * The first inhabitants (M31): a hermit in his hut, and a family come to settle beside him, whose
- * builder raises their own hut from the same plan the player can learn. They live by the same
+ * The first inhabitants (M31): a hermit in his cottage, and a family come to settle beside him, whose
+ * builder raises their house from a plan the player can learn, then the bake-house. Around the green and
+ * its well stand the hen-house and its run, the hermit's apiary; gravel paths join the doors to the well.
+ * Each building is set on ground chosen flat and dry, levelled, banked and founded (see build.Site). They live by the same
  * rules as the player: they gather, fish and cook through the same gestures and recipes, eat from
  * the hamlet's store, and every matter they take is written in the ledger of flows (so a hamlet
  * that fishes too much empties the river as the player would). Asleep at night and at home in the
@@ -41,46 +45,108 @@ public final class Hamlet {
     public final List<Villager> villagers = new ArrayList<>();
     /** Shared larder and woodpile. */
     public final Inventory store = new Inventory();
-    /** Hut anchors (lowest north-west corner): [0] the hermit's, [1] the family's (being built). */
+    /**
+     * Building anchors (lowest north-west corner of their plan): [0] the hermit's cottage, [1] the family's
+     * house (built by the builder), then the well, the hen-house, the apiary, the bake-house.
+     */
     public final List<int[]> huts = new ArrayList<>();
+    /** The plan of each building (by name, see build.Blueprint), in the order of {@link #huts}. */
+    public final List<String> plans = new ArrayList<>();
+    /** The north-west corner of the family's field (4 x 3), at the height of the ground nearby. */
+    public int[] field;
     public boolean founded;
     /** Whether the family's hens have been brought (they live in the herd, see Life). */
     public boolean hens;
     public double clock;
     private final SplittableRandom rnd = new SplittableRandom(7);
-    private final Blueprint hut = Blueprint.hut();
+    private final java.util.Map<String, Blueprint> known = Blueprint.builtIn();
     /** Blocks changed by the inhabitants this tick (for redrawing). */
     public final java.util.ArrayDeque<int[]> edits = new java.util.ArrayDeque<>();
 
+    /** The plan of building i. */
+    public Blueprint plan(int i) {
+        String n = i < plans.size() ? plans.get(i) : Blueprint.HUT;
+        return known.getOrDefault(n, known.get(Blueprint.HUT));
+    }
+
     /**
-     * Founds the hamlet near (cx, cz): the hermit's hut stands already, the family's site is
-     * marked beside it. {@code ground(x, z)} gives the height of the ground there.
+     * The hamlet's layout around its green (the well): plan, offset of its north-west corner from the
+     * green, and whether it stands when the player comes (else the builder raises it).
+     */
+    private static final Object[][] LAYOUT = {
+        {Blueprint.COTTAGE, -14, -11, true}, {Blueprint.HOUSE, 3, -14, false}, {Blueprint.WELL, -2, -2, true},
+        {Blueprint.COOP, -14, 3, true}, {Blueprint.APIARY, -22, -3, true}, {Blueprint.BAKEHOUSE, 5, 5, false}};
+
+    /**
+     * Founds the hamlet near (cx, cz): sites are chosen and their ground shaped, the hermit's cottage,
+     * the well, the hen-house and the apiary stand already, the family's house and the bake-house are
+     * marked out. {@code ground(x, z)} gives the height of the ground there.
      */
     public void found(World w, int cx, int cz, java.util.function.IntBinaryOperator ground) {
-        int[] a = site(w, cx + 14, cz + 6, ground), b = site(w, cx + 22, cz + 6, ground);
-        huts.add(a);
-        huts.add(b);
-        build(w, hut, a);
+        editing = w;
+        List<int[]> taken = new ArrayList<>();
+        int[] logs = {0};
+        int[][] anchors = new int[LAYOUT.length][];
+        // The green first, round the well, on dry and level ground; the houses then round it.
+        int ox = cx + 18, oz = cz + 10;
+        for (int k = 0; k < LAYOUT.length; k++) {
+            int i = k == 0 ? 2 : k <= 2 ? k - 1 : k; // the well, then the others in their order
+            Blueprint p = known.get((String) LAYOUT[i][0]);
+            int x = ox + (int) LAYOUT[i][1], z = oz + (int) LAYOUT[i][2];
+            int[] a = null;
+            for (int r = 4; a == null && r <= (k == 0 ? 24 : 16); r += 4) a = Site.choose(w, p, x, z, r, 3, taken, ground); // further if crowded or wet
+            if (a == null) a = Site.anchor(p, x, Site.level(w, p, x, z, ground), z);
+            taken.add(Site.box(p, a));
+            anchors[i] = a;
+            if (k == 0) { ox = a[0] - (int) LAYOUT[i][1]; oz = a[2] - (int) LAYOUT[i][2]; }
+        }
+        for (int i = 0; i < LAYOUT.length; i++) {
+            huts.add(anchors[i]);
+            plans.add((String) LAYOUT[i][0]);
+        }
+        for (int i = 0; i < huts.size(); i++) Site.prepare(w, plan(i), huts.get(i), this::set, logs);
+        for (int i = 0; i < huts.size(); i++) if ((boolean) LAYOUT[i][3]) build(w, plan(i), huts.get(i));
+        store.add(Blocks.OAK_LOG, logs[0]); // the trees felled for the sites
+        int[] green = plan(2).mark("porte", huts.get(2));
+        for (int i = 0; i < huts.size(); i++) {
+            if (i == 2) continue;
+            int[] door = plan(i).mark("porte", huts.get(i));
+            Site.path(w, door[0], door[2], green[0], green[2], door[1] - 1, this::set);
+        }
+        field = plan(1).mark("champ", huts.get(1));
+        int[] a = huts.get(0), yard = plan(1).mark("porte", huts.get(1)), cottageDoor = plan(0).mark("porte", a);
         Villager hermit = person("Anselme", Job.HERBALIST, 0x5a6b3a, 0x4a3a28, false);
         hermit.skills.xp[Skill.FORAGING.ordinal()] = 400; // a master gatherer: he can teach
         hermit.skills.xp[Skill.COOKING.ordinal()] = 200;
-        hermit.setHome(a[0] + 1.5, a[1] + 1, a[2] + 1.5);
+        int[] bed = plan(0).mark("lit1", a), hearth = plan(0).mark("foyer", a);
+        hermit.setHome(bed[0] + 0.5, bed[1], bed[2] + 0.5);
         Villager builder = person("Berthe", Job.BUILDER, 0x9a4030, 0x3a3a50, false);
         builder.skills.xp[Skill.BUILDING.ordinal()] = 320;
-        builder.plans.add(hut.name);
+        builder.plans.add(Blueprint.HOUSE);
+        builder.plans.add(Blueprint.BAKEHOUSE);
         Villager fisher = person("Corentin", Job.FISHER, 0x3a5a90, 0x3a3a3a, false);
         fisher.skills.xp[Skill.FISHING.ordinal()] = 250;
         Villager child = person("Daphné", Job.GATHERER, 0xd0a040, 0x6a4a30, true);
         Villager hunter = person("Edmond", Job.HUNTER, 0x4a5a30, 0x50402a, false);
         hunter.skills.xp[Skill.HUNTING.ordinal()] = 280;
-        hunter.setHome(a[0] + 2.5, a[1] + 1, a[2] + 6.5); // lodges by the hermit's fire
-        place(hunter, a[0] + 3.5, a[1] + 1, a[2] + 6.5);
-        for (Villager v : List.of(builder, fisher, child)) v.setHome(b[0] + 2.5, b[1] + 1, b[2] + 6.5);
-        place(hermit, a[0] + 2.5, a[1] + 1, a[2] + 6.5);
-        for (int i = 0; i < 3; i++) place(List.of(builder, fisher, child).get(i), b[0] + 1.5 + i, b[1] + 1, b[2] + 6.5);
+        hunter.setHome(hearth[0] + 0.5, hearth[1], hearth[2] + 0.5); // lodges by the hermit's fire
+        place(hunter, cottageDoor[0] + 1.5, cottageDoor[1], cottageDoor[2] + 0.5);
+        for (Villager v : List.of(builder, fisher, child)) v.setHome(yard[0] + 0.5, yard[1], yard[2] + 0.5);
+        place(hermit, cottageDoor[0] + 0.5, cottageDoor[1], cottageDoor[2] + 0.5);
+        for (int i = 0; i < 3; i++) place(List.of(builder, fisher, child).get(i), yard[0] - 0.5 + i, yard[1], yard[2] + 0.5);
         store.add(Items.STICK, 16);
         store.add(Items.SWEET_BERRIES, 8);
         founded = true;
+    }
+
+    /** Where the family's hens are brought: the hen-house's run, or by the family's hut in an older hamlet. */
+    public int[] henRun() {
+        for (int i = 0; i < huts.size(); i++) {
+            int[] m = plan(i).mark("poules", huts.get(i));
+            if (m != null) return m;
+        }
+        int[] h = huts.get(Math.min(1, huts.size() - 1));
+        return new int[] {h[0] + 2, h[1] + 1, h[2] - 2};
     }
 
     private Villager person(String name, Job job, int shirt, int trousers, boolean child) {
@@ -98,38 +164,50 @@ public final class Hamlet {
         v.z = z;
     }
 
-    /** Anchor of a hut near (x, z): its footing at the ground's height (the lowest of its corners). */
-    private static int[] site(World w, int x, int z, java.util.function.IntBinaryOperator ground) {
-        int y = Integer.MAX_VALUE;
-        for (int dz = 0; dz < 6; dz += 5) for (int dx = 0; dx < 5; dx += 4) y = Math.min(y, ground.applyAsInt(x + dx, z + dz));
-        return new int[] {x, y, z};
-    }
-
     /** Raises a plan at once (the hermit's hut was there before the player came). */
     private void build(World w, Blueprint p, int[] a) {
-        // A clearing: trees over the site are felled (their wood goes to the hamlet's pile).
-        for (int y = a[1] + 1; y < a[1] + p.h + 8; y++)
-            for (int z = -1; z <= p.d; z++)
-                for (int x = -1; x <= p.w; x++) {
-                    short b = w.get(a[0] + x, y, a[2] + z);
-                    if (Blocks.NAMES[b & 0xFFFF].endsWith("_leaves") || Blocks.NAMES[b & 0xFFFF].endsWith("_log") || Blocks.isPlant(b)) {
-                        if (Blocks.NAMES[b & 0xFFFF].endsWith("_log")) store.add(Blocks.fromState(Blocks.NAMES[b & 0xFFFF], java.util.Map.of()), 1);
-                        set(w, a[0] + x, y, a[2] + z, Blocks.AIR);
-                    }
-                }
-        for (int i = 0; i < 400; i++) {
+        for (int i = 0; i < p.w * p.h * p.d; i++) {
             int[] s = p.next(w, a[0], a[1], a[2]);
             if (s == null) break;
             set(w, s[0], s[1], s[2], (short) s[3]);
         }
-        // Earth under the footing, so the hut does not float over a slope.
-        for (int z = 0; z < p.d; z++)
-            for (int x = 0; x < p.w; x++)
-                for (int y = a[1] - 1; y > a[1] - 6 && !Blocks.isSolid(w.get(a[0] + x, y, a[2] + z)); y--) set(w, a[0] + x, y, a[2] + z, Blocks.DIRT);
     }
+
+    private World editing;
 
     private void set(World w, int x, int y, int z, short b) {
         if (w.set(x, y, z, b)) edits.add(new int[] {x, y, z});
+    }
+
+    /** For the site's earthworks (the world being founded). */
+    private void set(int x, int y, int z, short b) {
+        set(editing, x, y, z, b);
+    }
+
+    /** Raises every building at once, the family moved in (scripted shots of the finished hamlet). */
+    public void raiseAll(World w) {
+        for (int i = 0; i < huts.size(); i++) build(w, plan(i), huts.get(i));
+        Villager builder = villagers.stream().filter(v -> v.job == Job.BUILDER).findFirst().orElse(null);
+        if (builder != null) finished(builder, 1);
+    }
+
+    /** The first building not finished, from the family's house on (the cottage is the hermit's own), or -1. */
+    public int project(World w) {
+        for (int i = 1; i < huts.size(); i++) {
+            int[] a = huts.get(i);
+            if (plan(i).next(w, a[0], a[1], a[2]) != null) return i;
+        }
+        return -1;
+    }
+
+    /** Whether (x, y, z) belongs to a building of the hamlet (its box, and a block round it). */
+    boolean built(int x, int y, int z) {
+        for (int i = 0; i < huts.size(); i++) {
+            int[] a = huts.get(i);
+            Blueprint p = plan(i);
+            if (x >= a[0] - 1 && x <= a[0] + p.w && z >= a[2] - 1 && z <= a[2] + p.d && y >= a[1] - 2 && y <= a[1] + p.h) return true;
+        }
+        return false;
     }
 
     /** One step of the hamlet's life: {@code daylight} 0..1, {@code day} the calendar. */
@@ -170,11 +248,18 @@ public final class Hamlet {
         v.workTimer += dt;
         switch (v.job) {
             case BUILDER -> {
-                int[] a = huts.size() > 1 ? huts.get(1) : null;
-                int[] step = a == null ? null : hut.next(w, a[0], a[1], a[2]);
-                if (step == null) { decorate(v, w, a); cook(v, recipes, flows); return; }
+                int site = project(w);
+                if (site < 0) { decorate(v, w); cook(v, recipes, flows); return; }
+                int[] a = huts.get(site);
+                Blueprint plan = plan(site);
+                int[] step = plan.next(w, a[0], a[1], a[2]);
                 if (v.workAt != null) { fetch(v, w, flows); return; } // on the way to a tree, a rock, a tuft of grass
-                if (dist(v, step[0] + 0.5, step[2] + 0.5) > 7) { go(v, w, a[0] + 2, a[1] + 1, a[2] + 6); return; } // works from the yard
+                int[] yard = plan.mark("porte", a);
+                if (yard == null) yard = new int[] {a[0] + plan.w / 2, a[1] + plan.sunk, a[2] + plan.d};
+                if (dist(v, step[0] + 0.5, step[2] + 0.5) > 7 && dist(v, yard[0] + 0.5, yard[2] + 0.5) > 1.5) {
+                    go(v, w, yard[0], yard[1], yard[2]); // works from the yard
+                    return;
+                }
                 v.state = Villager.State.WORK;
                 if (v.workTimer < 2.5 / v.efficiency(Skill.BUILDING)) return;
                 v.workTimer = 0;
@@ -183,9 +268,7 @@ public final class Hamlet {
                 if (need != Blocks.AIR) store.remove(need, 1);
                 set(w, step[0], step[1], step[2], (short) step[3]);
                 v.skills.practice(Skill.BUILDING, 1);
-                if (step[3] == Blocks.STRAW_BED && hut.next(w, a[0], a[1], a[2]) == null) {
-                    for (Villager o : villagers) if (o.homeX == v.homeX) o.setHome(a[0] + 2.5, a[1] + 1, a[2] + 2.5); // moving in
-                }
+                if (plan.next(w, a[0], a[1], a[2]) == null) finished(v, site);
             }
             case FISHER -> {
                 if (v.workAt == null) { v.workAt = bank(w, (int) v.x, (int) v.z); if (v.workAt == null) { wander(v, w); return; } }
@@ -251,10 +334,11 @@ public final class Hamlet {
      */
     private boolean tendField(Villager v, World w, Flows flows) {
         if (huts.size() < 2) return false;
-        int[] h = huts.get(1);
+        if (field == null) { int[] h = huts.get(1); field = new int[] {h[0], h[1], h[2] + 9}; } // an older hamlet's
+        int[] h = field;
         for (int dz = 0; dz < 3; dz++)
             for (int dx = 0; dx < 4; dx++) {
-                int x = h[0] + dx, z = h[2] + 9 + dz, y = h[1] + 4;
+                int x = h[0] + dx, z = h[2] + dz, y = h[1] + 4;
                 while (y > h[1] - 5 && !Blocks.isSolid(w.get(x, y, z)) && !Blocks.isPlant(w.get(x, y, z))) y--;
                 short b = w.get(x, y, z), above = w.get(x, y + 1, z);
                 boolean ripe = b == Blocks.WHEAT_7, sow = b == Blocks.FARMLAND && above == Blocks.AIR && store.count(Items.WHEAT_SEEDS) > 0;
@@ -283,10 +367,25 @@ public final class Hamlet {
         return false;
     }
 
+    /** A building is finished: the family moves into its house, one bed each; the others are named. */
+    private void finished(Villager v, int site) {
+        Blueprint p = plan(site);
+        List<int[]> beds = p.marks("lit", huts.get(site));
+        if (site == 1 && !beds.isEmpty()) {
+            double yardX = v.homeX, yardZ = v.homeZ;
+            int n = 0;
+            for (Villager o : villagers)
+                if (o.homeX == yardX && o.homeZ == yardZ) { int[] b = beds.get(n++ % beds.size()); o.setHome(b[0] + 0.5, b[1], b[2] + 0.5); }
+            say(v, "Notre maison est finie ! Chacun son lit.");
+        } else say(v, Character.toUpperCase(Blueprint.title(p.name).charAt(0)) + Blueprint.title(p.name).substring(1) + " est bâti.");
+    }
+
     /** A finished home gets a decorated pot by its bed: the hamlet's first work of art. */
-    private void decorate(Villager v, World w, int[] a) {
-        int x = a[0] + 3, y = a[1] + 1, z = a[2] + 1;
-        if (w.get(x, y, z) != Blocks.AIR || decorated) return;
+    private void decorate(Villager v, World w) {
+        int[] at = huts.size() > 1 ? plan(1).mark("pot", huts.get(1)) : null;
+        if (at == null || decorated) return;
+        int x = at[0], y = at[1], z = at[2];
+        if (w.get(x, y, z) != Blocks.AIR) return;
         set(w, x, y, z, Blocks.DECORATED_POT);
         decorated = true;
         v.skills.practice(Skill.POTTERY, 2);
@@ -329,15 +428,19 @@ public final class Hamlet {
         if (item == Blocks.STRAW_BED && store.count(Blocks.THATCH) >= 3 && store.count(Blocks.OAK_PLANKS) >= 3) {
             store.remove(Blocks.THATCH, 3); store.remove(Blocks.OAK_PLANKS, 3); store.add(Blocks.STRAW_BED, 1); return;
         }
-        if ((item == Blocks.OAK_PLANKS || item == Blocks.OAK_DOOR) && store.count(Blocks.OAK_LOG) > 0) {
-            store.remove(Blocks.OAK_LOG, 1); store.add(Blocks.OAK_PLANKS, 4);
-            if (item == Blocks.OAK_DOOR && store.count(Blocks.OAK_PLANKS) >= 6) { store.remove(Blocks.OAK_PLANKS, 6); store.add(Blocks.OAK_DOOR, 3); }
-            return;
-        }
-        if (item == Blocks.OAK_DOOR && store.count(Blocks.OAK_PLANKS) >= 6) { store.remove(Blocks.OAK_PLANKS, 6); store.add(Blocks.OAK_DOOR, 3); return; }
-        java.util.function.Predicate<Short> source = item == Blocks.COBBLESTONE ? b -> b == Blocks.STONE || b == Blocks.COBBLESTONE
+        for (short[] m : MADE_FROM) // the builder's own work at the bench: planks, doors, stairs, furniture
+            if (m[0] == item) {
+                if (store.count(m[1]) >= m[2]) { store.remove(m[1], m[2]); store.add(item, m[3]); return; }
+                item = m[1]; // first, what it is made from
+                if (item == Blocks.OAK_PLANKS && store.count(Blocks.OAK_LOG) > 0) { store.remove(Blocks.OAK_LOG, 1); store.add(Blocks.OAK_PLANKS, 4); return; }
+                if (item == Blocks.THATCH && store.count(Items.PLANT_FIBER) >= 4) { store.remove(Items.PLANT_FIBER, 4); store.add(Blocks.THATCH, 1); return; }
+                break;
+            }
+        if (item == Blocks.OAK_PLANKS && store.count(Blocks.OAK_LOG) > 0) { store.remove(Blocks.OAK_LOG, 1); store.add(Blocks.OAK_PLANKS, 4); return; }
+        // Natural sources only: a rock, a tree, grass (never the hamlet's own floors and posts).
+        java.util.function.Predicate<Short> source = item == Blocks.COBBLESTONE ? b -> b == Blocks.STONE
             : item == Blocks.THATCH || item == Blocks.STRAW_BED ? b -> b == Blocks.SHORT_GRASS
-            : item == Blocks.OAK_LOG || item == Blocks.OAK_PLANKS || item == Blocks.OAK_DOOR ? b -> b == Blocks.OAK_LOG : null;
+            : item == Blocks.OAK_LOG || item == Blocks.OAK_PLANKS ? b -> b == Blocks.OAK_LOG : null;
         int[] at = source == null ? null : find(w, (int) Math.floor(v.homeX), (int) Math.floor(v.homeY), (int) Math.floor(v.homeZ), source);
         if (at == null) { // nothing of it nearby: drawn from the patch's account
             byte m = Blocks.MATTER[item & 0xFFFF];
@@ -348,6 +451,17 @@ public final class Hamlet {
         }
         v.workAt = at;
     }
+
+    /**
+     * What the builder makes from what (item, from, how many, gives), as the recipes have it; what has no
+     * recipe here (glass, iron, wool) is drawn from the patch's account.
+     */
+    private static final short[][] MADE_FROM = {
+        {Blocks.OAK_DOOR, Blocks.OAK_PLANKS, 6, 3}, {Blocks.OAK_STAIRS, Blocks.OAK_PLANKS, 6, 4}, {Blocks.OAK_SLAB, Blocks.OAK_PLANKS, 3, 6},
+        {Blocks.OAK_FENCE, Blocks.OAK_PLANKS, 4, 3}, {Blocks.OAK_WINDOW, Blocks.OAK_PLANKS, 4, 2}, {Blocks.OAK_TABLE, Blocks.OAK_PLANKS, 5, 1},
+        {Blocks.OAK_CHAIR, Blocks.OAK_PLANKS, 4, 2}, {Blocks.BARREL, Blocks.OAK_PLANKS, 7, 1}, {Blocks.CRAFTING_TABLE, Blocks.OAK_PLANKS, 4, 1},
+        {Blocks.COBBLESTONE_STAIRS, Blocks.COBBLESTONE, 6, 4}, {Blocks.COBBLESTONE_WALL, Blocks.COBBLESTONE, 6, 6},
+        {Blocks.FURNACE, Blocks.COBBLESTONE, 8, 1}, {Blocks.THATCH_ROOF, Blocks.THATCH, 3, 4}, {Blocks.NEST, Blocks.THATCH, 2, 1}};
 
     /** Walks to the source in {@code v.workAt} and takes it: a log, a stone, a tuft of grass. */
     private void fetch(Villager v, World w, Flows flows) {
@@ -382,14 +496,14 @@ public final class Hamlet {
     }
 
     /** The nearest block matching {@code what} within 24 blocks that has open air beside or above it. */
-    private static int[] find(World w, int x, int y, int z, java.util.function.Predicate<Short> what) {
+    private int[] find(World w, int x, int y, int z, java.util.function.Predicate<Short> what) {
         for (int r = 3; r <= 24; r++)
             for (int dz = -r; dz <= r; dz++)
                 for (int dx = -r; dx <= r; dx++) {
                     if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                     for (int dy = -6; dy <= 8; dy++) {
                         short b = w.get(x + dx, y + dy, z + dz);
-                        if (!what.test(b)) continue;
+                        if (!what.test(b) || built(x + dx, y + dy, z + dz)) continue;
                         if (w.get(x + dx, y + dy + 1, z + dz) == Blocks.AIR || w.get(x + dx, y + dy - 1, z + dz) != Blocks.OAK_LOG
                             && PathFinder.standable(w, x + dx + 1, y + dy, z + dz)) {
                             if (b == Blocks.OAK_LOG) while (w.get(x + dx, y + dy - 1, z + dz) == Blocks.OAK_LOG) dy--; // the foot of the trunk
@@ -420,8 +534,18 @@ public final class Hamlet {
         int[] c = v.path.get(0);
         double tx = c[0] + 0.5, tz = c[2] + 0.5, dx = tx - v.x, dz = tz - v.z, d = Math.hypot(dx, dz);
         double speed = (v.child ? 2.6 : 2.2) * dt;
-        if (w.get(c[0], c[1], c[2]) == Blocks.OAK_DOOR) set(w, c[0], c[1], c[2], Blocks.OAK_DOOR_OPEN); // opens on the way
-        if (w.get(c[0], c[1] + 1, c[2]) == Blocks.OAK_DOOR) set(w, c[0], c[1] + 1, c[2], Blocks.OAK_DOOR_OPEN);
+        for (int dy = 0; dy <= 1; dy++) // opens a door on the way (both halves), and closes it again behind
+            if (Blocks.isClosedDoor(w.get(c[0], c[1] + dy, c[2]))) {
+                for (int[] e : Doors.setOpen(w, c[0], c[1] + dy, c[2], true)) edits.add(e);
+                v.doorOpened = new int[] {c[0], c[1] + dy, c[2]};
+            }
+        if (v.doorOpened != null && Math.abs(v.x - (v.doorOpened[0] + 0.5)) + Math.abs(v.z - (v.doorOpened[2] + 0.5)) > 1.8) {
+            int[] o = v.doorOpened;
+            boolean someone = false;
+            for (Villager u : villagers) someone |= u != v && Math.abs(u.x - (o[0] + 0.5)) + Math.abs(u.z - (o[2] + 0.5)) < 1.5;
+            if (!someone) for (int[] e : Doors.setOpen(w, o[0], o[1], o[2], false)) edits.add(e);
+            v.doorOpened = null;
+        }
         v.yaw = (float) Math.atan2(dx, dz);
         v.gait += (float) (speed * 4);
         if (d <= speed) {
@@ -497,9 +621,8 @@ public final class Hamlet {
             v.skills.taughtUntil[skill.ordinal()] = v.skills.today + 1;
             s = "Tu en sais plus que moi en " + skill.displayName.toLowerCase() + "... montre-moi ?";
         } else if (v.needs.food < 8) s = "J'ai faim. Le garde-manger est presque vide.";
-        else if (v.job == Job.BUILDER && huts.size() > 1 && lastWorld != null
-            && hut.next(lastWorld, huts.get(1)[0], huts.get(1)[1], huts.get(1)[2]) != null)
-            s = "Je bâtis notre cabane. Il me manque du bois, de la pierre et du chaume.";
+        else if (v.job == Job.BUILDER && lastWorld != null && project(lastWorld) >= 0)
+            s = "Je bâtis " + Blueprint.title(plan(project(lastWorld)).name) + ". Il me faut du bois, de la pierre et du chaume.";
         else if (v.job == Job.FISHER) s = "Ne pêche pas les truites à l'automne : c'est leur fraie.";
         else if (v.job == Job.HERBALIST) s = "Les baies repoussent si l'on en laisse. Prends-en, mais pas tout.";
         else s = "Bonjour ! Je suis " + v.name + ", " + (v.skills.roleTitle().isEmpty() ? v.job.displayName : v.skills.roleTitle()) + ".";
@@ -558,6 +681,10 @@ public final class Hamlet {
         JsonArray hs = new JsonArray();
         for (int[] h : huts) { JsonArray a = new JsonArray(); for (int v : h) a.add(v); hs.add(a); }
         o.add("huts", hs);
+        JsonArray ps = new JsonArray();
+        for (String n : plans) ps.add(n);
+        o.add("plans", ps);
+        if (field != null) { JsonArray f = new JsonArray(); for (int v : field) f.add(v); o.add("field", f); }
         o.add("store", items(store));
         JsonArray vs = new JsonArray();
         for (Villager v : villagers) {
@@ -588,6 +715,9 @@ public final class Hamlet {
             JsonArray a = h.getAsJsonArray();
             huts.add(new int[] {a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt()});
         }
+        if (o.has("plans")) for (var n : o.getAsJsonArray("plans")) plans.add(n.getAsString());
+        while (plans.size() < huts.size()) plans.add(Blueprint.HUT); // a hamlet of the first huts
+        if (o.has("field")) { JsonArray f = o.getAsJsonArray("field"); field = new int[] {f.get(0).getAsInt(), f.get(1).getAsInt(), f.get(2).getAsInt()}; }
         readItems(store, o.getAsJsonObject("store"));
         for (var e : o.getAsJsonArray("villagers")) {
             JsonObject j = e.getAsJsonObject();

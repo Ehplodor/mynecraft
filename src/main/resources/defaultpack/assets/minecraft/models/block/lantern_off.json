@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "block/lantern_off",
+    "up": "block/lantern_top",
+    "down": "block/lantern_top",
+    "north": "block/lantern_off",
+    "south": "block/lantern_off",
+    "east": "block/lantern_off",
+    "west": "block/lantern_off"
+  }
+}

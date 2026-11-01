@@ -1,10 +1,28 @@
 {
   "variants": {
-    "open=false": {
-      "model": "minecraft:block/oak_door"
+    "half=lower,axis=x,open=false": {
+      "model": "minecraft:block/oak_door_bottom"
     },
-    "open=true": {
-      "model": "minecraft:block/oak_door_open"
+    "half=lower,axis=x,open=true": {
+      "model": "minecraft:block/oak_door_bottom"
+    },
+    "half=lower,axis=z,open=false": {
+      "model": "minecraft:block/oak_door_bottom"
+    },
+    "half=lower,axis=z,open=true": {
+      "model": "minecraft:block/oak_door_bottom"
+    },
+    "half=upper,axis=x,open=false": {
+      "model": "minecraft:block/oak_door_top"
+    },
+    "half=upper,axis=x,open=true": {
+      "model": "minecraft:block/oak_door_top"
+    },
+    "half=upper,axis=z,open=false": {
+      "model": "minecraft:block/oak_door_top"
+    },
+    "half=upper,axis=z,open=true": {
+      "model": "minecraft:block/oak_door_top"
     }
   }
 }

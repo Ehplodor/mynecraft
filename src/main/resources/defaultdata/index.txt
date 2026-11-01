@@ -1,6 +1,7 @@
 data/minecraft/recipe/andesite.json
 data/minecraft/recipe/anvil.json
 data/minecraft/recipe/arrow.json
+data/minecraft/recipe/barrel.json
 data/minecraft/recipe/beehive.json
 data/minecraft/recipe/berry_tart.json
 data/minecraft/recipe/birch_planks.json
@@ -46,16 +47,19 @@ data/minecraft/recipe/iron_knife.json
 data/minecraft/recipe/iron_pickaxe.json
 data/minecraft/recipe/iron_shovel.json
 data/minecraft/recipe/jug.json
+data/minecraft/recipe/lantern.json
 data/minecraft/recipe/leather.json
 data/minecraft/recipe/loom.json
 data/minecraft/recipe/millstone.json
 data/minecraft/recipe/nest.json
+data/minecraft/recipe/oak_chair.json
 data/minecraft/recipe/oak_door.json
 data/minecraft/recipe/oak_fence.json
 data/minecraft/recipe/oak_planks.json
 data/minecraft/recipe/oak_planks_sawn.json
 data/minecraft/recipe/oak_slab.json
 data/minecraft/recipe/oak_stairs.json
+data/minecraft/recipe/oak_table.json
 data/minecraft/recipe/oak_window.json
 data/minecraft/recipe/packed_ice.json
 data/minecraft/recipe/painting.json
@@ -63,6 +67,7 @@ data/minecraft/recipe/potters_wheel.json
 data/minecraft/recipe/red_dye.json
 data/minecraft/recipe/red_wool.json
 data/minecraft/recipe/roasted_mushroom.json
+data/minecraft/recipe/rug.json
 data/minecraft/recipe/sand.json
 data/minecraft/recipe/sawmill.json
 data/minecraft/recipe/shears.json

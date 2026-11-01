@@ -2,7 +2,7 @@ package net.mynecraft.world;
 
 /**
  * Vanilla-like placement rules: block state from the clicked face and the player's position (logs,
- * roofs, stairs, windows), slabs merging into doubles.
+ * roofs, stairs, windows, chairs, two-block doors), slabs merging into doubles.
  */
 public final class Placement {
     private Placement() {}
@@ -50,6 +50,12 @@ public final class Placement {
             // The pane faces the player: it runs across the line of sight.
             int base = selected - Blocks.FACING[selected & 0xFFFF];
             state = (short) (base + (away(player, px, pz) < 2 ? 0 : 1));
+        } else if (Blocks.isChair(selected)) {
+            state = (short) (Blocks.OAK_CHAIR + away(player, px, pz)); // its back away from the player
+        } else if (Blocks.isDoor(selected)) {
+            // A door: its leaf across the line of sight, the upper half set with it (if there is room).
+            if (!replaceable(there) || player.intersects(px, py, pz) || player.intersects(px, py + 1, pz)) return null;
+            return Doors.place(world, px, py, pz, away(player, px, pz) >= 2, false) ? new int[] {px, py, pz} : null;
         } else if (Blocks.logStates(selected) != null) {
             short[] axes = Blocks.logStates(selected); // y, x, z
             state = hit.nx() != 0 ? axes[1] : hit.nz() != 0 ? axes[2] : axes[0];

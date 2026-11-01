@@ -466,6 +466,7 @@ public final class Main {
             } else player.y = Double.parseDouble(xyz[1]);
             player.flying = true;
         }
+        liv.raiseHamlet = argv.contains("--hamlet-built");
         if (argv.contains("--life-demo")) {
             liv.flows.take(net.mynecraft.world.actor.Matter.WOOD, 12, player.x, player.z);
             liv.flows.take(net.mynecraft.world.actor.Matter.FRUIT, 5, player.x, player.z);
@@ -882,6 +883,8 @@ public final class Main {
                 if (miningProgress >= 1 && world.set(hit.x(), hit.y(), hit.z(), brokenInto(world, hit, target))) {
                     sound.blockBroken(material(target), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     liv.broke(target, input.slot, hit.x(), hit.y(), hit.z());
+                    int other = net.mynecraft.world.Doors.broke(world, hit.x(), hit.y(), hit.z(), target); // the whole door
+                    if (other != Integer.MIN_VALUE && Blocks.UPPER[target & 0xFFFF]) inventory.add(Blocks.OAK_DOOR, 1);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                     mining = null;
@@ -894,14 +897,17 @@ public final class Main {
             if (hit != null && ((creative && input.breakRequested) || (editDemo && streamer.settled()))) {
                 short broken = world.get(hit.x(), hit.y(), hit.z());
                 if (broken != Blocks.BEDROCK && world.set(hit.x(), hit.y(), hit.z(), brokenInto(world, hit, broken))) {
+                    net.mynecraft.world.Doors.broke(world, hit.x(), hit.y(), hit.z(), broken);
                     sound.blockBroken(material(broken), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                     renderer.blockChanged(hit.x(), hit.y(), hit.z());
                     fluids.blockChanged(hit.x(), hit.y(), hit.z());
                 }
             }
             short aimedBlock = hit == null ? Blocks.AIR : world.get(hit.x(), hit.y(), hit.z());
-            boolean interactive = aimedBlock == Blocks.OAK_DOOR || aimedBlock == Blocks.OAK_DOOR_OPEN || aimedBlock == Blocks.BERRY_BUSH
-                || aimedBlock == Blocks.STRAW_BED || aimedBlock == Blocks.FISH_TRAP_FULL || aimedBlock == Blocks.SNARE_FULL;
+            boolean interactive = Blocks.isDoor(aimedBlock) || aimedBlock == Blocks.BERRY_BUSH
+                || aimedBlock == Blocks.STRAW_BED || aimedBlock == Blocks.FISH_TRAP_FULL || aimedBlock == Blocks.SNARE_FULL
+                || Blocks.isChair(aimedBlock) || aimedBlock == Blocks.LANTERN || aimedBlock == Blocks.LANTERN_OFF
+                || aimedBlock == Blocks.BARREL;
             short heldItem = inventory.id(input.slot);
             boolean used = false;
             if (input.placeRequested && !screenOpen && !paused && hit != null && !creative && !input.shiftDown()
@@ -927,13 +933,21 @@ public final class Main {
                     liv.actor.needs.food = Math.max(0, liv.actor.needs.food - 3);
                     liv.actor.needs.water = Math.max(0, liv.actor.needs.water - 3);
                 }
+                if (u == net.mynecraft.world.actor.Gestures.Use.SAT && hit != null) { // sits down on the seat
+                    player.x = hit.x() + 0.5;
+                    player.y = hit.y() + 9 / 16.0;
+                    player.z = hit.z() + 0.5;
+                    player.vx = player.vy = player.vz = 0;
+                }
                 if (hit != null && u != net.mynecraft.world.actor.Gestures.Use.NONE) {
-                    for (int dy = 0; dy <= 1; dy++) { renderer.blockChanged(hit.x(), hit.y() + dy, hit.z()); fluids.blockChanged(hit.x(), hit.y() + dy, hit.z()); }
+                    for (int dy = -1; dy <= 1; dy++) { renderer.blockChanged(hit.x(), hit.y() + dy, hit.z()); fluids.blockChanged(hit.x(), hit.y() + dy, hit.z()); }
                     sound.blockPlaced(material(aimedBlock), hit.x() + 0.5, hit.y() + 0.5, hit.z() + 0.5);
                 }
-            } else if (hit != null && input.placeRequested && creative && interactive && aimedBlock != Blocks.STRAW_BED) {
-                liv.use(world, input.slot, new int[] {hit.x(), hit.y(), hit.z()}, null, false, life, null, null, sound); // doors
-                renderer.blockChanged(hit.x(), hit.y(), hit.z());
+            } else if (hit != null && input.placeRequested && creative && interactive && aimedBlock != Blocks.STRAW_BED
+                && aimedBlock != Blocks.BARREL) {
+                var u = liv.use(world, input.slot, new int[] {hit.x(), hit.y(), hit.z()}, null, false, life, null, null, sound); // doors, lanterns, seats
+                if (u == net.mynecraft.world.actor.Gestures.Use.SAT) { player.x = hit.x() + 0.5; player.y = hit.y() + 9 / 16.0; player.z = hit.z() + 0.5; }
+                for (int dy = -1; dy <= 1; dy++) renderer.blockChanged(hit.x(), hit.y() + dy, hit.z());
                 used = true;
             }
             if (used) {
@@ -1328,7 +1342,8 @@ public final class Main {
         if (b == Blocks.GLASS || b == Blocks.ICE || b == Blocks.PACKED_ICE || b == Blocks.GLOWSTONE) return Synth.Material.GLASS;
         if (b == Blocks.OAK_LEAVES || Blocks.SHAPE[b & 0xFFFF] == Blocks.SHAPE_CROSS) return Synth.Material.LEAVES;
         if (b == Blocks.OAK_PLANKS || b == Blocks.OAK_LOG || b == Blocks.OAK_LOG_X || b == Blocks.OAK_LOG_Z
-            || b == Blocks.CRAFTING_TABLE || Blocks.isSlab(b)) return Synth.Material.WOOD;
+            || b == Blocks.CRAFTING_TABLE || Blocks.isSlab(b) || Blocks.isDoor(b) || Blocks.isFurniture(b) && b != Blocks.LANTERN
+            && b != Blocks.LANTERN_OFF && b != Blocks.RUG) return Synth.Material.WOOD;
         if (Blocks.isFluid(b)) return Synth.Material.WATER;
         return Synth.Material.STONE;
     }

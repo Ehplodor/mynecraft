@@ -104,7 +104,7 @@ public final class Pasture {
 
     /** Fences and doors (open or closed: an open gate lets the flock out only if it leads somewhere). */
     static boolean barrier(short b) {
-        return b == Blocks.OAK_FENCE || b == Blocks.OAK_DOOR;
+        return b == Blocks.OAK_FENCE || Blocks.isClosedDoor(b);
     }
 
     static long key(int x, int z) {

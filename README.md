@@ -53,6 +53,14 @@ petit si leur enclos (barrières, portes fermées) a l'herbe pour un de plus. Cl
 couteau), traire (cruche), ou voir comment va la bête. Ruche près des fleurs : un essaim s'y installe, le miel se récolte
 (pas l'hiver). Démo : `--herd-demo`.
 
+Le hameau : autour d'une place et de son puits, la chaumière de l'ermite, le poulailler et son parcours, le rucher ;
+la maison de la famille puis le fournil sont élevés bloc à bloc par la bâtisseuse. Chaque bâtiment est posé sur un
+terrain choisi plat et sec, nivelé (socle de pierre hors du sol, fondations sur les pentes, talus autour, perron devant
+la porte), et des chemins de gravier mènent au puits. Les portes tiennent sur deux blocs (un battant fin qui s'ouvre
+d'une pièce ; les habitants referment derrière eux). Meubles : lit de paille (la nuit dormir, le jour se reposer),
+table, chaise (clic droit : s'asseoir), lanterne (allumer, éteindre), tonneau d'eau (boire), tapis. Démo :
+`--hamlet-built` (le hameau achevé), captures `src/test/scenes/hameau.txt`.
+
 `E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
 `E` ouvre la palette de tous les blocs.
 
@@ -73,7 +81,7 @@ Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `
 | `client/WeatherRenderer` | Nuages en blocs depuis le champ nuageux, précipitations abritées par les toits, éclairs |
 | `world/actor/*` | Acteur (joueur ou PNJ) : compétences, capacités, métiers, besoins, bien-être, boussole, flux de matières, gestes |
 | `world/crafting/RecipeBook`, `Workshop` | Grammaire de fabrication unique (poste, outil, compétence, durée, énergie, déchets), exécutée pour tout acteur |
-| `world/build/Blueprint`, `world/people/*` | Plans de bâtiments ; hameau, villageois, recherche de chemin A* |
+| `world/build/Blueprint`, `Draft`, `Site`, `world/people/*` | Plans de bâtiments (chaumière, maison, puits, poulailler, rucher, fournil), pose sur le terrain (choix du site, nivellement, fondations) ; hameau, villageois, recherche de chemin A* |
 | `world/Growth`, `world/Power`, `world/Drops` | Cultures et repousses selon le calendrier local, énergie des roues et moulins, ce que donne un bloc |
 | `world/Player`, `Raycast` | Physique AABB par balayage d'axe sur les vraies boîtes (dalles), montée de marche 0,6, raycast DDA |
 | `world/ChunkStreamer` | Monde infini : chargement du plus proche au plus loin, hystérésis, déchargement + sauvegarde |

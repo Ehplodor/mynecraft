@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "WW"
+  ],
+  "key": {
+    "W": "minecraft:red_wool"
+  },
+  "result": {
+    "id": "minecraft:rug",
+    "count": 3
+  },
+  "mynecraft:skill": "weaving"
+}

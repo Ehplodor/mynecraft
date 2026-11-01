@@ -58,6 +58,7 @@ public final class Shapes {
     /** The block whose textures and render layer a part of {@code id} uses. */
     public static short partBlock(short id, int part) {
         if (Blocks.SHAPE[id & 0xFFFF] == Blocks.SHAPE_WINDOW) return part == 0 ? Blocks.OAK_PLANKS : Blocks.GLASS;
+        if (part == 1) return id == Blocks.LANTERN || id == Blocks.LANTERN_OFF ? Blocks.ANVIL : Blocks.OAK_PLANKS; // frames, legs, a cap
         return id;
     }
 
@@ -156,6 +157,8 @@ public final class Shapes {
                 case Blocks.SHAPE_STAIRS -> stairBoxes(Blocks.FACING[id & 0xFFFF], Blocks.UPPER[id & 0xFFFF], variant);
                 case Blocks.SHAPE_WALL -> wallBoxes(variant);
                 case Blocks.SHAPE_WINDOW -> windowBoxes(Blocks.FACING[id & 0xFFFF] == 0, variant);
+                case Blocks.SHAPE_DOOR -> doorBoxes(Blocks.FACING[id & 0xFFFF] == 1, !Blocks.isSolid(id));
+                case Blocks.SHAPE_FURNITURE -> furnitureBoxes(id);
                 default -> new int[] {box(0, 0, 0, 16, 16, 16)};
             };
             CACHE[k] = b;
@@ -244,6 +247,59 @@ public final class Shapes {
             out[i] = p[4] == 1 ? bx | 1 << 30 : bx;
         }
         return out;
+    }
+
+    /**
+     * A door leaf, 3/16 thick in the middle of the wall (where a window's pane is); open, it has swung
+     * back against the jamb on the low side.
+     */
+    private static int[] doorBoxes(boolean alongZ, boolean open) {
+        if (!open) return new int[] {alongZ ? box(6, 0, 0, 9, 16, 16) : box(0, 0, 6, 16, 16, 9)};
+        return new int[] {alongZ ? box(0, 0, 0, 16, 16, 3) : box(0, 0, 0, 3, 16, 16)};
+    }
+
+    /** Four legs of a piece of furniture, {@code s} wide, from the floor up to {@code h}, inset {@code in}. */
+    private static void legs(java.util.List<Integer> b, int in, int s, int h) {
+        for (int x : new int[] {in, 16 - in - s})
+            for (int z : new int[] {in, 16 - in - s}) b.add(box(x, 0, z, x + s, h, z + s) | 1 << 30);
+    }
+
+    /**
+     * Furniture, part 0 in its own textures, part 1 in oak (legs, frames) or iron (a lantern's cap):
+     * <ul>
+     *   <li>the straw bed: a low oak frame on short legs, a mattress and its blanket over it;</li>
+     *   <li>the table: a thick top on four legs;</li>
+     *   <li>the chair: a seat on four legs, its back on the side it faces;</li>
+     *   <li>the lantern: a glazed body on the floor (or a table), its iron cap and handle;</li>
+     *   <li>the rug: a sixteenth of cloth on the floor.</li>
+     * </ul>
+     */
+    private static int[] furnitureBoxes(short id) {
+        java.util.List<Integer> b = new java.util.ArrayList<>();
+        if (id == Blocks.STRAW_BED) {
+            legs(b, 0, 2, 2);
+            b.add(box(0, 2, 0, 16, 5, 16) | 1 << 30);
+            b.add(box(1, 5, 1, 15, 9, 15));
+        } else if (id == Blocks.OAK_TABLE) {
+            legs(b, 1, 2, 13);
+            b.add(box(0, 13, 0, 16, 16, 16));
+        } else if (Blocks.isChair(id)) {
+            legs(b, 2, 2, 7);
+            b.add(box(2, 7, 2, 14, 9, 14));
+            b.add(switch (Blocks.FACING[id & 0xFFFF]) {
+                case NORTH -> box(2, 9, 2, 14, 16, 4);
+                case SOUTH -> box(2, 9, 12, 14, 16, 14);
+                case WEST -> box(2, 9, 2, 4, 16, 14);
+                default -> box(12, 9, 2, 14, 16, 14);
+            } | 1 << 30);
+        } else if (id == Blocks.LANTERN || id == Blocks.LANTERN_OFF) {
+            b.add(box(5, 0, 5, 11, 7, 11));
+            b.add(box(6, 7, 6, 10, 9, 10) | 1 << 30);
+            b.add(box(7, 9, 7, 9, 11, 9) | 1 << 30);
+        } else if (id == Blocks.RUG) {
+            b.add(box(0, 0, 0, 16, 1, 16));
+        } else b.add(box(0, 0, 0, 16, 16, 16));
+        return b.stream().mapToInt(Integer::intValue).toArray();
     }
 
     /** Smallest box holding all of them, packed the same way (outlines). */

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "lit=true": {
+      "model": "minecraft:block/lantern"
+    },
+    "lit=false": {
+      "model": "minecraft:block/lantern_off"
+    }
+  }
+}

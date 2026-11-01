@@ -28,8 +28,15 @@ public final class Blocks {
         OAK_STAIRS_TOP = 114, COBBLESTONE_STAIRS = 118, COBBLESTONE_STAIRS_TOP = 122, COBBLESTONE_WALL = 126,
         OAK_WINDOW = 127,
         // Husbandry: a straw nest (empty, an egg in it) and a beehive (empty, a colony, honey to take)
-        NEST = 129, NEST_EGG = 130, BEEHIVE = 131, BEEHIVE_BEES = 132, BEEHIVE_HONEY = 133;
-    public static final int COUNT = 134; // ids are shorts: up to 32 767 states
+        NEST = 129, NEST_EGG = 130, BEEHIVE = 131, BEEHIVE_BEES = 132, BEEHIVE_HONEY = 133,
+        // Doors stand two blocks high, a thin leaf in the middle of the wall: the lower half along x is
+        // OAK_DOOR (closed) and OAK_DOOR_OPEN, then the lower half along z, then the upper halves.
+        OAK_DOOR_Z = 134, OAK_DOOR_Z_OPEN = 135, OAK_DOOR_TOP = 136, OAK_DOOR_TOP_OPEN = 137, OAK_DOOR_TOP_Z = 138,
+        OAK_DOOR_TOP_Z_OPEN = 139,
+        // Furniture: a table, a chair (its back on the north, south, west, east side), a lantern (lit, out),
+        // a water barrel, a rug
+        OAK_TABLE = 140, OAK_CHAIR = 141, LANTERN = 145, LANTERN_OFF = 146, BARREL = 147, RUG = 148;
+    public static final int COUNT = 149; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -51,7 +58,9 @@ public final class Blocks {
         "snare", "snare", "oak_stairs", "oak_stairs", "oak_stairs", "oak_stairs",
         "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs",
         "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs",
-        "cobblestone_wall", "oak_window", "oak_window", "nest", "nest", "beehive", "beehive", "beehive"};
+        "cobblestone_wall", "oak_window", "oak_window", "nest", "nest", "beehive", "beehive", "beehive",
+        "oak_door", "oak_door", "oak_door", "oak_door", "oak_door", "oak_door",
+        "oak_table", "oak_chair", "oak_chair", "oak_chair", "oak_chair", "lantern", "lantern", "barrel", "rug"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
@@ -59,7 +68,8 @@ public final class Blocks {
         "level=1", "level=2", "level=3", "level=4", "level=5", "level=6", "level=7", "level=8",
         "level=0", "level=2", "level=4", "level=6", "level=8", "", "", "", "", "",
         "layers=1", "layers=2", "layers=3", "layers=4", "layers=5", "layers=6", "layers=7", "layers=8", "", "",
-        "", "", "", "age=0", "age=2", "age=5", "age=7", "age=3", "age=1", "", "", "", "open=false", "open=true", "", "",
+        "", "", "", "age=0", "age=2", "age=5", "age=7", "age=3", "age=1", "", "", "",
+        "half=lower,axis=x,open=false", "half=lower,axis=x,open=true", "", "",
         "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "full=false", "full=true",
         "facing=north", "facing=south", "facing=west", "facing=east",
         "facing=north,half=bottom", "facing=south,half=bottom", "facing=west,half=bottom", "facing=east,half=bottom",
@@ -67,11 +77,15 @@ public final class Blocks {
         "facing=north,half=top", "facing=south,half=top", "facing=west,half=top", "facing=east,half=top",
         "facing=north,half=bottom", "facing=south,half=bottom", "facing=west,half=bottom", "facing=east,half=bottom",
         "facing=north,half=top", "facing=south,half=top", "facing=west,half=top", "facing=east,half=top",
-        "", "axis=x", "axis=z", "full=false", "full=true", "state=empty", "state=bees", "state=honey"};
+        "", "axis=x", "axis=z", "full=false", "full=true", "state=empty", "state=bees", "state=honey",
+        "half=lower,axis=z,open=false", "half=lower,axis=z,open=true", "half=upper,axis=x,open=false",
+        "half=upper,axis=x,open=true", "half=upper,axis=z,open=false", "half=upper,axis=z,open=true",
+        "", "facing=north", "facing=south", "facing=west", "facing=east", "lit=true", "lit=false", "", ""};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
-        SHAPE_LAYER = 5, SHAPE_SLOPE = 6, SHAPE_STAIRS = 7, SHAPE_WALL = 8, SHAPE_WINDOW = 9;
+        SHAPE_LAYER = 5, SHAPE_SLOPE = 6, SHAPE_STAIRS = 7, SHAPE_WALL = 8, SHAPE_WINDOW = 9, SHAPE_DOOR = 10,
+        SHAPE_FURNITURE = 11;
     /**
      * High side of a slope (roof) or a stair: 0 north, 1 south, 2 west, 3 east. For a window, the
      * line of its pane: 0 along x, 1 along z.
@@ -79,6 +93,8 @@ public final class Blocks {
     public static final byte[] FACING = new byte[COUNT];
     /** Upside-down stairs (the step hangs under a slab at the top of the cell). */
     public static final boolean[] UPPER = new boolean[COUNT];
+    /** Door halves, and furniture (a bed, a table, chairs, a lantern, a barrel, a rug: one does not walk over them). */
+    private static final boolean[] DOOR = new boolean[COUNT], FURNITURE = new boolean[COUNT];
     public static final byte TINT_NONE = 0, TINT_GRASS = 1, TINT_FOLIAGE = 2, TINT_WATER = 3;
 
     // ---- fluids ----
@@ -141,9 +157,28 @@ public final class Blocks {
         plant(EDELWEISS);
         for (short p : new short[] {WHEAT_0, WHEAT_0 + 1, WHEAT_0 + 2, WHEAT_7, BERRY_BUSH, BERRY_BUSH_PICKED, BROWN_MUSHROOM,
             OAK_SAPLING}) plant(p);
-        cutout(OAK_DOOR, 0, false);
-        cutout(OAK_DOOR_OPEN, 0, false);
-        SOLID[OAK_DOOR_OPEN] = false; // an open door is a frame one walks through
+        for (int i = 0; i < 8; i++) { // doors: a leaf of boxes (see Shapes), light goes round it
+            short d = door(i >= 4, (i & 2) != 0, (i & 1) != 0);
+            cutout(d, 0, false);
+            SHAPE[d] = SHAPE_DOOR;
+            FACING[d] = (byte) (i >> 1 & 1);
+            UPPER[d] = i >= 4;
+            DOOR[d] = true;
+            if ((i & 1) != 0) SOLID[d] = false; // an open door is a doorway one walks through
+        }
+        // Furniture: boxes in the cell (see Shapes), light goes through.
+        for (short f : new short[] {STRAW_BED, OAK_TABLE, OAK_CHAIR, OAK_CHAIR + 1, OAK_CHAIR + 2, OAK_CHAIR + 3, LANTERN,
+            LANTERN_OFF, RUG}) {
+            SHAPE[f] = SHAPE_FURNITURE;
+            OPACITY[f] = 0;
+            FURNITURE[f] = true;
+        }
+        for (int f = 0; f < 4; f++) FACING[OAK_CHAIR + f] = (byte) f;
+        FURNITURE[BARREL] = true;
+        LAYER[LANTERN] = LAYER[LANTERN_OFF] = LAYER_CUTOUT;
+        SOLID[RUG] = false; // a rug is walked on, like a carpet
+        SOLID[LANTERN] = SOLID[LANTERN_OFF] = false;
+        EMISSION[LANTERN] = 15;
         cutout(OAK_FENCE, 0, false);
         cutout(FISH_TRAP, 0, false); // a wicker basket in the stream: water flows through
         cutout(FISH_TRAP_FULL, 0, false);
@@ -177,7 +212,8 @@ public final class Blocks {
         EMISSION[CAMPFIRE] = 14;
         EMISSION[FURNACE] = 7;
         for (int i = 0; i < COUNT; i++) FAMILY[i] = (short) i;
-        FAMILY[OAK_DOOR_OPEN] = OAK_DOOR;
+        for (int i = 0; i < COUNT; i++) if (DOOR[i]) FAMILY[i] = OAK_DOOR;
+        FAMILY[LANTERN_OFF] = LANTERN;
         for (int f = 1; f < 4; f++) FAMILY[THATCH_ROOF + f] = THATCH_ROOF;
         for (int i = WATER_FLOW_1 - 1; i <= WATER_FALLING; i++) {
             short w = (short) (i == WATER_FLOW_1 - 1 ? WATER : i);
@@ -253,6 +289,13 @@ public final class Blocks {
         hardness(0.5f, THATCH, DECORATED_POT);
         hardness(0.8f, RED_WOOL, BLUE_WOOL, WHITE_WOOL, YELLOW_WOOL);
         hardness(1.25f, TERRACOTTA);
+        for (int i = 0; i < COUNT; i++) if (DOOR[i]) { HARDNESS[i] = 2f; DROP[i] = OAK_DOOR; }
+        for (int i = 0; i < COUNT; i++) if (DOOR[i] && UPPER[i]) DROP[i] = AIR; // the door drops once, from its lower half
+        hardness(2f, OAK_TABLE, OAK_CHAIR, (short) (OAK_CHAIR + 1), (short) (OAK_CHAIR + 2), (short) (OAK_CHAIR + 3), BARREL);
+        for (int f = 1; f < 4; f++) DROP[OAK_CHAIR + f] = OAK_CHAIR;
+        hardness(0.5f, LANTERN, LANTERN_OFF);
+        DROP[LANTERN_OFF] = LANTERN;
+        hardness(0.3f, RUG);
         hardness(2f, CAMPFIRE, OAK_FENCE, OAK_DOOR, OAK_DOOR_OPEN, COMPOSTER, LOOM, WATER_WHEEL, WINDMILL, SAWMILL, DYE_VAT,
             TANNING_VAT, POTTERS_WHEEL, PAINTING);
         hardness(3.5f, FURNACE, MILLSTONE, STATUE);
@@ -332,8 +375,14 @@ public final class Blocks {
         TOOL[SNOW_BLOCK] = TOOL_SHOVEL;
         MATTER[BERRY_BUSH] = MATTER[BERRY_BUSH_PICKED] = M_FRUIT;
         for (short s : new short[] {CRAFTING_TABLE, OAK_FENCE, OAK_DOOR, OAK_DOOR_OPEN, COMPOSTER, LOOM, WATER_WHEEL,
-            WINDMILL, SAWMILL, DYE_VAT, TANNING_VAT, POTTERS_WHEEL, PAINTING, CAMPFIRE, BEEHIVE, BEEHIVE_BEES, BEEHIVE_HONEY})
+            WINDMILL, SAWMILL, DYE_VAT, TANNING_VAT, POTTERS_WHEEL, PAINTING, CAMPFIRE, BEEHIVE, BEEHIVE_BEES, BEEHIVE_HONEY,
+            OAK_TABLE, OAK_CHAIR, (short) (OAK_CHAIR + 1), (short) (OAK_CHAIR + 2), (short) (OAK_CHAIR + 3), BARREL})
             TOOL[s] = TOOL_AXE;
+        for (int i = 0; i < COUNT; i++) if (DOOR[i]) { TOOL[i] = TOOL_AXE; MATTER[i] = M_WOOD; }
+        for (short s : new short[] {OAK_TABLE, OAK_CHAIR, (short) (OAK_CHAIR + 1), (short) (OAK_CHAIR + 2), (short) (OAK_CHAIR + 3), BARREL})
+            MATTER[s] = M_WOOD;
+        BEAUTY[RUG] = 2;
+        BEAUTY[LANTERN] = 1;
         BEAUTY[POPPY] = BEAUTY[GENTIAN] = BEAUTY[EDELWEISS] = 2;
         BEAUTY[RED_WOOL] = BEAUTY[BLUE_WOOL] = BEAUTY[WHITE_WOOL] = BEAUTY[YELLOW_WOOL] = 1;
         BEAUTY[TERRACOTTA] = BEAUTY[GLASS] = BEAUTY[OAK_WINDOW] = BEAUTY[OAK_WINDOW + 1] = 1;
@@ -473,6 +522,52 @@ public final class Blocks {
     /** Low plants that stand in the open and are buried by snow, nipped by frost or eaten by grazers. */
     public static boolean isPlant(short id) {
         return id == SHORT_GRASS || id == POPPY || id == GENTIAN || id == EDELWEISS;
+    }
+
+    /** The door half: upper or lower, its leaf along z (else along x), open. */
+    public static short door(boolean upper, boolean alongZ, boolean open) {
+        int i = (upper ? 4 : 0) + (alongZ ? 2 : 0) + (open ? 1 : 0);
+        return i < 2 ? (short) (OAK_DOOR + i) : (short) (OAK_DOOR_Z + i - 2);
+    }
+
+    public static boolean isDoor(short id) {
+        return DOOR[id & 0xFFFF];
+    }
+
+    /** A closed door half (the leaf in the way). */
+    public static boolean isClosedDoor(short id) {
+        return DOOR[id & 0xFFFF] && SOLID[id & 0xFFFF];
+    }
+
+    /** The same door half, opened or closed. */
+    public static short withOpen(short id, boolean open) {
+        return door(UPPER[id & 0xFFFF], FACING[id & 0xFFFF] == 1, open);
+    }
+
+    /** The other half of a door: upper for lower and back, same leaf and state. */
+    public static short otherHalf(short id) {
+        return door(!UPPER[id & 0xFFFF], FACING[id & 0xFFFF] == 1, !SOLID[id & 0xFFFF]);
+    }
+
+    /** Furniture: a bed, a table, a chair, a lantern, a barrel, a rug. */
+    public static boolean isFurniture(short id) {
+        return FURNITURE[id & 0xFFFF];
+    }
+
+    /** A chair, facing its back to (0 north, 1 south, 2 west, 3 east). */
+    public static boolean isChair(short id) {
+        int c = (id & 0xFFFF) - OAK_CHAIR;
+        return c >= 0 && c < 4;
+    }
+
+    /**
+     * The state a plan (or a builder) counts as the same as {@code id}: a door open or closed, a lantern lit
+     * or out, are the same piece of the building.
+     */
+    public static short settled(short id) {
+        if (DOOR[id & 0xFFFF]) return withOpen(id, false);
+        if (id == LANTERN_OFF) return LANTERN;
+        return id;
     }
 
     /** Made of boxes inside the cell (stairs, walls, windows): see Shapes. */

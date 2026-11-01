@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " I ",
+    "GSG",
+    " I "
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "G": "minecraft:glass",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "minecraft:lantern",
+    "count": 1
+  },
+  "mynecraft:skill": "smithing"
+}

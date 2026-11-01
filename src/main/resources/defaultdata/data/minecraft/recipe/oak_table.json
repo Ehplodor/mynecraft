@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "PPP",
+    "S S",
+    "S S"
+  ],
+  "key": {
+    "P": "#minecraft:planks",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "minecraft:oak_table",
+    "count": 1
+  },
+  "mynecraft:skill": "building"
+}
