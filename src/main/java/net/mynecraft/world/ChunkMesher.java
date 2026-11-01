@@ -24,6 +24,10 @@ import java.util.Arrays;
  * height, minus one, in 4 bits: corners 0 and 1 in bits 24-31 of the last word, corners 2 and 3 in
  * bits 24-31 of the third (in place of the AO, which fluids do without). The shader also scrolls
  * the texture along the slope (currents) and down the sides (falls).
+ * SPECIAL_BOX (stairs, walls, windows: one face of a box inside the cell): the origin is the cell's low
+ * corner; the width and height fields hold the face's u0 and u1 - 1, bits 24-31 of the third word its
+ * v0 and v1 - 1 (4 bits each, sixteenths), bits 24-28 of the last word the depth of its plane along the
+ * face's axis (0..16). No AO; lit by the cell in front of the face.
  * Corners are numbered (u0,v0), (u1,v0), (u1,v1), (u0,v1). Smooth light is the exact sum of the 4
  * cells around a vertex. UVs are derived from position in the shader, so merged quads tile their
  * texture. Quads are grouped by render layer: opaque, then cutout, then translucent.
@@ -37,7 +41,7 @@ public final class ChunkMesher {
     private static final int CROSS_FACE = 6;
     /** Vertex adjustments applied by the shader (3-bit field). */
     public static final int SPECIAL_NONE = 0, SPECIAL_FLUID = 1, SPECIAL_SLAB_BOTTOM = 2, SPECIAL_OVERLAY = 3,
-        SPECIAL_SLAB_TOP = 4, SPECIAL_FLUID_CORNERS = 5, SPECIAL_SLOPE = 6;
+        SPECIAL_SLAB_TOP = 4, SPECIAL_FLUID_CORNERS = 5, SPECIAL_SLOPE = 6, SPECIAL_BOX = 7;
 
     /**
      * Mesh of one section; {@link #data} holds the layers back to back. {@link #visibility} says which
@@ -137,6 +141,7 @@ public final class ChunkMesher {
         meshSlabs();
         meshLayers();
         meshSlopes();
+        meshBoxes(world, chunk.cx * Section.SIZE, Chunk.sectionMinY(sy), chunk.cz * Section.SIZE);
         int vis = visibility.compute(section);
         int total = count[0] + count[1] + count[2];
         if (total == 0) return new Result(new int[0], 0, 0, 0, vis);
@@ -250,7 +255,7 @@ public final class ChunkMesher {
                             | (long) smoothLight(f, su, sv) << 24 | (long) smoothLight(f, -su, sv) << 36;
                         int blockField = local(b);
                         // Fluid surface: lowered unless the same fluid continues above.
-                        if (Blocks.isFluid(b) && Blocks.FLUID[padded[idx + up] & 0xFF] != Blocks.FLUID[b & 0xFFFF]) {
+                        if (Blocks.isFluid(b) && Blocks.FLUID[padded[idx + up] & 0xFFFF] != Blocks.FLUID[b & 0xFFFF]) {
                             blockField |= WATER_SURFACE;
                         }
                         if (Blocks.isFluid(b) && fluidCorners(b, idx, up)) {
@@ -319,7 +324,7 @@ public final class ChunkMesher {
             int i = low + (k & 1) * STRIDE[0] + (k >> 1) * STRIDE[2];
             short c = padded[i];
             if (Blocks.FLUID[c & 0xFFFF] == type) {
-                if (Blocks.FLUID[padded[i + up] & 0xFF] == type) return 16;
+                if (Blocks.FLUID[padded[i + up] & 0xFFFF] == type) return 16;
                 int h = Blocks.fluidHeight(c);
                 sum += Blocks.LEVEL[c & 0xFFFF] == 0 ? h * 4 : h; // sources weigh more, like vanilla
                 n += Blocks.LEVEL[c & 0xFFFF] == 0 ? 4 : 1;
@@ -359,14 +364,14 @@ public final class ChunkMesher {
      * is lower (a flowing step), otherwise a gap would show between the two surfaces.
      */
     private boolean fluidStep(short b, int idx, int n, int d, int up) {
-        if (d == 1 || !Blocks.isFluid(b) || Blocks.FLUID[padded[n] & 0xFF] != Blocks.FLUID[b & 0xFFFF]) return false;
+        if (d == 1 || !Blocks.isFluid(b) || Blocks.FLUID[padded[n] & 0xFFFF] != Blocks.FLUID[b & 0xFFFF]) return false;
         return surface(idx, up) > surface(n, up);
     }
 
     /** Height of a fluid cell's surface in sixteenths: full when the same fluid or a cover (ice) is above. */
     private int surface(int i, int up) {
         short b = padded[i];
-        return Blocks.FLUID[padded[i + up] & 0xFF] == Blocks.FLUID[b & 0xFFFF] || underCover(b, padded[i + up])
+        return Blocks.FLUID[padded[i + up] & 0xFFFF] == Blocks.FLUID[b & 0xFFFF] || underCover(b, padded[i + up])
             ? 16 : Blocks.fluidHeight(b);
     }
 
@@ -522,5 +527,88 @@ public final class ChunkMesher {
                         emitCornerCell(d, u, v, p[d] + (positive ? 1 : 0), p[u], p[v], f, b, positive, light, SPECIAL_SLOPE);
                     }
                 }
+    }
+
+    // ---- shaped blocks (stairs, walls, windows) ----
+
+    private final short[] around6 = new short[6], aroundNext = new short[6];
+    private final int[] coverRows = new int[16];
+    private int baseX, baseY, baseZ;
+    private World world;
+
+    /** Block at padded coordinates, read from the world beyond the padding (a neighbour's neighbour). */
+    private short blockAt(int x, int y, int z) {
+        if (x >= -1 && x <= 16 && y >= -1 && y <= 16 && z >= -1 && z <= 16) return padded[pIndex(x, y, z)];
+        return world.get(baseX + x, baseY + y, baseZ + z);
+    }
+
+    /** Variant of the shaped block at padded coordinates (see Shapes.variant). */
+    private int variantAt(short b, int x, int y, int z, short[] n) {
+        n[0] = blockAt(x - 1, y, z);
+        n[1] = blockAt(x + 1, y, z);
+        n[2] = blockAt(x, y - 1, z);
+        n[3] = blockAt(x, y + 1, z);
+        n[4] = blockAt(x, y, z - 1);
+        n[5] = blockAt(x, y, z + 1);
+        return Shapes.variant(b, n);
+    }
+
+    /**
+     * Stairs, walls and windows: every face of their boxes, one quad each (SPECIAL_BOX). A face on the
+     * cell's side is left out where the neighbour hides it: an opaque block, the same glass, or the
+     * boxes of a shaped neighbour covering it with the same material or an opaque one (two walls
+     * meeting, a row of windows).
+     */
+    private void meshBoxes(World world, int bx, int by, int bz) {
+        this.world = world;
+        baseX = bx;
+        baseY = by;
+        baseZ = bz;
+        for (int y = 0; y < 16; y++)
+            for (int z = 0; z < 16; z++)
+                for (int x = 0; x < 16; x++) {
+                    int idx = pIndex(x, y, z);
+                    short b = padded[idx];
+                    if (!Blocks.hasBoxes(b)) continue;
+                    int[] boxes = Shapes.boxes(b, variantAt(b, x, y, z, around6));
+                    int[] cell = {x, y, z};
+                    for (int box : boxes) {
+                        short part = Shapes.partBlock(b, Shapes.part(box));
+                        for (int f = 0; f < 6; f++) {
+                            int d = f >> 1, u = (d + 1) % 3, v = (d + 2) % 3;
+                            boolean positive = (f & 1) != 0;
+                            int depth = positive ? Shapes.max(box, d) : Shapes.min(box, d);
+                            int u0 = Shapes.min(box, u), u1 = Shapes.max(box, u), v0 = Shapes.min(box, v), v1 = Shapes.max(box, v);
+                            boolean side = depth == (positive ? 16 : 0);
+                            int n = idx + (positive ? STRIDE[d] : -STRIDE[d]);
+                            if (side && hidden(part, f, u0, u1, v0, v1, cell, n)) continue;
+                            int[] light = flatLight(paddedLight[side ? n : idx] & 0xFF);
+                            put(Blocks.LAYER[part & 0xFFFF], x, y, z, f, u0, u1 - 1, SPECIAL_BOX, false,
+                                faceInfo[(part & 0xFFFF) * 6 + f], light[1] | (v0 | v1 - 1 << 4) << 24, light[1] | depth << 24);
+                        }
+                    }
+                }
+    }
+
+    /** Whether the neighbour n hides the rectangle [u0, u1] x [v0, v1] of a face on the cell's side f. */
+    private boolean hidden(short part, int f, int u0, int u1, int v0, int v1, int[] cell, int n) {
+        short nb = padded[n];
+        if (!Blocks.hasBoxes(nb)) return !Blocks.faceVisible(part, nb);
+        int d = f >> 1, u = (d + 1) % 3, v = (d + 2) % 3;
+        boolean positive = (f & 1) != 0;
+        int[] p = cell.clone();
+        p[d] += positive ? 1 : -1;
+        int[] boxes = Shapes.boxes(nb, variantAt(nb, p[0], p[1], p[2], aroundNext));
+        java.util.Arrays.fill(coverRows, 0);
+        for (int box : boxes) {
+            if ((positive ? Shapes.min(box, d) : Shapes.max(box, d)) != (positive ? 0 : 16)) continue;
+            short np = Shapes.partBlock(nb, Shapes.part(box));
+            if (np != part && Blocks.LAYER[np & 0xFFFF] != Blocks.LAYER_OPAQUE) continue; // see-through cover
+            int mask = (1 << Shapes.max(box, u)) - (1 << Shapes.min(box, u));
+            for (int j = Shapes.min(box, v); j < Shapes.max(box, v); j++) coverRows[j] |= mask;
+        }
+        int need = (1 << u1) - (1 << u0);
+        for (int j = v0; j < v1; j++) if ((coverRows[j] & need) != need) return false;
+        return true;
     }
 }

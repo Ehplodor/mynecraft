@@ -13,6 +13,8 @@ data/minecraft/recipe/canvas.json
 data/minecraft/recipe/charcoal.json
 data/minecraft/recipe/chisel.json
 data/minecraft/recipe/cloth.json
+data/minecraft/recipe/cobblestone_stairs.json
+data/minecraft/recipe/cobblestone_wall.json
 data/minecraft/recipe/compost.json
 data/minecraft/recipe/composter.json
 data/minecraft/recipe/cooked_rabbit.json
@@ -47,6 +49,7 @@ data/minecraft/recipe/oak_planks.json
 data/minecraft/recipe/oak_planks_sawn.json
 data/minecraft/recipe/oak_slab.json
 data/minecraft/recipe/oak_stairs.json
+data/minecraft/recipe/oak_window.json
 data/minecraft/recipe/packed_ice.json
 data/minecraft/recipe/painting.json
 data/minecraft/recipe/potters_wheel.json

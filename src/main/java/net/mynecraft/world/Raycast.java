@@ -7,15 +7,16 @@ public final class Raycast {
 
     private Raycast() {}
 
-    /** Slab test of the ray against box [x, x+1] x [y+lo, y+hi] x [z, z+1]; normal of the entry face. */
-    private static Hit box(double ox, double oy, double oz, double dx, double dy, double dz, double maxDist,
-                           int x, int y, int z, double lo, double hi) {
-        double[] o = {ox, oy, oz}, d = {dx, dy, dz}, min = {x, y + lo, z}, max = {x + 1, y + hi, z + 1};
+    /**
+     * Slab test of the ray against the box [min, max]: distance to its entry, or -1 if missed.
+     * {@code normal} receives the entry face as {axis, sign} (axis -1: the ray starts inside).
+     */
+    private static double enter(double[] o, double[] d, double[] min, double[] max, double maxDist, int[] normal) {
         double tNear = 0, tFar = maxDist;
         int axis = -1, sign = 0;
         for (int a = 0; a < 3; a++) {
             if (d[a] == 0) {
-                if (o[a] < min[a] || o[a] > max[a]) return null;
+                if (o[a] < min[a] || o[a] > max[a]) return -1;
                 continue;
             }
             double t1 = (min[a] - o[a]) / d[a], t2 = (max[a] - o[a]) / d[a];
@@ -23,10 +24,31 @@ public final class Raycast {
             if (t1 > t2) { double t = t1; t1 = t2; t2 = t; s = 1; }
             if (t1 > tNear) { tNear = t1; axis = a; sign = s; }
             tFar = Math.min(tFar, t2);
-            if (tNear > tFar) return null;
+            if (tNear > tFar) return -1;
         }
-        if (axis < 0) return new Hit(x, y, z, 0, 1, 0); // ray starts inside the box
-        return new Hit(x, y, z, axis == 0 ? sign : 0, axis == 1 ? sign : 0, axis == 2 ? sign : 0);
+        normal[0] = axis;
+        normal[1] = sign;
+        return tNear;
+    }
+
+    /** The nearest of a partial block's boxes the ray crosses (slab, stair, wall, window), or null. */
+    private static Hit partial(double ox, double oy, double oz, double dx, double dy, double dz, double maxDist,
+                               int x, int y, int z, int[] boxes) {
+        double[] o = {ox, oy, oz}, d = {dx, dy, dz}, min = new double[3], max = new double[3];
+        int[] normal = new int[2];
+        double best = Double.MAX_VALUE;
+        Hit hit = null;
+        for (int b : boxes) {
+            min[0] = x + Shapes.min(b, 0) / 16.0; min[1] = y + Shapes.min(b, 1) / 16.0; min[2] = z + Shapes.min(b, 2) / 16.0;
+            max[0] = x + Shapes.max(b, 0) / 16.0; max[1] = y + Shapes.max(b, 1) / 16.0; max[2] = z + Shapes.max(b, 2) / 16.0;
+            double t = enter(o, d, min, max, maxDist, normal);
+            if (t < 0 || t >= best) continue;
+            best = t;
+            int axis = normal[0], sign = normal[1];
+            hit = axis < 0 ? new Hit(x, y, z, 0, 1, 0) // ray starts inside the box
+                : new Hit(x, y, z, axis == 0 ? sign : 0, axis == 1 ? sign : 0, axis == 2 ? sign : 0);
+        }
+        return hit;
     }
 
     public static Hit cast(World world, double ox, double oy, double oz,
@@ -44,10 +66,10 @@ public final class Raycast {
         while (t <= maxDist) {
             short b = world.get(x, y, z);
             if (Blocks.isTargetable(b)) {
-                if (!Blocks.isSlab(b)) return new Hit(x, y, z, nx, ny, nz);
-                // Partial block: the ray must actually cross its box, otherwise keep going.
-                Hit partial = box(ox, oy, oz, dx, dy, dz, maxDist, x, y, z,
-                    Blocks.BOX_MIN[b & 0xFFFF] / 16.0, Blocks.BOX_MAX[b & 0xFFFF] / 16.0);
+                int[] boxes = Blocks.isSlab(b) ? Shapes.cell(b) : Blocks.hasBoxes(b) ? Shapes.at(world, x, y, z) : null;
+                if (boxes == null) return new Hit(x, y, z, nx, ny, nz);
+                // Partial block: the ray must actually cross one of its boxes, otherwise keep going.
+                Hit partial = partial(ox, oy, oz, dx, dy, dz, maxDist, x, y, z, boxes);
                 if (partial != null) return partial;
             }
             if (tmx < tmy && tmx < tmz) {

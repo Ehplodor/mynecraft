@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "minecraft:block/oak_window"
+    },
+    "axis=z": {
+      "model": "minecraft:block/oak_window"
+    }
+  }
+}

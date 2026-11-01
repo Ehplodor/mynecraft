@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "facing=north,half=bottom": {
+      "model": "minecraft:block/cobblestone_stairs"
+    },
+    "facing=south,half=bottom": {
+      "model": "minecraft:block/cobblestone_stairs"
+    },
+    "facing=west,half=bottom": {
+      "model": "minecraft:block/cobblestone_stairs"
+    },
+    "facing=east,half=bottom": {
+      "model": "minecraft:block/cobblestone_stairs"
+    },
+    "facing=north,half=top": {
+      "model": "minecraft:block/cobblestone_stairs"
+    },
+    "facing=south,half=top": {
+      "model": "minecraft:block/cobblestone_stairs"
+    },
+    "facing=west,half=top": {
+      "model": "minecraft:block/cobblestone_stairs"
+    },
+    "facing=east,half=top": {
+      "model": "minecraft:block/cobblestone_stairs"
+    }
+  }
+}

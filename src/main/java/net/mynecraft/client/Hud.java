@@ -3,6 +3,7 @@ package net.mynecraft.client;
 import net.mynecraft.resource.BlockAppearance;
 import net.mynecraft.resource.FontLoader;
 import net.mynecraft.world.Blocks;
+import net.mynecraft.world.Shapes;
 import org.joml.Matrix4f;
 import org.lwjgl.BufferUtils;
 
@@ -289,10 +290,65 @@ final class Hud {
             return;
         }
         float w = s * 0.43f;
+        if (Blocks.hasBoxes(block)) { boxesIcon(block, cx, cy, s, w); return; }
         float d = Blocks.isSlab(block) ? s / 4 : 0; // half-height icon for slabs: lower the top face
         face(block, 3, 1.0f, cx, cy - s / 2 + d, cx + w, cy - s / 4 + d, cx, cy + d, cx - w, cy - s / 4 + d, 0); // top
         face(block, 5, 0.8f, cx - w, cy - s / 4 + d, cx, cy + d, cx, cy + s / 2, cx - w, cy + s / 4, d > 0 ? 0.5f : 0);
         face(block, 1, 0.6f, cx, cy + d, cx + w, cy - s / 4 + d, cx + w, cy + s / 4, cx, cy + s / 2, d > 0 ? 0.5f : 0);
+    }
+
+    /**
+     * Stairs, walls, windows: their boxes seen from above the south-east corner, back to front, each
+     * face showing the part of the texture it covers in the world.
+     */
+    private void boxesIcon(short block, float cx, float cy, float s, float w) {
+        int[] boxes = Shapes.boxes(block, Shapes.iconVariant(block));
+        // Farther boxes first: the view comes from +x, +y, +z.
+        Integer[] order = new Integer[boxes.length];
+        for (int i = 0; i < order.length; i++) order[i] = boxes[i];
+        java.util.Arrays.sort(order, java.util.Comparator.comparingInt(b -> {
+            int sum = 0;
+            for (int a = 0; a < 3; a++) sum += Shapes.min(b, a) + Shapes.max(b, a);
+            return sum;
+        }));
+        for (int b : order) {
+            short part = Shapes.partBlock(block, Shapes.part(b));
+            float x0 = Shapes.min(b, 0) / 16f, y0 = Shapes.min(b, 1) / 16f, z0 = Shapes.min(b, 2) / 16f;
+            float x1 = Shapes.max(b, 0) / 16f, y1 = Shapes.max(b, 1) / 16f, z1 = Shapes.max(b, 2) / 16f;
+            float[] p = new float[8];
+            // top (u = x, v = z)
+            iso(p, 0, cx, cy, s, w, x0, y1, z0); iso(p, 2, cx, cy, s, w, x1, y1, z0);
+            iso(p, 4, cx, cy, s, w, x1, y1, z1); iso(p, 6, cx, cy, s, w, x0, y1, z1);
+            face(part, 3, 1.0f, p, x0, x1, z0, z1);
+            // south, +z (u = x, v = 1 - y)
+            iso(p, 0, cx, cy, s, w, x0, y1, z1); iso(p, 2, cx, cy, s, w, x1, y1, z1);
+            iso(p, 4, cx, cy, s, w, x1, y0, z1); iso(p, 6, cx, cy, s, w, x0, y0, z1);
+            face(part, 5, 0.8f, p, x0, x1, 1 - y1, 1 - y0);
+            // east, +x (u = 1 - z, v = 1 - y)
+            iso(p, 0, cx, cy, s, w, x1, y1, z1); iso(p, 2, cx, cy, s, w, x1, y1, z0);
+            iso(p, 4, cx, cy, s, w, x1, y0, z0); iso(p, 6, cx, cy, s, w, x1, y0, z1);
+            face(part, 1, 0.6f, p, 1 - z1, 1 - z0, 1 - y1, 1 - y0);
+        }
+    }
+
+    /** Screen position of a point of the cell (0..1) in the icon's isometric view. */
+    private static void iso(float[] p, int i, float cx, float cy, float s, float w, float x, float y, float z) {
+        p[i] = cx + w * (x - z);
+        p[i + 1] = cy - s / 2 + s / 4 * (x + z) + s / 2 * (1 - y);
+    }
+
+    /** Quad of a face's texture cropped to [u0, u1] x [v0, v1], corners in p (texture order). */
+    private void face(short block, int f, float shade, float[] p, float u0, float u1, float v0, float v1) {
+        int info = faceInfo[(block & 0xFFFF) * 6 + f];
+        float layer = info & BlockAppearance.LAYER_MASK;
+        float[] tint = TINT[(info >> BlockAppearance.TINT_SHIFT) & 3];
+        float r = tint[0] * shade, g = tint[1] * shade, b = tint[2] * shade;
+        vertex(p[0], p[1], u0, v0, layer, r, g, b, 1);
+        vertex(p[2], p[3], u1, v0, layer, r, g, b, 1);
+        vertex(p[4], p[5], u1, v1, layer, r, g, b, 1);
+        vertex(p[0], p[1], u0, v0, layer, r, g, b, 1);
+        vertex(p[4], p[5], u1, v1, layer, r, g, b, 1);
+        vertex(p[6], p[7], u0, v1, layer, r, g, b, 1);
     }
 
     /**

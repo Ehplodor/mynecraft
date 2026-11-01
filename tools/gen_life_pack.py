@@ -134,10 +134,19 @@ def main():
         save(n, rgba(snare(f), 118 + f))
         cross(n, n)
     state("snare", {"full=false": {"model": "minecraft:block/snare"}, "full=true": {"model": "minecraft:block/snare_full"}})
-    # roofs and stairs: ramps, drawn by the mesher from a full-cube model
-    for n, tex in (("thatch_roof", "thatch"), ("oak_stairs", "oak_planks")):
+    # roofs: ramps, drawn by the mesher from a full-cube model
+    write_json("models/block/thatch_roof.json", {"parent": "block/cube_all", "textures": {"all": "block/thatch"}})
+    state("thatch_roof", {f"facing={f}": {"model": "minecraft:block/thatch_roof"} for f in ("north", "south", "west", "east")})
+    # stairs, walls, windows: boxes drawn by the mesher (world.Shapes) with the textures of a full-cube model
+    for n, tex in (("oak_stairs", "oak_planks"), ("cobblestone_stairs", "cobblestone")):
         write_json(f"models/block/{n}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{tex}"}})
-        state(n, {f"facing={f}": {"model": f"minecraft:block/{n}"} for f in ("north", "south", "west", "east")})
+        state(n, {f"facing={f},half={h}": {"model": f"minecraft:block/{n}"}
+                  for h in ("bottom", "top") for f in ("north", "south", "west", "east")})
+    write_json("models/block/cobblestone_wall.json", {"parent": "block/cube_all", "textures": {"all": "block/cobblestone"}})
+    state("cobblestone_wall")
+    # the window: an oak frame and a glass pane (the mesher takes them from oak planks and glass)
+    write_json("models/block/oak_window.json", {"parent": "block/cube_all", "textures": {"all": "block/oak_planks"}})
+    state("oak_window", {f"axis={a}": {"model": "minecraft:block/oak_window"} for a in ("x", "z")})
     state("fish_trap", {"full=false": {"model": "minecraft:block/fish_trap"},
                         "full=true": {"model": "minecraft:block/fish_trap_full"}})
     # ---- building
@@ -246,7 +255,9 @@ def main():
               "white_wool": "Drap blanc", "yellow_wool": "Drap jaune", "terracotta": "Terre cuite",
               "decorated_pot": "Pot décoré", "painting": "Tableau", "statue": "Statue", "sawmill": "Scierie",
               "dye_vat": "Cuve de teinture", "fish_trap": "Nasse", "snare": "Collet",
-              "thatch_roof": "Pente de chaume", "oak_stairs": "Escalier en chêne"}
+              "thatch_roof": "Pente de chaume", "oak_stairs": "Escalier en chêne",
+              "cobblestone_stairs": "Escalier en pierre", "cobblestone_wall": "Muret de pierre",
+              "oak_window": "Fenêtre en chêne"}
     items = {"wooden_pickaxe": "Pioche en bois", "stone_pickaxe": "Pioche en pierre", "iron_pickaxe": "Pioche en fer",
              "wooden_axe": "Hache en bois", "stone_axe": "Hache en pierre", "iron_axe": "Hache en fer",
              "wooden_shovel": "Pelle en bois", "stone_shovel": "Pelle en pierre", "iron_shovel": "Pelle en fer",
@@ -403,6 +414,9 @@ def gen_data():
     shaped("snare", ["F", "S"], {"F": "string", "S": "stick"}, "snare", skill="hunting")
     shaped("thatch_roof", ["T  ", "TT "], {"T": "thatch"}, "thatch_roof", 4, skill="building")
     shaped("oak_stairs", ["P  ", "PP ", "PPP"], {"P": "oak_planks"}, "oak_stairs", 4, skill="building")
+    shaped("cobblestone_stairs", ["C  ", "CC ", "CCC"], {"C": "cobblestone"}, "cobblestone_stairs", 4, skill="building")
+    shaped("cobblestone_wall", ["CCC", "CCC"], {"C": "cobblestone"}, "cobblestone_wall", 6, skill="building")
+    shaped("oak_window", ["SSS", "SGS", "SSS"], {"S": "stick", "G": "glass"}, "oak_window", 2, skill="building")
     shaped("fish_trap", ["SFS", "F F", "SFS"], {"S": "stick", "F": "string"}, "fish_trap", skill="fishing")
     shaped("fishing_rod", ["  S", " SF", "S F"], {"S": "stick", "F": "string"}, "fishing_rod", skill="fishing")
     shaped("bow", [" SF", "S F", " SF"], {"S": "stick", "F": "string"}, "bow", skill="hunting", level=1)
