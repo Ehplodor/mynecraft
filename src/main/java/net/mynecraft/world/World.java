@@ -81,6 +81,24 @@ public final class World {
         return Blocks.isSolid(b) ? Blocks.BOX_MIN[b & 0xFFFF] | Blocks.BOX_MAX[b & 0xFFFF] << 8 : -1;
     }
 
+    private static final int[] FULL_CELL = {Shapes.box(0, 0, 0, 16, 16, 16)};
+
+    /**
+     * Collision boxes of a cell, packed as in {@link Shapes} (stairs, walls and windows have several),
+     * or null if nothing there stops a body. Below the world and in unloaded chunks: a full cell.
+     * {@code scratch} (6 entries) holds the neighbours a shaped block looks at.
+     */
+    public int[] collisionBoxes(int x, int y, int z, short[] scratch) {
+        if (y >= Chunk.MAX_Y) return null;
+        if (y < Chunk.MIN_Y) return FULL_CELL;
+        Chunk c = chunk(x >> 4, z >> 4);
+        if (c == null) return FULL_CELL;
+        short b = c.get(x & 15, y, z & 15);
+        if (!Blocks.isSolid(b)) return null;
+        if (Blocks.hasBoxes(b)) return Shapes.boxes(b, Shapes.variantAt(this, x, y, z, b, scratch));
+        return Shapes.cell(b);
+    }
+
     /** Sets a block in a loaded chunk; returns false if out of range or unchanged. */
     public boolean set(int x, int y, int z, short id) {
         if (y < Chunk.MIN_Y || y >= Chunk.MAX_Y) return false;

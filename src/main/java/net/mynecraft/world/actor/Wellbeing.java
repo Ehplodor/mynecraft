@@ -21,7 +21,8 @@ public record Wellbeing(double roof, double walls, double fire, boolean bed, dou
             for (int dy = 1; dy <= 16; dy++)
                 if (Blocks.isOpaque(w.get(x + o[0], y + dy, z + o[1])) || Blocks.isSlab(w.get(x + o[0], y + dy, z + o[1]))
                     || w.get(x + o[0], y + dy, z + o[1]) == Blocks.THATCH
-                    || Blocks.SHAPE[w.get(x + o[0], y + dy, z + o[1]) & 0xFFFF] == Blocks.SHAPE_SLOPE) { roofed++; break; }
+                    || Blocks.SHAPE[w.get(x + o[0], y + dy, z + o[1]) & 0xFFFF] == Blocks.SHAPE_SLOPE
+                    || Blocks.SHAPE[w.get(x + o[0], y + dy, z + o[1]) & 0xFFFF] == Blocks.SHAPE_STAIRS) { roofed++; break; }
         int walled = 0;
         int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
         for (int[] d : dirs)

@@ -77,7 +77,8 @@ Contrôles : `F3` écran de débogage (FPS, temps GPU, sections, mémoire…), `
 | `world/storage/PlayerData` | Joueur dans `level.dat` avec les clés vanilla (`Health`, `Air`, `Inventory`, `playerGameType`) |
 | `world/crafting/RecipeBook`, `CraftingMenu` | Recettes de data packs (formes, sans forme, tags, formats 1.21 et anciens) ; règles de clic vanilla |
 | `client/InventoryScreen` | Écrans inventaire / établi / palette créative |
-| `world/Placement` | Règles de pose vanilla (axe des bûches, demi-dalles, fusion en dalle double) |
+| `world/Placement` | Règles de pose vanilla (axe des bûches, demi-dalles, fusion en dalle double, escaliers et fenêtres orientés) |
+| `world/Shapes` | Blocs en boîtes : escaliers (coins comme vanilla), murets reliés, fenêtres encadrées ; boîtes pour le maillage, les collisions et la visée |
 | `world/LightEngine` | Lumière ciel + blocs (BFS ajout/retrait incrémental, traverse les chunks) |
 | `world/ChunkMesher` | **Greedy meshing** (fusion à lumière et AO égales), lumière lisse + AO par sommet, eau abaissée, plantes en croix, **16 o/quad** (vertex pulling) |
 | `resource/PackSource`, `ResourceManager` | Packs dossier/zip/classpath empilés (le dernier gagne) |

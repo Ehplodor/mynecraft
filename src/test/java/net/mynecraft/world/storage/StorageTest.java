@@ -114,7 +114,7 @@ class StorageTest {
         Chunk f = w.getOrGenerateEmpty(1, 0);
         byte[] fluids = new byte[16];
         int n = 0;
-        for (int i = 0; i < Blocks.COUNT; i++) if (Blocks.isFluid((byte) i)) fluids[n++] = (byte) i;
+        for (int i = 0; i < Blocks.COUNT; i++) if (Blocks.isFluid((short) i)) fluids[n++] = (byte) i;
         for (int i = 0; i < n; i++) f.set(i, 70, 0, fluids[i]);
         Chunk fb = ChunkCodec.decode(Nbt.read(Nbt.toBytes(ChunkCodec.encode(f))), 1, 0);
         for (int i = 0; i < n; i++) assertEquals(fluids[i], fb.get(i, 70, 0), Blocks.STATE[fluids[i]]);

@@ -1,15 +1,27 @@
 {
   "variants": {
-    "facing=north": {
+    "facing=north,half=bottom": {
       "model": "minecraft:block/oak_stairs"
     },
-    "facing=south": {
+    "facing=south,half=bottom": {
       "model": "minecraft:block/oak_stairs"
     },
-    "facing=west": {
+    "facing=west,half=bottom": {
       "model": "minecraft:block/oak_stairs"
     },
-    "facing=east": {
+    "facing=east,half=bottom": {
+      "model": "minecraft:block/oak_stairs"
+    },
+    "facing=north,half=top": {
+      "model": "minecraft:block/oak_stairs"
+    },
+    "facing=south,half=top": {
+      "model": "minecraft:block/oak_stairs"
+    },
+    "facing=west,half=top": {
+      "model": "minecraft:block/oak_stairs"
+    },
+    "facing=east,half=top": {
       "model": "minecraft:block/oak_stairs"
     }
   }

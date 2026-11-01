@@ -128,5 +128,8 @@
   "block.minecraft.snare": "Collet",
   "block.minecraft.thatch_roof": "Pente de chaume",
   "block.minecraft.oak_stairs": "Escalier en chêne",
-  "item.minecraft.drum": "Tambour"
+  "item.minecraft.drum": "Tambour",
+  "block.minecraft.cobblestone_stairs": "Escalier en pierre",
+  "block.minecraft.cobblestone_wall": "Muret de pierre",
+  "block.minecraft.oak_window": "Fenêtre en chêne"
 }

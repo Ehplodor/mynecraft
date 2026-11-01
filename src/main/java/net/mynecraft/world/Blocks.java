@@ -23,8 +23,11 @@ public final class Blocks {
         LOOM = 88, POTTERS_WHEEL = 89, WATER_WHEEL = 90, WINDMILL = 91, RED_WOOL = 92, BLUE_WOOL = 93, WHITE_WOOL = 94,
         YELLOW_WOOL = 95, TERRACOTTA = 96, DECORATED_POT = 97, PAINTING = 98, STATUE = 99, SAWMILL = 100, DYE_VAT = 101,
         FISH_TRAP = 102, FISH_TRAP_FULL = 103,
-        THATCH_ROOF = 104, /* facing north, south, west, east */ OAK_STAIRS = 108, SNARE = 112, SNARE_FULL = 113;
-    public static final int COUNT = 114; // ids are shorts: up to 32 767 states
+        THATCH_ROOF = 104, /* facing north, south, west, east */ OAK_STAIRS = 108, SNARE = 112, SNARE_FULL = 113,
+        // Stairs (facing north, south, west, east; upside down after), walls, windows (pane along x, along z)
+        OAK_STAIRS_TOP = 114, COBBLESTONE_STAIRS = 118, COBBLESTONE_STAIRS_TOP = 122, COBBLESTONE_WALL = 126,
+        OAK_WINDOW = 127;
+    public static final int COUNT = 129; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -43,7 +46,10 @@ public final class Blocks {
         "millstone", "anvil", "tanning_vat", "loom", "potters_wheel", "water_wheel", "windmill", "red_wool", "blue_wool",
         "white_wool", "yellow_wool", "terracotta", "decorated_pot", "painting", "statue", "sawmill", "dye_vat", "fish_trap", "fish_trap",
         "thatch_roof", "thatch_roof", "thatch_roof", "thatch_roof", "oak_stairs", "oak_stairs", "oak_stairs", "oak_stairs",
-        "snare", "snare"};
+        "snare", "snare", "oak_stairs", "oak_stairs", "oak_stairs", "oak_stairs",
+        "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs",
+        "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs",
+        "cobblestone_wall", "oak_window", "oak_window"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
@@ -53,13 +59,24 @@ public final class Blocks {
         "layers=1", "layers=2", "layers=3", "layers=4", "layers=5", "layers=6", "layers=7", "layers=8", "", "",
         "", "", "", "age=0", "age=2", "age=5", "age=7", "age=3", "age=1", "", "", "", "open=false", "open=true", "", "",
         "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "full=false", "full=true",
-        "facing=north", "facing=south", "facing=west", "facing=east", "facing=north", "facing=south", "facing=west", "facing=east", "full=false", "full=true"};
+        "facing=north", "facing=south", "facing=west", "facing=east",
+        "facing=north,half=bottom", "facing=south,half=bottom", "facing=west,half=bottom", "facing=east,half=bottom",
+        "full=false", "full=true",
+        "facing=north,half=top", "facing=south,half=top", "facing=west,half=top", "facing=east,half=top",
+        "facing=north,half=bottom", "facing=south,half=bottom", "facing=west,half=bottom", "facing=east,half=bottom",
+        "facing=north,half=top", "facing=south,half=top", "facing=west,half=top", "facing=east,half=top",
+        "", "axis=x", "axis=z"};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
-        SHAPE_LAYER = 5, SHAPE_SLOPE = 6;
-    /** High side of a slope (roof, ramp): 0 north, 1 south, 2 west, 3 east. */
+        SHAPE_LAYER = 5, SHAPE_SLOPE = 6, SHAPE_STAIRS = 7, SHAPE_WALL = 8, SHAPE_WINDOW = 9;
+    /**
+     * High side of a slope (roof) or a stair: 0 north, 1 south, 2 west, 3 east. For a window, the
+     * line of its pane: 0 along x, 1 along z.
+     */
     public static final byte[] FACING = new byte[COUNT];
+    /** Upside-down stairs (the step hangs under a slab at the top of the cell). */
+    public static final boolean[] UPPER = new boolean[COUNT];
     public static final byte TINT_NONE = 0, TINT_GRASS = 1, TINT_FOLIAGE = 2, TINT_WATER = 3;
 
     // ---- fluids ----
@@ -130,19 +147,34 @@ public final class Blocks {
         cutout(FISH_TRAP_FULL, 0, false);
         plant(SNARE);
         plant(SNARE_FULL);
-        for (int f = 0; f < 4; f++) { // roofs and stairs: a ramp, half a block to stand on (more to climb, see Player)
-            for (short base : new short[] {THATCH_ROOF, OAK_STAIRS}) {
+        for (int f = 0; f < 4; f++) { // roofs: a ramp, half a block to stand on (more to climb, see Player)
+            SHAPE[THATCH_ROOF + f] = SHAPE_SLOPE;
+            FACING[THATCH_ROOF + f] = (byte) f;
+            OPACITY[THATCH_ROOF + f] = 0;
+        }
+        // Stairs, walls and windows are boxes in their cell (see Shapes); light goes through them.
+        for (short base : new short[] {OAK_STAIRS, OAK_STAIRS_TOP, COBBLESTONE_STAIRS, COBBLESTONE_STAIRS_TOP}) {
+            for (int f = 0; f < 4; f++) {
                 short id = (short) (base + f);
-                SHAPE[id] = SHAPE_SLOPE;
+                SHAPE[id] = SHAPE_STAIRS;
                 FACING[id] = (byte) f;
+                UPPER[id] = base == OAK_STAIRS_TOP || base == COBBLESTONE_STAIRS_TOP;
                 OPACITY[id] = 0;
             }
+        }
+        SHAPE[COBBLESTONE_WALL] = SHAPE_WALL;
+        OPACITY[COBBLESTONE_WALL] = 0;
+        for (int a = 0; a < 2; a++) {
+            SHAPE[OAK_WINDOW + a] = SHAPE_WINDOW;
+            FACING[OAK_WINDOW + a] = (byte) a;
+            LAYER[OAK_WINDOW + a] = LAYER_CUTOUT;
+            OPACITY[OAK_WINDOW + a] = 0;
         }
         EMISSION[CAMPFIRE] = 14;
         EMISSION[FURNACE] = 7;
         for (int i = 0; i < COUNT; i++) FAMILY[i] = (short) i;
         FAMILY[OAK_DOOR_OPEN] = OAK_DOOR;
-        for (int f = 1; f < 4; f++) { FAMILY[THATCH_ROOF + f] = THATCH_ROOF; FAMILY[OAK_STAIRS + f] = OAK_STAIRS; }
+        for (int f = 1; f < 4; f++) FAMILY[THATCH_ROOF + f] = THATCH_ROOF;
         for (int i = WATER_FLOW_1 - 1; i <= WATER_FALLING; i++) {
             short w = (short) (i == WATER_FLOW_1 - 1 ? WATER : i);
             fluid(w, FLUID_WATER, LAYER_TRANSLUCENT, 1, w == WATER ? 0 : w == WATER_FALLING ? 8 : w - WATER_FLOW_1 + 1);
@@ -227,10 +259,12 @@ public final class Blocks {
         hardness(0f, SNARE, SNARE_FULL);
         for (int f = 0; f < 4; f++) {
             DROP[THATCH_ROOF + f] = THATCH_ROOF;
-            DROP[OAK_STAIRS + f] = OAK_STAIRS;
             hardness(0.5f, (short) (THATCH_ROOF + f));
-            hardness(2f, (short) (OAK_STAIRS + f));
+            hardness(2f, (short) (OAK_STAIRS + f), (short) (OAK_STAIRS_TOP + f), (short) (COBBLESTONE_STAIRS + f),
+                (short) (COBBLESTONE_STAIRS_TOP + f));
         }
+        hardness(2f, COBBLESTONE_WALL);
+        hardness(1f, OAK_WINDOW, (short) (OAK_WINDOW + 1));
         hardness(0.6f, FISH_TRAP, FISH_TRAP_FULL);
         DROP[BERRY_BUSH_PICKED] = BERRY_BUSH;
         for (int a = 0; a < 4; a++) DROP[WHEAT_0 + a] = AIR; // harvests come from Drops
@@ -253,7 +287,8 @@ public final class Blocks {
         for (int i = 1; i < COUNT; i++) {
             String n = NAMES[i];
             if (FLUID[i] != FLUID_NONE) continue;
-            if (n.endsWith("_log") || n.endsWith("_planks") || n.endsWith("_slab") || n.endsWith("_stairs") || n.endsWith("_sapling")) {
+            if (n.endsWith("_log") || n.endsWith("_planks") || n.endsWith("_slab") || n.startsWith("oak_") && n.endsWith("_stairs")
+                || n.endsWith("_sapling") || n.endsWith("_window")) {
                 MATTER[i] = M_WOOD;
                 TOOL[i] = TOOL_AXE;
             } else if (n.endsWith("_ore")) {
@@ -265,10 +300,15 @@ public final class Blocks {
             }
         }
         for (short s : new short[] {STONE, COBBLESTONE, GRANITE, DIORITE, ANDESITE, DEEPSLATE, OBSIDIAN, GLOWSTONE, FURNACE,
-            MILLSTONE, ANVIL, STATUE, TERRACOTTA}) {
+            MILLSTONE, ANVIL, STATUE, TERRACOTTA, COBBLESTONE_WALL}) {
             MATTER[s] = M_STONE;
             TOOL[s] = TOOL_PICKAXE;
             TIER[s] = 1;
+        }
+        for (int i = 0; i < 8; i++) {
+            MATTER[COBBLESTONE_STAIRS + i] = M_STONE;
+            TOOL[COBBLESTONE_STAIRS + i] = TOOL_PICKAXE;
+            TIER[COBBLESTONE_STAIRS + i] = 1;
         }
         TIER[GLOWSTONE] = TIER[TERRACOTTA] = 0;
         TIER[IRON_ORE] = 2;
@@ -286,7 +326,7 @@ public final class Blocks {
             WINDMILL, SAWMILL, DYE_VAT, TANNING_VAT, POTTERS_WHEEL, PAINTING, CAMPFIRE}) TOOL[s] = TOOL_AXE;
         BEAUTY[POPPY] = BEAUTY[GENTIAN] = BEAUTY[EDELWEISS] = 2;
         BEAUTY[RED_WOOL] = BEAUTY[BLUE_WOOL] = BEAUTY[WHITE_WOOL] = BEAUTY[YELLOW_WOOL] = 1;
-        BEAUTY[TERRACOTTA] = BEAUTY[GLASS] = 1;
+        BEAUTY[TERRACOTTA] = BEAUTY[GLASS] = BEAUTY[OAK_WINDOW] = BEAUTY[OAK_WINDOW + 1] = 1;
         BEAUTY[DECORATED_POT] = 3;
         BEAUTY[PAINTING] = BEAUTY[STATUE] = 5;
     }
@@ -354,17 +394,41 @@ public final class Blocks {
     private Blocks() {}
 
     /**
-     * Id of the state of {@code name} whose properties all appear in {@code properties}, else the
-     * block's default state (its first id), else -1 for an unknown name.
+     * Id of the state of {@code name} that agrees with {@code properties} on the most of its own
+     * properties without contradicting any (a property left out matches any value: an old save
+     * without "half" reads as a bottom stair); else the block's default state (its first id), else
+     * -1 for an unknown name.
      */
     public static short fromState(String name, java.util.Map<String, String> properties) {
-        short first = -1;
+        short first = -1, best = -1;
+        int bestScore = -1;
         for (int i = 0; i < COUNT; i++) {
             if (!NAMES[i].equals(name)) continue;
             if (first < 0) first = (short) i;
-            if (matches(STATE[i], properties)) return (short) i;
+            int score = agreement(STATE[i], properties);
+            if (score > bestScore) { best = (short) i; bestScore = score; }
         }
-        return first;
+        return best >= 0 ? best : first;
+    }
+
+    /** How many of the state's "k=v" are in {@code properties}; -1 if one has another value there. */
+    private static int agreement(String state, java.util.Map<String, String> properties) {
+        if (state.isEmpty()) return 0;
+        int n = 0;
+        for (String kv : state.split(",")) {
+            int eq = kv.indexOf('=');
+            String have = properties.get(kv.substring(0, eq));
+            if (have == null) continue;
+            if (!have.equals(kv.substring(eq + 1))) return -1;
+            n++;
+        }
+        return n;
+    }
+
+    /** A stair of the same material as {@code id}, facing (0 north, 1 south, 2 west, 3 east) and half given. */
+    public static short stair(short id, int facing, boolean upper) {
+        return fromState(NAMES[id & 0xFFFF], java.util.Map.of("facing", new String[] {"north", "south", "west", "east"}[facing],
+            "half", upper ? "top" : "bottom"));
     }
 
     /** True if every "k=v" of {@code state} is present in {@code properties}. */
@@ -399,6 +463,11 @@ public final class Blocks {
     /** Low plants that stand in the open and are buried by snow, nipped by frost or eaten by grazers. */
     public static boolean isPlant(short id) {
         return id == SHORT_GRASS || id == POPPY || id == GENTIAN || id == EDELWEISS;
+    }
+
+    /** Made of boxes inside the cell (stairs, walls, windows): see Shapes. */
+    public static boolean hasBoxes(short id) {
+        return SHAPE[id & 0xFFFF] >= SHAPE_STAIRS;
     }
 
     public static boolean isSlab(short id) {

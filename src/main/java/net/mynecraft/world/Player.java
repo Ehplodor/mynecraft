@@ -2,7 +2,7 @@ package net.mynecraft.world;
 
 /**
  * Player body: axis-aligned box, feet at (x, y, z). Movement is swept one axis at a time against
- * the collision boxes of nearby blocks (full cubes, slabs...), which is exact and allocation-free.
+ * the collision boxes of nearby blocks (full cubes, slabs, the boxes of stairs, walls and windows), which is exact and allocation-free.
  * Walking into a ledge up to {@link #STEP_HEIGHT} high climbs it, like vanilla.
  */
 public final class Player {
@@ -15,6 +15,7 @@ public final class Player {
     public boolean onGround, flying;
     /** Fluid the body is in (Blocks.FLUID_*), updated every step. */
     public short fluid;
+    private final short[] around = new short[6]; // neighbours of a shaped block being collided with
 
     /** Integrates one step. Horizontal velocity is set by the controller; gravity is applied here. */
     public void step(World world, double dt) {
@@ -49,7 +50,7 @@ public final class Player {
     /** Retries the blocked rest of a horizontal move from up to STEP_HEIGHT higher; undone if it gains nothing. */
     private void stepUp(World world, double restX, double restZ) {
         double sx = x, sy = y, sz = z;
-        // On a ramp (stairs, roof) the next one is a whole block up: climb it as a step.
+        // On a roof's ramp the next one is a whole block up: climb it as a step (stairs have real steps).
         short under = world.get(fl(x), fl(y - 0.01), fl(z));
         double up = sweep(world, 1, Blocks.SHAPE[under & 0xFFFF] == Blocks.SHAPE_SLOPE ? 1.05 : STEP_HEIGHT);
         double ax = sweep(world, 0, restX), az = sweep(world, 2, restZ);
@@ -123,17 +124,18 @@ public final class Player {
         for (int by = y0; by <= y1; by++)
             for (int bz = z0; bz <= z1; bz++)
                 for (int bx = x0; bx <= x1; bx++) {
-                    int box = w.collisionBox(bx, by, bz);
-                    if (box < 0) continue;
-                    double[] bmin = {bx, by + (box & 0xFF) / 16.0, bz};
-                    double[] bmax = {bx + 1, by + (box >> 8) / 16.0, bz + 1};
-                    boolean overlaps = true;
-                    for (int a = 0; a < 3 && overlaps; a++) {
-                        if (a != axis) overlaps = bmax[a] > min[a] + EPS && bmin[a] < max[a] - EPS;
+                    int[] boxes = w.collisionBoxes(bx, by, bz, around);
+                    if (boxes == null) continue;
+                    for (int box : boxes) {
+                        double[] bmin = {bx + Shapes.min(box, 0) / 16.0, by + Shapes.min(box, 1) / 16.0, bz + Shapes.min(box, 2) / 16.0};
+                        double[] bmax = {bx + Shapes.max(box, 0) / 16.0, by + Shapes.max(box, 1) / 16.0, bz + Shapes.max(box, 2) / 16.0};
+                        boolean overlaps = true;
+                        for (int a = 0; a < 3 && overlaps; a++)
+                            if (a != axis) overlaps = bmax[a] > min[a] + EPS && bmin[a] < max[a] - EPS;
+                        if (!overlaps) continue;
+                        if (d > 0 && bmin[axis] >= max[axis] - EPS) d = Math.min(d, bmin[axis] - max[axis]);
+                        else if (d < 0 && bmax[axis] <= min[axis] + EPS) d = Math.max(d, bmax[axis] - min[axis]);
                     }
-                    if (!overlaps) continue;
-                    if (d > 0 && bmin[axis] >= max[axis] - EPS) d = Math.min(d, bmin[axis] - max[axis]);
-                    else if (d < 0 && bmax[axis] <= min[axis] + EPS) d = Math.max(d, bmax[axis] - min[axis]);
                 }
         if (axis == 0) x += d; else if (axis == 1) y += d; else z += d;
         return d;

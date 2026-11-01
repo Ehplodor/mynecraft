@@ -64,8 +64,18 @@ void main() {
         int c = positive ? k : (4 - k) % 4;
         int d = int(face) / 2, u = (d + 1) % 3, v = (d + 2) % 3;
         local = origin;
-        local[u] += float(CORNER[c].x * w);
-        local[v] += float(CORNER[c].y * h);
+        if (special == 7u) {
+            // A face of a box inside the cell (stairs, walls, windows): extents and depth in sixteenths.
+            float u0 = float((q.x >> 18) & 15u), u1 = float((q.x >> 22) & 15u) + 1.0;
+            float v0 = float((q.z >> 24) & 15u), v1 = float((q.z >> 28) & 15u) + 1.0;
+            local[d] += float((q.w >> 24) & 31u) / 16.0;
+            local[u] += (CORNER[c].x == 0 ? u0 : u1) / 16.0;
+            local[v] += (CORNER[c].y == 0 ? v0 : v1) / 16.0;
+            w = 0; h = 0; // no slab or fluid adjustment below
+        } else {
+            local[u] += float(CORNER[c].x * w);
+            local[v] += float(CORNER[c].y * h);
+        }
         float yMin = origin.y, yMax = origin.y + (u == 1 ? float(w) : v == 1 ? float(h) : 0.0);
         bool top = d == 1 ? face == 3u : local.y == yMax;
         bool bottom = d == 1 ? face == 2u : local.y == yMin;

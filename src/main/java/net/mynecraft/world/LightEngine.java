@@ -181,8 +181,8 @@ public final class LightEngine {
                         int va = la == null ? Chunk.DEFAULT_LIGHT : la[ia] & 0xFF;
                         int vb = lb == null ? Chunk.DEFAULT_LIGHT : lb[ib] & 0xFF;
                         if (va == vb) continue;
-                        int opA = secA == null ? 0 : Blocks.OPACITY[secA.blocks[ia] & 0xFF];
-                        int opB = secB == null ? 0 : Blocks.OPACITY[secB.blocks[ib] & 0xFF];
+                        int opA = secA == null ? 0 : Blocks.OPACITY[secA.blocks[ia] & 0xFFFF];
+                        int opB = secB == null ? 0 : Blocks.OPACITY[secB.blocks[ib] & 0xFFFF];
                         int y = y0 + ly;
                         int wax = (c.cx << 4) + ax, waz = (c.cz << 4) + az;
                         int wbx = (n.cx << 4) + bx, wbz = (n.cz << 4) + bz;

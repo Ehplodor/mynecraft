@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SSS",
+    "SGS",
+    "SSS"
+  ],
+  "key": {
+    "S": "minecraft:stick",
+    "G": "minecraft:glass"
+  },
+  "result": {
+    "id": "minecraft:oak_window",
+    "count": 2
+  },
+  "mynecraft:skill": "building"
+}
