@@ -61,6 +61,19 @@ d'une pièce ; les habitants referment derrière eux). Meubles : lit de paille (
 table, chaise (clic droit : s'asseoir), lanterne (allumer, éteindre), tonneau d'eau (boire), tapis. Démo :
 `--hamlet-built` (le hameau achevé), captures `src/test/scenes/hameau.txt`.
 
+La tranche de l'eau (M38) : les eaux usées de la tannerie et de la teinture polluent la rivière, et la pollution
+descend vers l'aval puis s'en va d'elle-même en quelques jours. Une eau sale devient trouble et brune à l'écran,
+et les truites cessent de frayer au-delà de 50 % de pollution. Roseaux (sauvages sur les berges, ou plantés) et
+saules (bouture plantée au bord de l'eau, écorce qui soigne) filtrent l'eau. Corentin le pêcheur nomme le
+pollueur et refuse alors de commercer avec lui ; Anselme donne des roseaux. Le carnet a une page des projets
+(`N` jusqu'à la page 4, `Y` pour accepter un projet) : « ramener la rivière à la vie », et un héron cendré revient
+quand c'est fait. Le carnet nomme aussi « l'eau de source », l'eau la plus pure du territoire. La vanne (clic droit
+pour l'ouvrir ou la fermer) retient l'eau ou la laisse passer dans une rigole de pierre qui irrigue le champ voisin ;
+fermée sur une rivière, elle ralentit les roues d'aval et fâche le hameau. Après des jours d'averse vient la crue :
+l'eau monte de deux blocs sur les berges basses, puis laisse du bois flotté et du limon fertile (à labourer). On
+approche mieux une bête face au vent ; `V` maintenu pour écouter les sons lointains et savoir d'où ils viennent.
+Démos : `--water-demo` (`--pollute 0.8` pour l'eau sale), `--flood`, `--listen` ; captures `src/test/scenes/eau.txt`.
+
 `E` ouvre l'inventaire (grille 2×2) ; clic droit sur un établi : grille 3×3 (Maj pour poser contre lui). En créatif,
 `E` ouvre la palette de tous les blocs.
 
