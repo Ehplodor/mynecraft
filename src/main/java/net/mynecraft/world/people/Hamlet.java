@@ -267,6 +267,11 @@ public final class Hamlet {
         }
     }
 
+    /** The fisher warns of the flood (E7.5). */
+    public void warnFlood(Villager f) {
+        say(f, "La rivière grossit ! Éloignez les bêtes des berges basses.");
+    }
+
     /** The first inhabitant with this trade, or null. */
     public Villager villager(Job job) {
         for (Villager v : villagers) if (v.job == job) return v;

@@ -339,7 +339,7 @@ public final class Main {
         renderer.creatures = creatureRenderer;
         boolean showcase = argv.contains("--showcase");
         double pollutionTimer = 0;
-        boolean listenDemo = argv.contains("--listen");
+        boolean listenDemo = argv.contains("--listen"), floodDemo = argv.contains("--flood");
         double lifeWait = Double.parseDouble(option(argv.toArray(new String[0]), "--life-seconds", showcase ? "2" : "0")), lifeClock = 0;
         Creature aimed = null;
         Overlay overlay = new Overlay();
@@ -1054,6 +1054,10 @@ public final class Main {
                 for (int dx = -4; dx <= 4; dx++) for (int dz = -4; dz <= 4; dz++) for (int y = gy + 1; y <= gy + 6; y++)
                     renderer.blockChanged(cx + 9 + dx, y, cz - 5 + dz);
             }
+            if (floodDemo && streamer.settled()) { // scripted shot: the rivers round the player at the crest of a flood
+                floodDemo = false;
+                liv.flood.since = net.mynecraft.world.Flood.DAYS / 2;
+            }
             if (polluteDemo >= 0 && streamer.settled()) { // scripted shot: the water around fouled (or not)
                 for (int dx = -2; dx <= 2; dx++)
                     for (int dz = -2; dz <= 2; dz++) {
@@ -1314,6 +1318,7 @@ public final class Main {
                 ambience.wind = here == null || paused ? 0 : (float) (Math.hypot(here.windX(), here.windZ()) * (1 + Math.max(0, cam.pos.y - 80) / 80));
                 ambience.daylight = (DayCycle.daylight(ticks) - 0.15f) / 0.85f;
                 ambience.warmth = (float) ((net.mynecraft.world.life.Ecosystem.temperatureOffset(life.eco.season().phase()) + 11) / 18);
+                sound.swell = (float) (liv.flood.height() / net.mynecraft.world.Flood.HEIGHT);
                 sound.update(cam.pos.x, cam.pos.y, cam.pos.z, cam.yaw, cam.pitch, ambience, weatherClock);
             }
             if (stats != null) {
