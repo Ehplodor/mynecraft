@@ -34,6 +34,15 @@ public final class Drops {
                 if (block == Blocks.OAK_LEAVES && rnd.nextDouble() < 0.05 * luck) out.add(new Drop(Blocks.OAK_SAPLING, 1));
                 if (rnd.nextDouble() < 0.10) out.add(new Drop(Items.STICK, 1));
             }
+            case Blocks.WILLOW_LEAVES -> { // a cutting to plant, and the bark the herbalist chews for fever
+                if (rnd.nextDouble() < 0.08 * luck) out.add(new Drop(Blocks.WILLOW_SAPLING, 1));
+                if (rnd.nextDouble() < 0.15 * luck) out.add(new Drop(Items.WILLOW_BARK, 1));
+                if (rnd.nextDouble() < 0.10) out.add(new Drop(Items.STICK, 1));
+            }
+            case Blocks.REEDS -> {
+                out.add(new Drop(Blocks.REEDS, 1));
+                if (rnd.nextDouble() < 0.4 * luck) out.add(new Drop(Items.PLANT_FIBER, 1));
+            }
             case Blocks.COAL_ORE -> out.add(new Drop(Items.COAL, 1));
             case Blocks.CLAY -> out.add(new Drop(Items.CLAY_BALL, 4));
             case Blocks.WHEAT_7 -> {

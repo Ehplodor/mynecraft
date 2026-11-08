@@ -192,7 +192,9 @@ public final class FluidSimulator {
         if (next > max) return;
         for (int i = 0; i < 4; i++) {
             int nx = x + HX[i], nz = z + HZ[i];
-            flowInto(nx, y, nz, world.get(nx, y, nz), type, next, false);
+            short n = world.get(nx, y, nz);
+            if (n == Blocks.SLUICE_OPEN) { nx += HX[i]; nz += HZ[i]; n = world.get(nx, y, nz); } // through the open gate
+            flowInto(nx, y, nz, n, type, next, false);
         }
     }
 
@@ -209,6 +211,7 @@ public final class FluidSimulator {
         for (int i = 0; i < 4; i++) {
             int nx = x + HX[i], nz = z + HZ[i];
             short n = world.get(nx, y, nz);
+            if (n == Blocks.SLUICE_OPEN) { nx += HX[i]; nz += HZ[i]; n = world.get(nx, y, nz); } // fed through an open gate
             if (Blocks.FLUID[n & 0xFFFF] != type) continue;
             int lvl = Blocks.LEVEL[n & 0xFFFF];
             if (lvl == 0) sources++;

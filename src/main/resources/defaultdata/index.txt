@@ -56,6 +56,7 @@ data/minecraft/recipe/oak_chair.json
 data/minecraft/recipe/oak_door.json
 data/minecraft/recipe/oak_fence.json
 data/minecraft/recipe/oak_planks.json
+data/minecraft/recipe/oak_planks_from_driftwood.json
 data/minecraft/recipe/oak_planks_sawn.json
 data/minecraft/recipe/oak_slab.json
 data/minecraft/recipe/oak_stairs.json
@@ -71,6 +72,7 @@ data/minecraft/recipe/rug.json
 data/minecraft/recipe/sand.json
 data/minecraft/recipe/sawmill.json
 data/minecraft/recipe/shears.json
+data/minecraft/recipe/sluice.json
 data/minecraft/recipe/smoked_meat.json
 data/minecraft/recipe/smooth_stone.json
 data/minecraft/recipe/snare.json
@@ -79,6 +81,7 @@ data/minecraft/recipe/spruce_planks_sawn.json
 data/minecraft/recipe/statue.json
 data/minecraft/recipe/stick.json
 data/minecraft/recipe/stone_axe.json
+data/minecraft/recipe/stone_channel.json
 data/minecraft/recipe/stone_hoe.json
 data/minecraft/recipe/stone_pickaxe.json
 data/minecraft/recipe/stone_shovel.json

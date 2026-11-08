@@ -27,6 +27,7 @@ uniform sampler2D uSceneColor; // the opaque world, for refraction under water
 uniform sampler2D uSceneDepth;
 uniform vec2 uScreen;
 uniform vec2 uDepthRange;      // near, far of the camera projection
+uniform sampler2D uPollution;  // the water's pollution per 64-block patch, wraps every 512 blocks
 uniform float uHideWater;      // 1: the eye is at the waterline, the water view draws the water
 
 out vec4 fragColor;
@@ -101,9 +102,20 @@ void main() {
         vec2 bent = suv + n.xz * 0.04 * clamp(thick / 4.0, 0.0, 1.0);
         if (linearDepth(texture(uSceneDepth, bent).r) < linearDepth(gl_FragCoord.z)) bent = suv; // not what is in front
         vec3 under = texture(uSceneColor, bent).rgb;
-        float absorb = 1.0 - exp(-thick * 0.22);
+        vec2 water = texture(uPollution, (vPos.xz + uCamWorld) / 512.0).rg; // pollution, purest-water mark
+        float absorb = 1.0 - exp(-thick * 0.22 * (1.0 - 0.6 * water.g)); // spring water: the bed seen deep down
         vec3 deep = vTint * 0.35 * lit;
         vec3 body = mix(under * mix(vec3(1.0), vTint * 1.4, 0.45), deep, absorb);
+        // Fouled water (tannery, dyes): cloudy and brown, the bed no longer seen, a scum drifting on it.
+        float foul = water.r;
+        if (foul > 0.01) {
+            vec2 wp = vPos.xz + uCamWorld;
+            float swirl = sin(wp.x * 1.3 + sin(wp.y * 0.4) * 2.0 + uTime * 0.3) * sin(wp.y * 1.7 + sin(wp.x * 0.5) * 2.0 - uTime * 0.2);
+            float scum = smoothstep(0.6, 0.95, swirl * 0.5 + 0.5);
+            vec3 murk = vec3(0.36, 0.30, 0.18) * lit;
+            body = mix(body, murk, clamp(foul * 1.4, 0.0, 0.85));
+            body = mix(body, vec3(0.55, 0.5, 0.35) * lit, scum * foul * 0.5);
+        }
         if (above) {
             float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
             vec3 r = reflect(-v, n);

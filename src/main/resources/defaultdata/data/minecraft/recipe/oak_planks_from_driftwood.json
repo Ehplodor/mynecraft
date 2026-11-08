@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "D"
+  ],
+  "key": {
+    "D": "minecraft:driftwood"
+  },
+  "result": {
+    "id": "minecraft:oak_planks",
+    "count": 2
+  },
+  "mynecraft:skill": "woodcutting"
+}

@@ -58,6 +58,19 @@ public final class Main {
     }
 
     /** Height (0..1) within the hit block of the point where the ray enters it through a side face. */
+    /** Shallow water (one block deep, open to the sky) within 24 blocks of (x, y, z): where a heron wades; null if none. */
+    static int[] shallows(World w, double x, double y, double z) {
+        int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
+        for (int r = 2; r <= 24; r += 2)
+            for (int a = 0; a < 16; a++) {
+                int sx = bx + (int) Math.round(r * Math.cos(a * Math.PI / 8)), sz = bz + (int) Math.round(r * Math.sin(a * Math.PI / 8));
+                for (int sy = by + 6; sy >= by - 10; sy--)
+                    if (Blocks.FLUID[w.get(sx, sy, sz) & 0xFFFF] == Blocks.FLUID_WATER && w.get(sx, sy + 1, sz) == Blocks.AIR
+                        && w.isSolid(sx, sy - 1, sz)) return new int[] {sx, sy, sz};
+            }
+        return null;
+    }
+
     private static double hitHeight(Raycast.Hit hit, double ox, double oy, double oz, double dx, double dy, double dz) {
         double t;
         if (hit.nx() != 0) t = (hit.x() + (hit.nx() > 0 ? 1 : 0) - ox) / dx;
@@ -309,7 +322,8 @@ public final class Main {
 
         boolean editDemo = argv.contains("--edit-demo"), fluidDemo = argv.contains("--fluid-demo");
         boolean blocksDemo = argv.contains("--blocks-demo"), shapesDemo = argv.contains("--shapes-demo"),
-            herdDemo = argv.contains("--herd-demo");
+            herdDemo = argv.contains("--herd-demo"), waterDemo = argv.contains("--water-demo");
+        double polluteDemo = Double.parseDouble(option(argv.toArray(new String[0]), "--pollute", "-1"));
         // Animals (M22): simulated around the player, drawn with the world and its shadows.
         Life life = new Life(world, world.seed);
         try { // the ecosystem's patches as they were left (else bootstrapped afresh)
@@ -324,6 +338,8 @@ public final class Main {
         CreatureRenderer creatureRenderer = new CreatureRenderer();
         renderer.creatures = creatureRenderer;
         boolean showcase = argv.contains("--showcase");
+        double pollutionTimer = 0;
+        boolean listenDemo = argv.contains("--listen");
         double lifeWait = Double.parseDouble(option(argv.toArray(new String[0]), "--life-seconds", showcase ? "2" : "0")), lifeClock = 0;
         Creature aimed = null;
         Overlay overlay = new Overlay();
@@ -667,7 +683,9 @@ public final class Main {
                         worldMap.open(player.x, player.z);
                         input.capture(false);
                     }
-                    if (input.pressedChar('n')) notebook.turn(); // naturalist's notebook: patch, compass, skills
+                    sound.listening = input.heldChar('v') || listenDemo; // V held: listen (G13)
+                    if (input.pressedChar('n')) notebook.turn(); // naturalist's notebook: patch, compass, skills, projects
+                    if (notebook.open && notebook.page == Notebook.PROJECTS && input.pressedChar('y')) liv.acceptProject();
                     if (input.pressedChar('h')) { // the hearth: centre of the territory the compass watches
                         liv.actor.setHome(player.x, player.y, player.z);
                         liv.say("Votre foyer est ici.");
@@ -818,16 +836,33 @@ public final class Main {
                 life.eco.update(ticks, DayCycle.daylight(ticks), DayCycle.DAY_TICKS);
                 weather.atmosphere.seasonOffset = (float) net.mynecraft.world.life.Ecosystem.temperatureOffset(life.eco.season().phase());
                 renderer.seasonChanged(life.eco.season().phase());
+                if ((pollutionTimer -= dt) <= 0) { pollutionTimer = 0.5; renderer.pollution.update(life.ecology, player.x, player.z); }
                 if (showcase && streamer.settled()) {
                     life.showcase(player.x, player.y, player.z, cam.yaw);
                     showcase = false;
                 }
                 life.lure = inventory.id(input.slot); // kept animals follow the food in the hand
+                var air = weather.here(); // the wind carries the player's scent to the animals downwind
+                life.windX = air.windX();
+                life.windZ = air.windZ();
                 life.tick(dt, player.x, player.y, player.z, input.shiftDown());
                 for (int[] e : liv.tick(dt, world, player, weather, life, recipes, DayCycle.daylight(ticks), creative, survival,
                     miningProgress > 0)) {
                     renderer.blockChanged(e[0], e[1], e[2]);
                     fluids.blockChanged(e[0], e[1], e[2]);
+                }
+                if (liv.heronComing) { // R16: the river lives again, a heron glides down to the shallows nearby
+                    liv.heronComing = false;
+                    int[] at = shallows(world, player.x, player.y, player.z);
+                    if (at != null) {
+                        var heron = life.spawn(net.mynecraft.world.life.Species.HERON, at[0] + 14.5, at[1] + 12, at[2] + 14.5);
+                        heron.goalX = at[0] + 0.5;
+                        heron.goalY = at[1];
+                        heron.goalZ = at[2] + 0.5;
+                        heron.state = net.mynecraft.world.life.Creature.State.FLY; // glides in and lands in the shallows
+                        heron.stateTime = 30;
+                        sound.splash(at[0] + 0.5, at[1], at[2] + 0.5);
+                    }
                 }
                 if (streamer.settled()) lifeClock += dt;
                 for (int[] e; (e = life.edits.poll()) != null; ) { // grass grown, eaten, frozen; lakes iced over or thawed
@@ -907,7 +942,7 @@ public final class Main {
             boolean interactive = Blocks.isDoor(aimedBlock) || aimedBlock == Blocks.BERRY_BUSH
                 || aimedBlock == Blocks.STRAW_BED || aimedBlock == Blocks.FISH_TRAP_FULL || aimedBlock == Blocks.SNARE_FULL
                 || Blocks.isChair(aimedBlock) || aimedBlock == Blocks.LANTERN || aimedBlock == Blocks.LANTERN_OFF
-                || aimedBlock == Blocks.BARREL;
+                || aimedBlock == Blocks.BARREL || aimedBlock == Blocks.SLUICE || aimedBlock == Blocks.SLUICE_OPEN;
             short heldItem = inventory.id(input.slot);
             boolean used = false;
             if (input.placeRequested && !screenOpen && !paused && hit != null && !creative && !input.shiftDown()
@@ -947,7 +982,7 @@ public final class Main {
                 && aimedBlock != Blocks.BARREL) {
                 var u = liv.use(world, input.slot, new int[] {hit.x(), hit.y(), hit.z()}, null, false, life, null, null, sound); // doors, lanterns, seats
                 if (u == net.mynecraft.world.actor.Gestures.Use.SAT) { player.x = hit.x() + 0.5; player.y = hit.y() + 9 / 16.0; player.z = hit.z() + 0.5; }
-                for (int dy = -1; dy <= 1; dy++) renderer.blockChanged(hit.x(), hit.y() + dy, hit.z());
+                for (int dy = -1; dy <= 1; dy++) { renderer.blockChanged(hit.x(), hit.y() + dy, hit.z()); fluids.blockChanged(hit.x(), hit.y() + dy, hit.z()); }
                 used = true;
             }
             if (used) {
@@ -992,6 +1027,41 @@ public final class Main {
                 life.keepNew(net.mynecraft.world.life.Species.SHEEP, cx - 1.5, fy, cz + 1.5, "joueur", true);
                 life.keepNew(net.mynecraft.world.life.Species.GOAT, cx + 2.5, fy, cz + 0.5, "joueur", false);
                 for (int i = 0; i < 3; i++) life.keepNew(net.mynecraft.world.life.Species.HEN, cx + 1.5 + i, fy, cz - 1.5, "joueur", false);
+            }
+            if (waterDemo && streamer.settled()) { // scripted shot: a pool before the eyes, reeds and a willow on its bank
+                waterDemo = false;
+                int cx = (int) Math.floor(player.x), cz = (int) Math.floor(player.z) - 10, gy = world.generator.column(cx, cz).height();
+                for (int dx = -10; dx <= 10; dx++)
+                    for (int dz = -8; dz <= 8; dz++) {
+                        int x = cx + dx, z = cz + dz;
+                        boolean pool = Math.abs(dx) <= 7 && Math.abs(dz) <= 3;
+                        for (int y = gy - 4; y < gy; y++) if (!world.isSolid(x, y, z)) demoSet(world, renderer, x, y, z, Blocks.DIRT);
+                        demoSet(world, renderer, x, gy - 2, z, pool ? Blocks.SAND : Blocks.DIRT);
+                        demoSet(world, renderer, x, gy - 1, z, pool ? Blocks.WATER : Blocks.DIRT);
+                        demoSet(world, renderer, x, gy, z, pool ? Blocks.WATER : Blocks.GRASS);
+                        for (int y = gy + 1; y <= gy + 14; y++) demoSet(world, renderer, x, y, z, Blocks.AIR);
+                        if (!pool && Math.abs(dz) == 4 && Math.abs(dx) <= 6 && (dx & 1) == 0) demoSet(world, renderer, x, gy + 1, z, Blocks.REEDS);
+                    }
+                net.mynecraft.world.Growth.willow(world, cx + 9, gy + 1, cz - 5);
+                // A stone channel leaving the pool westwards through an open gate, a field beside it.
+                for (int dx = -8; dx >= -14; dx--) {
+                    demoSet(world, renderer, cx + dx, gy - 1, cz, Blocks.STONE_CHANNEL);
+                    demoSet(world, renderer, cx + dx, gy, cz, dx == -8 ? Blocks.SLUICE_OPEN : Blocks.WATER_FLOW_1);
+                    for (int dz = 2; dz <= 4; dz++) demoSet(world, renderer, cx + dx, gy, cz + dz, Blocks.FARMLAND);
+                    for (int dz = 2; dz <= 4; dz++) demoSet(world, renderer, cx + dx, gy + 1, cz + dz, (short) (Blocks.WHEAT_0 + 1));
+                }
+                demoSet(world, renderer, cx - 8, gy, cz - 2, Blocks.SLUICE);
+                for (int dx = -4; dx <= 4; dx++) for (int dz = -4; dz <= 4; dz++) for (int y = gy + 1; y <= gy + 6; y++)
+                    renderer.blockChanged(cx + 9 + dx, y, cz - 5 + dz);
+            }
+            if (polluteDemo >= 0 && streamer.settled()) { // scripted shot: the water around fouled (or not)
+                for (int dx = -2; dx <= 2; dx++)
+                    for (int dz = -2; dz <= 2; dz++) {
+                        var patch = life.ecology.at(player.x + dx * 64.0, player.z + dz * 64.0);
+                        patch.pollution = polluteDemo;
+                    }
+                renderer.pollution.update(life.ecology, player.x, player.z);
+                polluteDemo = -1;
             }
             if (blocksDemo && streamer.settled()) { // scripted shot: the blocks of M27..M34 in a row, on the ground before the eyes
                 blocksDemo = false;
@@ -1140,6 +1210,11 @@ public final class Main {
             if (input.selected != shownBlock) {
                 shownBlock = input.selected;
                 blockShownAt = now;
+            }
+            if (sound.listening) { // G13: what the ear finds, and from where
+                String heard = sound.notable == null ? "Vous écoutez... rien de marquant."
+                    : "Vous écoutez : " + sound.notableName + ", " + SoundEngine.bearing(cam.yaw, cam.pos.x, cam.pos.z, sound.notable[0], sound.notable[2]) + ".";
+                hud.textCentered(heard, hud.width() / 2f, hud.height() * 0.3f, 0.85f, 0.9f, 1);
             }
             if (notebook.open && !screenOpen && !worldMap.open) notebook.draw(hud, life, player.x, player.z, liv);
             if (aimedVillager != null && !screenOpen) { // an inhabitant: name, trade, what they say

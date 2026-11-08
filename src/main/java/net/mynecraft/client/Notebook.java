@@ -15,18 +15,20 @@ import net.mynecraft.world.life.Vegetation;
  */
 final class Notebook {
     boolean open;
-    /** 0 the patch, 1 the harmony compass and the flows, 2 skills and trades (N turns the pages, then closes). */
+    /** 0 the patch, 1 the harmony compass and the flows, 2 skills and trades, 3 projects (N turns the pages, then closes). */
     int page;
+    static final int PROJECTS = 3;
 
     /** N: next page, closing after the last. */
     void turn() {
         if (!open) { open = true; page = 0; }
-        else if (++page > 2) { open = false; page = 0; }
+        else if (++page > PROJECTS) { open = false; page = 0; }
     }
 
     void draw(Hud hud, Life life, double x, double z, Livelihood me) {
         if (page == 1) compass(hud, life, x, z, me);
         else if (page == 2) skills(hud, me);
+        else if (page == PROJECTS) projects(hud, life, me);
         else draw(hud, life, x, z);
     }
 
@@ -68,6 +70,13 @@ final class Notebook {
             double t = acc.taken[m.ordinal()], g = acc.returned[m.ordinal()];
             if (t < 0.01 && g < 0.01) continue;
             hud.text(String.format("%-18s %7.1f / %.1f", m.displayName, t, g), left, y, 0.8f, 0.85f, 0.8f);
+            y += line;
+        }
+        var src = me.flows.pollutedBy(x, z);
+        var patch = life.ecology.existing(x, z);
+        if (src != null && patch != null && patch.pollution > 0.02) {
+            hud.text(String.format("Eaux troublées par %s, versées vers %.0f, %.0f (jour %d)", "Moi".equals(src.who()) ? "vous" : src.who(),
+                src.x(), src.z(), (int) src.day() + 1), left, y, 0.85f, 0.7f, 0.45f);
             y += line;
         }
         if (acc.offSeasonKills > 0) {
@@ -120,6 +129,42 @@ final class Notebook {
         y += line * 0.3f;
         hud.text("Plans connus : " + String.join(", ", me.actor.plans), left, y, 0.8f, 0.85f, 0.8f);
         y += line;
+        hud.text("N : page suivante", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
+    }
+
+    /** The projects (aspirations): proposed, under way, accomplished; and the purest water of the territory. */
+    private void projects(Hud hud, Life life, Livelihood me) {
+        float s = hud.scale, line = hud.lineHeight() + s;
+        float w = Math.min(hud.width() * 0.6f, 330 * s), left = 6 * s, top = 6 * s;
+        float rows = 5.5f + 3.3f * Math.max(1, me.projects.all().size());
+        hud.rect(left - 3 * s, top - 3 * s, w + 6 * s, rows * line + 8 * s, 0.05f, 0.06f, 0.04f, 0.78f);
+        float y = top;
+        hud.text("Projets", left, y, 1, 0.95f, 0.7f);
+        y += line * 1.3f;
+        var all = me.projects.all();
+        if (all.isEmpty()) {
+            hud.text("Aucun projet pour l'instant : écoutez les gens, regardez la nature.", left, y, 0.75f, 0.75f, 0.75f);
+            y += line;
+        }
+        boolean waiting = false;
+        for (var p : all) {
+            String mark = switch (p.state) { case PROPOSED -> "[proposé]"; case ACCEPTED -> "[en cours]"; case DONE -> "[accompli]"; };
+            float c = p.state == net.mynecraft.world.actor.Projects.State.DONE ? 0.6f : 1;
+            hud.text(mark + " " + p.title, left, y, c, c * 0.95f, c * 0.75f);
+            y += line;
+            hud.text("  " + p.goal, left, y, 0.75f, 0.8f, 0.75f);
+            y += line;
+            if (!p.status.isEmpty()) { hud.text("  " + p.status, left, y, 0.6f, 0.85f, 0.95f); y += line; }
+            waiting |= p.state == net.mynecraft.world.actor.Projects.State.PROPOSED;
+            y += line * 0.3f;
+        }
+        var pure = life.ecology.purest();
+        if (pure != null) {
+            hud.text(String.format("Eau de source : la parcelle %d, %d (vers %d, %d), la plus pure et la plus vivante", pure.px, pure.pz,
+                pure.px * Ecology.PATCH + Ecology.PATCH / 2, pure.pz * Ecology.PATCH + Ecology.PATCH / 2), left, y, 0.55f, 0.85f, 1);
+            y += line;
+        }
+        if (waiting) { hud.text("Y : accepter le projet proposé", left, y + line * 0.2f, 0.95f, 0.85f, 0.5f); y += line; }
         hud.text("N : fermer", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
     }
 
@@ -135,7 +180,7 @@ final class Notebook {
         int listed = 0;
         for (Species sp : Species.values())
             if (p.pop[sp.ordinal()] >= 0.05 || p.dormant[sp.ordinal()] >= 0.05 || life.ecology.suitable(p, sp)) listed++;
-        int rows = 10 + listed + Math.min(6, links.size());
+        int rows = 12 + listed + Math.min(6, links.size());
         hud.rect(left - 3 * s, top - 3 * s, w + 6 * s, rows * line + 8 * s, 0.05f, 0.06f, 0.04f, 0.78f);
         float y = top;
         int day = (int) Math.floor(life.eco.day());
@@ -158,6 +203,13 @@ final class Notebook {
         y = gauge(hud, "Sol (nutriments)", p.soil, 0.6f, 0.45f, 0.3f, left, y, w);
         y = gauge(hud, "Détritus", Math.min(1, p.detritus * 5), 0.5f, 0.42f, 0.35f, left, y, w);
         y = gauge(hud, "Vie aquatique", p.aquatic, 0.35f, 0.6f, 0.9f, left, y, w);
+        if (p.pollution > 0.01 || p.cleaners > 0.5) {
+            y = gauge(hud, p.spawnStopped ? "Eau polluée (truites sans frai)" : "Eau polluée", p.pollution, 0.55f, 0.45f, 0.25f, left, y, w);
+            if (p.cleaners > 0.5) {
+                hud.text(String.format("Épurateurs des berges : %.0f (roseaux, saules)", p.cleaners), left, y, 0.6f, 0.85f, 0.6f);
+                y += line;
+            }
+        }
         y += line * 0.3f;
         for (Species sp : Species.values()) {
             int i = sp.ordinal();

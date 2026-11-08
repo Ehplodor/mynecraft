@@ -40,7 +40,7 @@ public final class Gestures {
     }
 
     /** What a use of the right hand did (for sounds and messages); NONE if nothing. */
-    public enum Use { NONE, ATE, DRANK, PICKED, HOED, SOWED, PLANTED, COMPOSTED, DOOR, SLEPT, HIVE_LOST, SAT, RESTED, LIGHT }
+    public enum Use { NONE, ATE, DRANK, PICKED, HOED, SOWED, PLANTED, COMPOSTED, DOOR, SLEPT, HIVE_LOST, SAT, RESTED, LIGHT, REMEDY, SLUICE }
 
     /**
      * The right hand on the block at (x, y, z) (or on nothing: x = Integer.MIN_VALUE) holding the item
@@ -60,6 +60,10 @@ public final class Gestures {
         if (Blocks.isDoor(target)) { // both halves
             net.mynecraft.world.Doors.toggle(w, x, y, z);
             return Use.DOOR;
+        }
+        if (target == Blocks.SLUICE || target == Blocks.SLUICE_OPEN) { // the gate: hold the water back or let it go
+            w.set(x, y, z, target == Blocks.SLUICE ? Blocks.SLUICE_OPEN : Blocks.SLUICE);
+            return Use.SLUICE;
         }
         if (target == Blocks.LANTERN || target == Blocks.LANTERN_OFF) {
             w.set(x, y, z, target == Blocks.LANTERN ? Blocks.LANTERN_OFF : Blocks.LANTERN);
@@ -145,6 +149,21 @@ public final class Gestures {
             a.skills.practice(Skill.FARMING, 1);
             return Use.PLANTED;
         }
+        if (held == Blocks.WILLOW_SAPLING && (target == Blocks.GRASS || target == Blocks.DIRT || target == Blocks.SAND)
+            && w.get(x, y + 1, z) == Blocks.AIR && Growth.reedGround(w, x, y, z)) { // a willow cutting, on a wet bank
+            w.set(x, y + 1, z, Blocks.WILLOW_SAPLING);
+            a.inventory.takeOne(slot);
+            if (growth != null) growth.planted(x, y + 1, z);
+            a.skills.practice(Skill.FARMING, 1);
+            return Use.PLANTED;
+        }
+        if (held == Blocks.REEDS && w.get(x, y + 1, z) == Blocks.AIR && Growth.reedGround(w, x, y, z)) { // reeds at the water's edge
+            w.set(x, y + 1, z, Blocks.REEDS);
+            a.inventory.takeOne(slot);
+            if (growth != null) growth.planted(x, y + 1, z);
+            a.skills.practice(Skill.FARMING, 0.5);
+            return Use.PLANTED;
+        }
         if (held == Items.COMPOST && (target == Blocks.FARMLAND || Blocks.wheatAge(target) >= 0)) {
             a.inventory.takeOne(slot);
             if (flows != null) flows.give(Matter.COMPOST, 1, x, z); // feeds the patch's soil
@@ -152,6 +171,13 @@ public final class Gestures {
             if (age >= 0 && age < 3) w.set(x, y, z, (short) (target + 1));
             a.skills.practice(Skill.FARMING, 0.5);
             return Use.COMPOSTED;
+        }
+        if (held == Items.WILLOW_BARK) { // chewed willow bark: the pain eases, the fever falls (the caller heals the body)
+            a.inventory.takeOne(slot);
+            a.needs.rest = Math.min(1, a.needs.rest + 0.2);
+            a.needs.warmth += (0.5 - a.needs.warmth) * 0.5;
+            a.skills.practice(Skill.FORAGING, 0.3);
+            return Use.REMEDY;
         }
         if (Items.isFood(held) && (a.needs.food < Needs.MAX - 0.5 || held == Items.MILK && a.needs.water < Needs.MAX - 0.5)) {
             a.needs.eat(held);

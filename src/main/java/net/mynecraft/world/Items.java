@@ -33,7 +33,7 @@ public final class Items {
         TROUT, COOKED_TROUT, SMOKED_MEAT, ROASTED_MUSHROOM, HERB_TROUT, BERRY_TART,
         CHARCOAL, IRON_INGOT, HIDE, LEATHER, PLANT_FIBER, STRING, CLOTH, CLAY_BALL, ASH, COMPOST, SLAG,
         RED_DYE, BLUE_DYE, WHITE_DYE, YELLOW_DYE, CANVAS, DRUM,
-        SHEARS, FLEECE, JUG, MILK, CHEESE, EGG, COOKED_EGG, MUTTON, COOKED_MUTTON, CHICKEN, COOKED_CHICKEN, HONEY;
+        SHEARS, FLEECE, JUG, MILK, CHEESE, EGG, COOKED_EGG, MUTTON, COOKED_MUTTON, CHICKEN, COOKED_CHICKEN, HONEY, WILLOW_BARK;
     public static final int COUNT;
     /** Largest stack per item (1 for tools, 64 for most). */
     public static final byte[] MAX_STACK;
@@ -117,6 +117,7 @@ public final class Items {
         CHICKEN = pure("chicken");
         COOKED_CHICKEN = pure("cooked_chicken");
         HONEY = pure("honey");
+        WILLOW_BARK = pure("willow_bark");
         REGISTRY.freeze();
         COUNT = REGISTRY.size();
         MAX_STACK = new byte[COUNT];
@@ -171,6 +172,7 @@ public final class Items {
         food(CHICKEN, GROUP_MEAT, 2, 0);
         food(COOKED_CHICKEN, GROUP_MEAT, 6, 0);
         food(HONEY, GROUP_DAIRY, 3, 1);
+        food(WILLOW_BARK, GROUP_VEGETABLE, 0, 1); // chewed for pain and fever: a remedy more than a food
         MAX_STACK[MILK] = 1;
         MAX_STACK[EGG] = 16;
         CATEGORY[Blocks.BROWN_MUSHROOM] = CATEGORY_FOOD;

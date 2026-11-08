@@ -11,12 +11,17 @@ public final class Power {
 
     /** Work units at (x, y, z); {@code wind} in blocks per second (the weather's wind there). */
     public static double at(World w, int x, int y, int z, double wind) {
+        return at(w, x, y, z, wind, 0);
+    }
+
+    /** As above, {@code held} the share of the river held back upstream by closed sluices (0..1): the wheels slow down. */
+    public static double at(World w, int x, int y, int z, double wind, double held) {
         double p = 0;
         for (int dy = -3; dy <= 3; dy++)
             for (int dz = -3; dz <= 3; dz++)
                 for (int dx = -3; dx <= 3; dx++) {
                     short b = w.get(x + dx, y + dy, z + dz);
-                    if (b == Blocks.WATER_WHEEL) p += wheel(w, x + dx, y + dy, z + dz);
+                    if (b == Blocks.WATER_WHEEL) p += wheel(w, x + dx, y + dy, z + dz) * (1 - held);
                     else if (b == Blocks.WINDMILL) p += mill(w, x + dx, y + dy, z + dz, wind);
                 }
         return p;

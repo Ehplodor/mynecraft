@@ -182,5 +182,11 @@ class LivelihoodTest {
         assertTrue(here.aquatic < h);
         assertTrue(down.aquatic < d && d - down.aquatic < h - here.aquatic);
         assertEquals(u, up.aquatic, 1e-9);
+        // The water slice: waste water fouls the patch (a lasting pollution), less and less downstream, never upstream.
+        assertTrue(here.pollution > 0.2, "here " + here.pollution);
+        assertTrue(down.pollution > 0 && down.pollution < here.pollution, "downstream " + down.pollution);
+        assertEquals(0, up.pollution, 1e-9);
+        eco.advance(30); // and the river cleans itself in a few weeks
+        assertTrue(here.pollution < 0.05, "still fouled: " + here.pollution);
     }
 }

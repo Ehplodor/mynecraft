@@ -39,6 +39,16 @@ import java.util.function.BiFunction;
  */
 public final class Ecology {
     public static final int PATCH = 64;
+    /**
+     * The water's own cleaning: half the pollution gone in about this many days without new waste
+     * (bacteria, dilution in the current), faster in the warm. A strong pollution falls under a
+     * tenth in about a season (8 days) once the tannery stops.
+     */
+    public static final double POLLUTION_HALF_DAYS = 3;
+    /** Extra cleaning per day for each reed along the water (a willow counts as several), saturating. */
+    public static final double REED_CLEANING = 0.03;
+    /** Trout spawning stops above this pollution, and resumes only below the second (a threshold, with a lag). */
+    public static final double SPAWN_STOP = 0.5, SPAWN_RESUME = 0.25;
     /** Years simulated when a patch is first created. */
     static final int BOOTSTRAP_YEARS = 6;
     private static final double STEP = 0.1; // days per integration step
@@ -53,6 +63,22 @@ public final class Ecology {
         public final float climate, water, forest, rain, height;
         /** Plant biomass, flowers, soil nutrients, detritus, aquatic food (algae, insects): all 0..~1. */
         public double plants, flowers, soil, detritus, aquatic;
+        /**
+         * Pollution of the patch's water, 0..1 (see {@link #POLLUTION_HALF_DAYS}): filled by the waste water
+         * poured here or upstream, carried away and broken down day after day, faster where reeds and
+         * willows grow along the banks ({@link #cleaners}).
+         */
+        public double pollution;
+        /** Reeds (and willows, worth several) along this patch's water: they filter it. Kept by the world, not saved. */
+        public double cleaners;
+        /**
+         * Closed sluice gates on the water of this patch (counted from the world), and the share of the
+         * river's flow held back upstream of it (0..0.8, from the gates up to three patches upstream): a
+         * wheel turns slower, the trout spawn less. Neither is saved: the world keeps them.
+         */
+        public double sluices, held;
+        /** Trout stop spawning above {@link #SPAWN_STOP} pollution and only start again below {@link #SPAWN_RESUME}. */
+        public boolean spawnStopped;
         /** Animals in the patch per species (active ones), and those dormant (hibernating, estivating). */
         public final double[] pop = new double[N], dormant = new double[N];
         /** Fraction of each species carrying the disease. */
@@ -107,6 +133,24 @@ public final class Ecology {
 
     public int size() {
         return patches.size();
+    }
+
+    /** How pure and alive a patch's water is (0 where there is no water or it is fouled): for the purest river (L17). */
+    public static double purity(Patch p) {
+        if (p.water <= 0.1 || p.pollution >= 0.05) return 0;
+        double trout = p.pop[Species.TROUT.ordinal()];
+        return Math.min(1, p.aquatic) * (1 - 10 * p.pollution) * trout / (trout + 2);
+    }
+
+    /** The patch of the territory with the purest, liveliest water (L17 "eau de source"), or null. */
+    public Patch purest() {
+        Patch best = null;
+        double score = 0.05;
+        for (Patch p : patches.values()) {
+            double s = purity(p);
+            if (s > score) { score = s; best = p; }
+        }
+        return best;
     }
 
     public java.util.Collection<Patch> patches() {
@@ -273,7 +317,14 @@ public final class Ecology {
         double runoff = 0.01 * p.soil * p.rain * p.water * dt;
         p.soil = clamp(p.soil - runoff * 0.5 - 0.015 * p.soil * p.rain * dt); // and some lost deep down
         double troutFood = p.aquatic / (p.aquatic + 0.2);
-        p.aquatic = clamp(p.aquatic + (runoff * 20 + 0.02 * warm * p.water) - (0.05 * p.aquatic + 0.01 * n[trout] * troutFood) * dt);
+        // Polluted water grows less life and smothers what there is.
+        double clean = 1 - p.pollution;
+        p.aquatic = clamp(p.aquatic + (runoff * 20 + 0.02 * warm * p.water) * clean * (1 - 0.5 * p.held)
+            - (0.05 * p.aquatic + 0.15 * p.pollution * p.aquatic + 0.01 * n[trout] * troutFood) * dt);
+        // The water cleans itself, faster in the warm and where reeds filter it.
+        p.pollution = clamp(p.pollution * Math.exp(-selfCleaning(p, warm) * dt));
+        if (p.pollution > SPAWN_STOP) p.spawnStopped = true;
+        else if (p.pollution < SPAWN_RESUME) p.spawnStopped = false;
 
         // Consumers: births (in season, as well fed as they are), deaths, crowding.
         double[] births = new double[N], deaths = new double[N];
@@ -314,6 +365,10 @@ public final class Ecology {
             // Logistic: births slow down as the patch fills up (territories, dens: intraspecific competition).
             births[s] = n[s] * b * food * breeding(sp, season.phase()) * Math.max(0, 1 - n[s] / ceiling(p, sp));
             deaths[s] = n[s] * m * (1 + 1.5 * (1 - food));
+            if (sp == Species.TROUT) { // fouled water: fewer eggs hatch, then none; fish choke and die
+                births[s] *= p.spawnStopped ? 0 : (1 - p.pollution) * (1 - 0.6 * p.held); // a held river: less to spawn in
+                deaths[s] += n[s] * 0.25 * p.pollution;
+            }
             if (!suitable(p, sp)) { births[s] = 0; deaths[s] += n[s] * 0.1; }
         }
         // Predation (type II): each predator kills up to a handful a day, fewer when prey is scarce.
@@ -325,6 +380,7 @@ public final class Ecology {
         deaths[trout] += fished;
         births[heron] += n[heron] * 0.2 * heronFed * breeding(Species.HERON, season.phase()) * Math.max(0, 1 - n[heron] / ceiling(p, Species.HERON));
         deaths[heron] += n[heron] * 0.03 * (1 - heronFed);
+        deaths[heron] += n[heron] * 0.3 * Math.max(0, p.pollution - 0.2); // and they leave a fouled river
         // Disease (a pathogen: parasitism), spreading faster in crowded herds.
         for (int s : new int[] {rabbit, deer, ibex}) {
             double i = p.sick[s];
@@ -359,6 +415,26 @@ public final class Ecology {
         double decay = p.detritus * 0.12 * (0.15 + 0.85 * warm) * decomposers * dt;
         p.detritus = Math.max(0, p.detritus - decay);
         p.soil = clamp(p.soil + decay * 0.5 + 0.002 * dt); // and a little from the weathering rock
+    }
+
+    /** Fraction of the pollution broken down per day: the water's own work, plus the reeds' and willows'. */
+    static double selfCleaning(Patch p, double warm) {
+        double own = Math.log(2) / POLLUTION_HALF_DAYS * (0.6 + 0.6 * warm);
+        return own + REED_CLEANING * p.cleaners / (1 + p.cleaners / 30);
+    }
+
+    /**
+     * Waste water poured into a patch's water: {@code amount} of pollution added (it saturates: the
+     * dirtier the water, the less a new pour changes it). Returns how much passes on downstream,
+     * the rest held back by the patch's reeds and willows.
+     */
+    public static double pollute(Patch p, double amount) {
+        if (amount <= 0) return 0;
+        double filtered = p.cleaners / (p.cleaners + 10); // ten reeds hold back half
+        double added = amount * (1 - p.pollution);
+        p.pollution = clamp(p.pollution + added);
+        p.aquatic = clamp(p.aquatic * (1 - 0.5 * Math.min(1, added))); // the first wave smothers algae and larvae
+        return amount * (1 - filtered);
     }
 
     /** How much of the year's breeding a species does at this phase (0..1): spring young, autumn trout spawning... */
@@ -477,7 +553,7 @@ public final class Ecology {
 
     // ------------------------------------------------------------------------------- saving
 
-    private static final int VERSION = 1;
+    private static final int VERSION = 2; // 2: water pollution
 
     public void save(Path file) throws IOException {
         Files.createDirectories(file.getParent());
@@ -495,6 +571,8 @@ public final class Ecology {
                 out.writeDouble(p.soil);
                 out.writeDouble(p.detritus);
                 out.writeDouble(p.aquatic);
+                out.writeDouble(p.pollution);
+                out.writeBoolean(p.spawnStopped);
                 for (int s = 0; s < N; s++) {
                     out.writeDouble(p.pop[s]);
                     out.writeDouble(p.dormant[s]);
@@ -509,7 +587,8 @@ public final class Ecology {
     public boolean load(Path file) throws IOException {
         if (!Files.exists(file)) return false;
         try (DataInputStream in = new DataInputStream(new java.util.zip.GZIPInputStream(Files.newInputStream(file)))) {
-            if (in.readInt() != VERSION) return false;
+            int version = in.readInt();
+            if (version < 1 || version > VERSION) return false;
             day = in.readDouble();
             int species = in.readInt(), count = in.readInt();
             for (int i = 0; i < count; i++) {
@@ -519,6 +598,10 @@ public final class Ecology {
                 p.soil = in.readDouble();
                 p.detritus = in.readDouble();
                 p.aquatic = in.readDouble();
+                if (version >= 2) {
+                    p.pollution = in.readDouble();
+                    p.spawnStopped = in.readBoolean();
+                }
                 for (int s = 0; s < species; s++) {
                     double a = in.readDouble(), b = in.readDouble(), c = in.readDouble();
                     if (s < N) { p.pop[s] = a; p.dormant[s] = b; p.sick[s] = c; }

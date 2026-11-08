@@ -20,7 +20,9 @@ import java.util.Map;
  */
 public final class Growth {
     /** Days of full growth per wheat stage, for a berry bush to bear again, for a sapling to become a tree. */
-    static final double WHEAT_STAGE_DAYS = 1.5, BERRY_DAYS = 3, SAPLING_DAYS = 4, TRAP_DAYS = 1;
+    static final double WHEAT_STAGE_DAYS = 1.5, BERRY_DAYS = 3, SAPLING_DAYS = 4, TRAP_DAYS = 1, REED_DAYS = 3;
+    /** Reeds stop spreading when this many already grow within four blocks. */
+    static final int REED_CROWD = 12;
 
     private final Map<Long, double[]> places = new LinkedHashMap<>(); // position -> {progress 0..1}
 
@@ -119,6 +121,27 @@ public final class Growth {
                         }
                     }
                 }
+            } else if (b == Blocks.REEDS) { // reeds spread along the wet bank, one clump at a time, until crowded
+                if (!nearWater(w, p[0], p[1] - 1, p[2])) { it.remove(); continue; }
+                e.getValue()[0] += rate * days / REED_DAYS;
+                if (e.getValue()[0] >= 1) {
+                    e.getValue()[0] = 0;
+                    int[] s = reedSpot(w, p[0], p[1], p[2], (int) (e.getKey() * 31 + spreads++));
+                    if (s == null) it.remove();
+                    else {
+                        w.set(s[0], s[1], s[2], Blocks.REEDS);
+                        changed.add(s);
+                        spread.add(s);
+                    }
+                }
+            } else if (b == Blocks.WILLOW_SAPLING) { // a willow grows only with its feet near water
+                if (!nearWater(w, p[0], p[1] - 1, p[2])) continue;
+                e.getValue()[0] += rate * days / SAPLING_DAYS;
+                if (e.getValue()[0] >= 1) {
+                    willow(w, p[0], p[1], p[2]);
+                    changed.add(p);
+                    it.remove();
+                }
             } else if (b == Blocks.BERRY_BUSH_PICKED || b == Blocks.OAK_SAPLING) {
                 e.getValue()[0] += rate * days / (b == Blocks.OAK_SAPLING ? SAPLING_DAYS : BERRY_DAYS);
                 if (e.getValue()[0] >= 1) {
@@ -131,7 +154,60 @@ public final class Growth {
                 it.remove(); // dug up, eaten, harvested
             }
         }
+        for (int[] q : spread) planted(q[0], q[1], q[2]);
+        spread.clear();
         return changed;
+    }
+
+    private final List<int[]> spread = new ArrayList<>();
+    private int spreads;
+
+    /** Wet ground to sow a reed on, next to the reeds at (x, y, z); null when crowded or none. */
+    static int[] reedSpot(World w, int x, int y, int z, int seed) {
+        int count = 0;
+        for (int dz = -4; dz <= 4; dz++)
+            for (int dx = -4; dx <= 4; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                    if (w.get(x + dx, y + dy, z + dz) == Blocks.REEDS) count++;
+        if (count >= REED_CROWD) return null;
+        for (int i = 0; i < 8; i++) {
+            int a = Math.floorMod(seed + i * 3, 8);
+            int dx = new int[] {1, -1, 0, 0, 1, -1, 1, -1}[a], dz = new int[] {0, 0, 1, -1, 1, 1, -1, -1}[a];
+            for (int dy = -1; dy <= 1; dy++) {
+                int sx = x + dx, sy = y + dy, sz = z + dz;
+                if (reedGround(w, sx, sy - 1, sz) && w.get(sx, sy, sz) == Blocks.AIR) return new int[] {sx, sy, sz};
+            }
+        }
+        return null;
+    }
+
+    /** Ground reeds take on: wet soil or sand by the water (within two blocks). */
+    public static boolean reedGround(World w, int x, int y, int z) {
+        short g = w.get(x, y, z);
+        if (g != Blocks.GRASS && g != Blocks.DIRT && g != Blocks.SAND) return false;
+        for (int dz = -2; dz <= 2; dz++)
+            for (int dx = -2; dx <= 2; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                    if (Blocks.FLUID[w.get(x + dx, y + dy, z + dz) & 0xFFFF] == Blocks.FLUID_WATER) return true;
+        return false;
+    }
+
+    /** A willow: a short oak trunk and a wide, drooping crown of willow leaves. */
+    public static void willow(World w, int x, int y, int z) {
+        int top = y + 4;
+        for (int dz = -3; dz <= 3; dz++)
+            for (int dx = -3; dx <= 3; dx++) {
+                int d2 = dx * dx + dz * dz;
+                if (d2 > 10) continue;
+                for (int ly = top - 1; ly <= top + 1; ly++) {
+                    if (ly == top + 1 && d2 > 4) continue;
+                    if (w.get(x + dx, ly, z + dz) == Blocks.AIR) w.set(x + dx, ly, z + dz, Blocks.WILLOW_LEAVES);
+                }
+                if (d2 >= 5 && ((dx * 7 + dz * 13) & 1) == 0) // hanging curtains at the rim
+                    for (int ly = top - 2; ly >= top - 3; ly--)
+                        if (w.get(x + dx, ly, z + dz) == Blocks.AIR) w.set(x + dx, ly, z + dz, Blocks.WILLOW_LEAVES);
+            }
+        for (int ty = y; ty < top; ty++) w.set(x, ty, z, Blocks.OAK_LOG);
     }
 
     static boolean nearWater(World w, int x, int y, int z) {
