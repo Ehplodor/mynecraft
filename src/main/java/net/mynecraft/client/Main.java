@@ -324,6 +324,7 @@ public final class Main {
         CreatureRenderer creatureRenderer = new CreatureRenderer();
         renderer.creatures = creatureRenderer;
         boolean showcase = argv.contains("--showcase");
+        double pollutionTimer = 0;
         double lifeWait = Double.parseDouble(option(argv.toArray(new String[0]), "--life-seconds", showcase ? "2" : "0")), lifeClock = 0;
         Creature aimed = null;
         Overlay overlay = new Overlay();
@@ -818,6 +819,7 @@ public final class Main {
                 life.eco.update(ticks, DayCycle.daylight(ticks), DayCycle.DAY_TICKS);
                 weather.atmosphere.seasonOffset = (float) net.mynecraft.world.life.Ecosystem.temperatureOffset(life.eco.season().phase());
                 renderer.seasonChanged(life.eco.season().phase());
+                if ((pollutionTimer -= dt) <= 0) { pollutionTimer = 0.5; renderer.pollution.update(life.ecology, player.x, player.z); }
                 if (showcase && streamer.settled()) {
                     life.showcase(player.x, player.y, player.z, cam.yaw);
                     showcase = false;

@@ -31,7 +31,7 @@ public final class Harmony {
                 n++;
                 plants += Math.min(1, p.plants);
                 soil += Math.min(1, p.soil);
-                if (p.water > 0.05) { water += Math.min(1, p.aquatic); wet++; }
+                if (p.water > 0.05) { water += Math.min(1, p.aquatic) * (1 - p.pollution); wet++; }
                 int could = 0, present = 0;
                 for (Species s : Species.values())
                     if (ecology.suitable(p, s)) { could++; if (p.pop[s.ordinal()] + p.dormant[s.ordinal()] >= 0.5) present++; }

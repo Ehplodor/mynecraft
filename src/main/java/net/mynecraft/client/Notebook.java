@@ -70,6 +70,13 @@ final class Notebook {
             hud.text(String.format("%-18s %7.1f / %.1f", m.displayName, t, g), left, y, 0.8f, 0.85f, 0.8f);
             y += line;
         }
+        var src = me.flows.pollutedBy(x, z);
+        var patch = life.ecology.existing(x, z);
+        if (src != null && patch != null && patch.pollution > 0.02) {
+            hud.text(String.format("Eaux troublées par %s, versées vers %.0f, %.0f (jour %d)", "Moi".equals(src.who()) ? "vous" : src.who(),
+                src.x(), src.z(), (int) src.day() + 1), left, y, 0.85f, 0.7f, 0.45f);
+            y += line;
+        }
         if (acc.offSeasonKills > 0) {
             hud.text(String.format("Animaux tués en saison des petits : %.0f", acc.offSeasonKills), left, y, 0.95f, 0.5f, 0.45f);
             y += line;
@@ -135,7 +142,7 @@ final class Notebook {
         int listed = 0;
         for (Species sp : Species.values())
             if (p.pop[sp.ordinal()] >= 0.05 || p.dormant[sp.ordinal()] >= 0.05 || life.ecology.suitable(p, sp)) listed++;
-        int rows = 10 + listed + Math.min(6, links.size());
+        int rows = 12 + listed + Math.min(6, links.size());
         hud.rect(left - 3 * s, top - 3 * s, w + 6 * s, rows * line + 8 * s, 0.05f, 0.06f, 0.04f, 0.78f);
         float y = top;
         int day = (int) Math.floor(life.eco.day());
@@ -158,6 +165,13 @@ final class Notebook {
         y = gauge(hud, "Sol (nutriments)", p.soil, 0.6f, 0.45f, 0.3f, left, y, w);
         y = gauge(hud, "Détritus", Math.min(1, p.detritus * 5), 0.5f, 0.42f, 0.35f, left, y, w);
         y = gauge(hud, "Vie aquatique", p.aquatic, 0.35f, 0.6f, 0.9f, left, y, w);
+        if (p.pollution > 0.01 || p.cleaners > 0.5) {
+            y = gauge(hud, p.spawnStopped ? "Eau polluée (truites sans frai)" : "Eau polluée", p.pollution, 0.55f, 0.45f, 0.25f, left, y, w);
+            if (p.cleaners > 0.5) {
+                hud.text(String.format("Épurateurs des berges : %.0f (roseaux, saules)", p.cleaners), left, y, 0.6f, 0.85f, 0.6f);
+                y += line;
+            }
+        }
         y += line * 0.3f;
         for (Species sp : Species.values()) {
             int i = sp.ordinal();

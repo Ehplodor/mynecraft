@@ -47,7 +47,7 @@ public final class Workshop {
         }
         if (r.tool() != Items.TOOL_NONE) inv.wearOut(inv.findTool(r.tool()));
         for (RecipeBook.Stack s : p.outputs()) inv.add(s.item(), s.count());
-        if (flows != null) for (RecipeBook.Waste w : r.waste()) flows.give(w.matter(), w.amount(), a.x, a.z);
+        if (flows != null) for (RecipeBook.Waste w : r.waste()) flows.give(w.matter(), w.amount(), a.x, a.z, a.name);
         a.skills.practice(r.skill(), 1 + r.level() + r.seconds() / 4);
         return true;
     }

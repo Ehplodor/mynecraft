@@ -35,8 +35,10 @@ public final class Blocks {
         OAK_DOOR_TOP_Z_OPEN = 139,
         // Furniture: a table, a chair (its back on the north, south, west, east side), a lantern (lit, out),
         // a water barrel, a rug
-        OAK_TABLE = 140, OAK_CHAIR = 141, LANTERN = 145, LANTERN_OFF = 146, BARREL = 147, RUG = 148;
-    public static final int COUNT = 149; // ids are shorts: up to 32 767 states
+        OAK_TABLE = 140, OAK_CHAIR = 141, LANTERN = 145, LANTERN_OFF = 146, BARREL = 147, RUG = 148,
+        // The water's slice: reeds along the banks and the willow (a cutting, its weeping leaves on an oak-like trunk)
+        REEDS = 149, WILLOW_SAPLING = 150, WILLOW_LEAVES = 151;
+    public static final int COUNT = 152; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -60,7 +62,8 @@ public final class Blocks {
         "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs", "cobblestone_stairs",
         "cobblestone_wall", "oak_window", "oak_window", "nest", "nest", "beehive", "beehive", "beehive",
         "oak_door", "oak_door", "oak_door", "oak_door", "oak_door", "oak_door",
-        "oak_table", "oak_chair", "oak_chair", "oak_chair", "oak_chair", "lantern", "lantern", "barrel", "rug"};
+        "oak_table", "oak_chair", "oak_chair", "oak_chair", "oak_chair", "lantern", "lantern", "barrel", "rug",
+        "reeds", "willow_sapling", "willow_leaves"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
@@ -80,7 +83,7 @@ public final class Blocks {
         "", "axis=x", "axis=z", "full=false", "full=true", "state=empty", "state=bees", "state=honey",
         "half=lower,axis=z,open=false", "half=lower,axis=z,open=true", "half=upper,axis=x,open=false",
         "half=upper,axis=x,open=true", "half=upper,axis=z,open=false", "half=upper,axis=z,open=true",
-        "", "facing=north", "facing=south", "facing=west", "facing=east", "lit=true", "lit=false", "", ""};
+        "", "facing=north", "facing=south", "facing=west", "facing=east", "lit=true", "lit=false", "", "", "", "", ""};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
@@ -145,6 +148,9 @@ public final class Blocks {
             SOLID[i] = true;
         }
         TINT[GRASS] = TINT_GRASS;
+        cutout(WILLOW_LEAVES, 1, true); // silvery green of its own, not the biome's
+        plant(REEDS);
+        plant(WILLOW_SAPLING);
         for (short leaves : new short[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES}) {
             cutout(leaves, 1, true);
             TINT[leaves] = TINT_FOLIAGE; // vanilla gives birch and spruce fixed colours; biome foliage here
@@ -269,7 +275,8 @@ public final class Blocks {
         hardness(0.6f, GRASS, GRAVEL);
         hardness(2f, OAK_LOG, OAK_LOG_X, OAK_LOG_Z, BIRCH_LOG, BIRCH_LOG_X, BIRCH_LOG_Z, SPRUCE_LOG, SPRUCE_LOG_X,
             SPRUCE_LOG_Z, OAK_PLANKS, BIRCH_PLANKS, SPRUCE_PLANKS, COBBLESTONE, OAK_SLAB, OAK_SLAB_TOP, OAK_SLAB_DOUBLE);
-        hardness(0.2f, OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES);
+        hardness(0.2f, OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES, WILLOW_LEAVES);
+        hardness(0f, REEDS, WILLOW_SAPLING);
         hardness(0.3f, GLASS, GLOWSTONE);
         hardness(0f, SHORT_GRASS, POPPY);
         hardness(3f, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, DEEPSLATE);
@@ -324,7 +331,7 @@ public final class Blocks {
         DROP[STONE] = COBBLESTONE;
         DROP[GRASS] = DIRT;
         DROP_COUNT[OAK_SLAB_DOUBLE] = 2;
-        for (short none : new short[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES, GLASS, SHORT_GRASS, BEDROCK}) DROP[none] = AIR;
+        for (short none : new short[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES, WILLOW_LEAVES, GLASS, SHORT_GRASS, BEDROCK}) DROP[none] = AIR;
         for (int i = 1; i < COUNT; i++) {
             if (FLUID[i] != FLUID_NONE) { DROP[i] = AIR; HARDNESS[i] = -1; }
         }

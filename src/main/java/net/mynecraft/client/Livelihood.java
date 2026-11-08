@@ -184,6 +184,7 @@ final class Livelihood {
         switch (u) {
             case ATE -> say(String.format("Miam. (faim %.0f/20, variété des repas %.0f %%)", actor.needs.food, 100 * actor.needs.variety()));
             case DRANK -> say("Vous buvez.");
+            case REMEDY -> { heal += 4; say("L'écorce de saule est amère, mais la douleur s'apaise."); }
             case SLEPT -> say("Vous dormez jusqu'au matin.");
             case RESTED -> say("Ce n'est pas l'heure de dormir : vous vous allongez un moment.");
             case SAT -> say("Vous vous asseyez. (avancer pour vous lever)");
@@ -192,6 +193,12 @@ final class Livelihood {
         }
         return u;
     }
+
+    final net.mynecraft.world.life.Riverbank riverbank = new net.mynecraft.world.life.Riverbank();
+    private double bankTimer;
+
+    /** Half-hearts a remedy will give back at the next tick. */
+    int heal;
 
     /** After the player struck an animal: if it died, the hunter's share (meat, hide) and the ledger. */
     void struck(Creature c, Life life) {
@@ -308,6 +315,8 @@ final class Livelihood {
         actor.y = p.y;
         actor.z = p.z;
         double day = life.eco.day(), phase = life.eco.season().phase();
+        flows.day = day;
+        if ((bankTimer -= dt) <= 0) { bankTimer = 1; riverbank.update(w, life.ecology); } // reeds and willows clean the water
         actor.skills.rust(day);
         toastLeft -= dt;
         var air = weather.here();
@@ -317,6 +326,7 @@ final class Livelihood {
         if (!creative && !p.flying) {
             int hurt = actor.needs.tick(dt, effort, place.felt(air.temperature(), raining), false);
             if (hurt > 0) survival.hurt(hurt);
+            if (heal > 0) { survival.health = Math.min(Survival.MAX_HEALTH, survival.health + heal); heal = 0; }
         }
         survival.fed = actor.needs.food > 6 && actor.needs.water > 4;
         if ((measureTimer -= dt) <= 0) {

@@ -150,5 +150,9 @@
   "block.minecraft.oak_chair": "Chaise en chêne",
   "block.minecraft.lantern": "Lanterne",
   "block.minecraft.barrel": "Tonneau d'eau",
-  "block.minecraft.rug": "Tapis"
+  "block.minecraft.rug": "Tapis",
+  "block.minecraft.reeds": "Roseaux",
+  "block.minecraft.willow_sapling": "Bouture de saule",
+  "block.minecraft.willow_leaves": "Feuilles de saule",
+  "item.minecraft.willow_bark": "Écorce de saule"
 }

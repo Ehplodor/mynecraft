@@ -60,6 +60,15 @@ public final class Hamlet {
     public double clock;
     private final SplittableRandom rnd = new SplittableRandom(7);
     private final java.util.Map<String, Blueprint> known = Blueprint.builtIn();
+    /**
+     * The river (the water slice): whether the fisher's water is fouled, by whom (a name, the player's
+     * actor name included), whether the fisher owes a fish trap to thank for the river's return, and
+     * whether the herbalist already handed out reeds and a willow cutting.
+     */
+    public boolean riverFouled, owesTrap, taughtReeds;
+    public String fouler;
+    private double riverCheck;
+
     /** Blocks changed by the inhabitants this tick (for redrawing). */
     public final java.util.ArrayDeque<int[]> edits = new java.util.ArrayDeque<>();
 
@@ -215,6 +224,7 @@ public final class Hamlet {
                      double day) {
         clock += dt;
         lastWorld = w;
+        if ((riverCheck -= dt) <= 0) { riverCheck = 5; watchRiver(flows, ecology); }
         for (Villager v : villagers) {
             if (w.chunk((int) Math.floor(v.x) >> 4, (int) Math.floor(v.z) >> 4) == null) continue; // far away: resting
             v.skills.rust(day);
@@ -233,6 +243,35 @@ public final class Hamlet {
             if (v.state == Villager.State.SLEEP) v.state = Villager.State.IDLE;
             work(v, w, flows, ecology, recipes, dt);
         }
+    }
+
+    /** The fisher's water: fouled above 0.3 (by the last who poured there), clean again under the spawning threshold. */
+    void watchRiver(Flows flows, Ecology ecology) {
+        Villager f = villager(Job.FISHER);
+        if (f == null || ecology == null) return;
+        double x = f.workAt != null ? f.workAt[0] : f.x, z = f.workAt != null ? f.workAt[2] : f.z;
+        Ecology.Patch p = ecology.existing(x, z);
+        if (p == null) return;
+        if (p.pollution > 0.3) {
+            riverFouled = true;
+            Flows.Source src = flows == null ? null : flows.pollutedBy(x, z);
+            if (src != null) fouler = src.who();
+        } else if (riverFouled && p.pollution < Ecology.SPAWN_RESUME && !p.spawnStopped) {
+            riverFouled = false;
+            if (p.cleaners >= 3) owesTrap = true; // somebody planted the banks: the fisher is grateful
+            say(f, "L'eau s'éclaircit... les truites reviennent frayer !");
+        }
+    }
+
+    /** The first inhabitant with this trade, or null. */
+    public Villager villager(Job job) {
+        for (Villager v : villagers) if (v.job == job) return v;
+        return null;
+    }
+
+    /** How the inhabitants name the one who fouled the river, speaking to {@code player}. */
+    private String foulerName(Actor player) {
+        return fouler == null ? "quelqu'un en amont" : fouler.equals(player.name) ? "toi" : fouler;
     }
 
     private void eat(Villager v) {
@@ -277,7 +316,10 @@ public final class Hamlet {
                 if (v.workTimer < 40 / v.efficiency(Skill.FISHING)) return;
                 v.workTimer = 0;
                 Ecology.Patch p = ecology.existing(v.x, v.z);
-                if (p != null && p.pop[Species.TROUT.ordinal()] >= 1) { // only what the river holds
+                if (p != null && p.pollution > 0.3) { // fouled water: the trout hide or die, and the fisher grieves
+                    say(v, "L'eau est trouble et sent la tannerie... rien ne mord.");
+                    v.needs.rest = Math.max(0, v.needs.rest - 0.05);
+                } else if (p != null && p.pop[Species.TROUT.ordinal()] >= 1) { // only what the river holds
                     ecology.died(Species.TROUT, v.x, v.z);
                     flows.take(Matter.FISH, 1, v.x, v.z);
                     store.add(Items.TROUT, 1);
@@ -620,6 +662,24 @@ public final class Hamlet {
             v.lastLesson = clock;
             v.skills.taughtUntil[skill.ordinal()] = v.skills.today + 1;
             s = "Tu en sais plus que moi en " + skill.displayName.toLowerCase() + "... montre-moi ?";
+        } else if (v.job == Job.FISHER && owesTrap) {
+            owesTrap = false;
+            player.inventory.add(Blocks.FISH_TRAP, 1);
+            s = "La rivière revit, les roseaux y sont pour beaucoup. Tiens, une nasse : tu l'as bien méritée.";
+        } else if (v.job == Job.FISHER && riverFouled)
+            s = ("toi".equals(foulerName(player)) ? "C'est toi qui verses tes eaux de tannage dans ma rivière !"
+                : "La rivière est trouble depuis que " + foulerName(player) + " y verse ses eaux sales.")
+                + " Plus une truite ne fraie.";
+        else if (v.job == Job.HERBALIST && riverFouled && !taughtReeds) {
+            taughtReeds = true;
+            player.inventory.add(Blocks.REEDS, 4);
+            player.inventory.add(Blocks.WILLOW_SAPLING, 1);
+            s = "Plante ces roseaux au bord de l'eau, en aval de la souillure : leurs racines filtrent. Et ce saule, au pied mouillé : il boit la boue, et son écorce soigne la fièvre.";
+        } else if (v.job == Job.HERBALIST && riverFouled)
+            s = "Des roseaux, encore des roseaux le long de la berge. Dix touffes, et l'eau en aval est deux fois plus claire.";
+        else if (riverFouled && v.job != Job.FISHER && rnd.nextDouble() < 0.5) {
+            Villager f = villager(Job.FISHER);
+            s = (f == null ? "On dit" : f.name + " dit") + " que la rivière est sale à cause de " + foulerName(player) + ".";
         } else if (v.needs.food < 8) s = "J'ai faim. Le garde-manger est presque vide.";
         else if (v.job == Job.BUILDER && lastWorld != null && project(lastWorld) >= 0)
             s = "Je bâtis " + Blueprint.title(plan(project(lastWorld)).name) + ". Il me faut du bois, de la pierre et du chaume.";
@@ -652,6 +712,11 @@ public final class Hamlet {
         boolean wanted = false;
         for (short w : wants) wanted |= w == held;
         if (!wanted) return null;
+        if (v.job == Job.FISHER && riverFouled && player.name.equals(fouler)) {
+            String s = "Je ne commerce pas avec qui empoisonne ma rivière.";
+            say(v, s);
+            return v.name + " : " + s;
+        }
         for (short g : gives) {
             if (store.count(g) == 0) continue;
             store.remove(g, 1);
@@ -678,6 +743,10 @@ public final class Hamlet {
         o.addProperty("clock", clock);
         o.addProperty("decorated", decorated);
         o.addProperty("hens", hens);
+        o.addProperty("riverFouled", riverFouled);
+        o.addProperty("owesTrap", owesTrap);
+        o.addProperty("taughtReeds", taughtReeds);
+        if (fouler != null) o.addProperty("fouler", fouler);
         JsonArray hs = new JsonArray();
         for (int[] h : huts) { JsonArray a = new JsonArray(); for (int v : h) a.add(v); hs.add(a); }
         o.add("huts", hs);
@@ -711,6 +780,10 @@ public final class Hamlet {
         clock = o.get("clock").getAsDouble();
         decorated = o.has("decorated") && o.get("decorated").getAsBoolean();
         hens = o.has("hens") && o.get("hens").getAsBoolean();
+        riverFouled = o.has("riverFouled") && o.get("riverFouled").getAsBoolean();
+        owesTrap = o.has("owesTrap") && o.get("owesTrap").getAsBoolean();
+        taughtReeds = o.has("taughtReeds") && o.get("taughtReeds").getAsBoolean();
+        fouler = o.has("fouler") ? o.get("fouler").getAsString() : null;
         for (var h : o.getAsJsonArray("huts")) {
             JsonArray a = h.getAsJsonArray();
             huts.add(new int[] {a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt()});

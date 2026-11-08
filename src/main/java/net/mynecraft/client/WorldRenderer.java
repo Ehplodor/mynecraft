@@ -92,6 +92,7 @@ final class WorldRenderer {
             glUniform1i(shader.uniform("uShadowMap"), 3);
             glUniform1i(shader.uniform("uSceneColor"), 4);
             glUniform1i(shader.uniform("uSceneDepth"), 5);
+            glUniform1i(shader.uniform("uPollution"), 6);
             // Tint colours by type: none, grass, foliage, water. Grass and foliage come from the biome map.
             glUniform3fv(shader.uniform("uTints"), new float[] {
                 1, 1, 1, 0.57f, 0.74f, 0.35f, 0.47f, 0.70f, 0.27f, 0.25f, 0.46f, 0.89f});
@@ -169,6 +170,8 @@ final class WorldRenderer {
     long cullNanos, cullFrames; // CPU time spent selecting and sorting sections (benchmark stats)
 
     private final BiomeMap biomes;
+    /** The water's pollution per patch, read by the water shader. */
+    final PollutionMap pollution = new PollutionMap();
 
     WorldRenderer(World world, int[] faceInfo, TextureArray textures, BiomeMap biomes, int cullRadius) {
         this.world = world;
@@ -452,6 +455,8 @@ final class WorldRenderer {
         glBindTexture(GL_TEXTURE_2D, scene.copyColor());
         glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, scene.copyDepth());
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, pollution.id);
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -591,6 +596,7 @@ final class WorldRenderer {
         glDeleteBuffers(ebo);
         glDeleteTextures(textures.id);
         biomes.dispose();
+        pollution.dispose();
         for (Program p : new Program[] {opaqueProgram, cutoutProgram, translucentProgram}) glDeleteProgram(p.shader.program);
     }
 }

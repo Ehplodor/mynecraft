@@ -88,8 +88,12 @@ public final class Chunk {
         return dirty;
     }
 
+    /** Counts the edits since load or generation (readers compare it to know whether to look again). */
+    public volatile int edits;
+
     public void markDirty() {
         dirty = true;
+        edits++;
     }
 
     public void markClean() {
