@@ -61,6 +61,17 @@ final class SoundEngine {
     private final SplittableRandom random = new SplittableRandom();
     private final ArrayDeque<double[]> thunder = new ArrayDeque<>(); // {time, x, y, z, gain, near}
     private double nextBird = 5, nextDrip = 2, nextOwl = 20, lastTime;
+    /**
+     * Listening (G13, a key held): the near sounds (rain, wind, leaves, insects) fade, the far ones
+     * (running water, the shore, birds, an owl) come out; {@link #notable} is where the most marked
+     * sound comes from, and what it is, for the HUD.
+     */
+    boolean listening;
+    double[] notable;
+    String notableName;
+    private double lastCall;
+    private double[] lastCallAt;
+    private String lastCallName;
     private int reverbSlot, reverb, muffle, preset = -1;
     private boolean checked;
 
@@ -249,22 +260,23 @@ final class SoundEngine {
         float fx = (float) (-Math.sin(yaw) * Math.cos(pitch)), fy = (float) Math.sin(pitch), fz = (float) (-Math.cos(yaw) * Math.cos(pitch));
         alListenerfv(AL_ORIENTATION, new float[] {fx, fy, fz, 0, 1, 0});
 
-        // Targets for the ambient loops.
+        // Targets for the ambient loops (the near ones hushed while listening).
+        float near = listening ? 0.3f : 1, far = listening ? 1.7f : 1;
         float outside = 1 - a.underground;
         float rain = a.snow ? 0 : a.rain * outside;
         float heavy = smooth(0.35f, 0.8f, a.rain);
         float out = a.sheltered ? 0.25f : 1; // outside sounds through walls
-        target("rain_light", a.hail ? 0 : rain * (1 - heavy) * 0.8f * out, dt);
-        target("rain_heavy", a.hail ? 0 : rain * heavy * 0.9f * out, dt);
+        target("rain_light", a.hail ? 0 : rain * (1 - heavy) * 0.8f * out * near, dt);
+        target("rain_heavy", a.hail ? 0 : rain * heavy * 0.9f * out * near, dt);
         target("rain_roof", a.sheltered && !a.hail ? rain * 0.9f : 0, dt);
         target("hail", a.hail ? a.rain * outside * (a.sheltered ? 0.5f : 1) : 0, dt);
         float wind = (float) Math.pow(Math.min(1, Math.max(0, (a.wind - 2f) / 18)), 1.5) * (0.15f + 0.85f * outside);
-        target("wind", wind * 0.5f * out, dt);
-        target("leaves", wind * a.forest * 0.8f * out, dt);
+        target("wind", wind * 0.5f * out * near, dt);
+        target("leaves", wind * a.forest * 0.8f * out * near, dt);
         float night = 1 - smooth(0.2f, 0.6f, a.daylight);
         float dry = 1 - Math.min(1, a.rain * 2), alive = smooth(0.15f, 0.5f, a.warmth), summer = smooth(0.55f, 0.9f, a.warmth);
-        target("crickets", night * a.grass * outside * dry * alive * 0.5f * out, dt);
-        target("insects", (1 - night) * summer * Math.max(a.grass, a.forest * 0.6f) * outside * dry * 0.25f * out, dt);
+        target("crickets", night * a.grass * outside * dry * alive * 0.5f * out * near, dt);
+        target("insects", (1 - night) * summer * Math.max(a.grass, a.forest * 0.6f) * outside * dry * 0.25f * out * near, dt);
         boolean wetland = a.water.length > 0 || a.coast != null;
         target("frogs", wetland ? night * alive * outside * (1 - Math.min(1, a.rain)) * 0.4f * out : 0, dt);
         target("cave", a.underground * 0.7f, dt);
@@ -282,18 +294,28 @@ final class SoundEngine {
                 int s = water[i * 3 + k];
                 boolean on = w != null && (int) w[4] == k;
                 if (on) alSource3f(s, AL_POSITION, (float) w[0], (float) w[1], (float) w[2]);
-                alSourcef(s, AL_GAIN, on ? (float) Math.min(1, w[3]) * (k == 2 ? 1.2f : 0.9f) : 0);
+                alSourcef(s, AL_GAIN, on ? (float) Math.min(1, w[3]) * (k == 2 ? 1.2f : 0.9f) * far : 0);
             }
         }
         if (a.coast != null) alSource3f(surf, AL_POSITION, (float) a.coast[0], (float) a.coast[1], (float) a.coast[2]);
-        alSourcef(surf, AL_GAIN, a.coast != null ? 0.8f : 0);
+        alSourcef(surf, AL_GAIN, a.coast != null ? 0.8f * far : 0);
+        // The most marked sound: a call just heard, else the loudest running water, else the shore.
+        notable = null;
+        if (lastCallAt != null && now - lastCall < 6) { notable = lastCallAt; notableName = lastCallName; }
+        else if (a.water.length > 0) {
+            double[] best = a.water[0];
+            for (double[] w : a.water) if (w[3] > best[3]) best = w;
+            notable = best;
+            notableName = (int) best[4] == 2 ? "une chute d'eau" : (int) best[4] == 1 ? "la rivière" : "un ruisseau";
+        } else if (a.coast != null) { notable = a.coast; notableName = "le ressac"; }
 
         // Birds by day (more in woods), not in rain, not underground.
         if (now >= nextBird) {
             if (a.daylight > 0.45f && a.underground < 0.3f && a.rain < 0.15f && !a.sheltered) {
                 double angle = random.nextDouble() * Math.PI * 2, d = 10 + random.nextDouble() * 22;
-                play("bird", x + Math.cos(angle) * d, y + 4 + random.nextDouble() * 8, z + Math.sin(angle) * d,
-                    0.45f, 0.93f + random.nextFloat() * 0.15f, 60);
+                double bx = x + Math.cos(angle) * d, by = y + 4 + random.nextDouble() * 8, bz = z + Math.sin(angle) * d;
+                play("bird", bx, by, bz, 0.45f * far, 0.93f + random.nextFloat() * 0.15f, 60);
+                call(now, bx, by, bz, "un oiseau");
             }
             nextBird = now + 2 + random.nextDouble() * 9 / ((0.35 + a.forest) * (0.25 + a.warmth)); // a quiet winter
         }
@@ -301,7 +323,8 @@ final class SoundEngine {
         if (now >= nextOwl) {
             if (a.daylight < 0.15f && a.forest > 0.2f && a.underground < 0.3f && a.rain < 0.3f && !a.sheltered) {
                 double angle = random.nextDouble() * Math.PI * 2, d = 18 + random.nextDouble() * 30;
-                play("owl", x + Math.cos(angle) * d, y + 6, z + Math.sin(angle) * d, 0.5f, 0.95f + random.nextFloat() * 0.1f, 80);
+                play("owl", x + Math.cos(angle) * d, y + 6, z + Math.sin(angle) * d, 0.5f * far, 0.95f + random.nextFloat() * 0.1f, 80);
+                call(now, x + Math.cos(angle) * d, y + 6, z + Math.sin(angle) * d, "une chouette");
             }
             nextOwl = now + 12 + random.nextDouble() * 30 / a.forest;
         }
@@ -321,6 +344,25 @@ final class SoundEngine {
             double[] t = thunder.pollFirst();
             play(t[5] > 0 ? "thunder_near" : "thunder_far", t[1], t[2], t[3], (float) t[4], 0.9f + random.nextFloat() * 0.2f, 2000);
         }
+    }
+
+    /** Where (tx, tz) lies for a camera at (x, z) turned to {@code yaw}: "devant", "à droite", "derrière à gauche"... */
+    static String bearing(double yaw, double x, double z, double tx, double tz) {
+        double dx = tx - x, dz = tz - z;
+        double fwd = -dx * Math.sin(yaw) - dz * Math.cos(yaw), right = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+        double a = Math.toDegrees(Math.atan2(right, fwd)), m = Math.abs(a);
+        String side = a > 0 ? "à droite" : "à gauche";
+        if (m < 22.5) return "devant";
+        if (m < 67.5) return "devant " + side;
+        if (m < 112.5) return side;
+        if (m < 157.5) return "derrière " + side;
+        return "derrière";
+    }
+
+    private void call(double now, double x, double y, double z, String name) {
+        lastCall = now;
+        lastCallAt = new double[] {x, y, z};
+        lastCallName = name;
     }
 
     private void target(String loop, float level, double dt) {

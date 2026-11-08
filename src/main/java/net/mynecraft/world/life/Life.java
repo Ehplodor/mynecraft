@@ -53,6 +53,20 @@ public final class Life {
     public final java.util.ArrayDeque<String> notes = new java.util.ArrayDeque<>();
     private double herdDay = Double.NaN;
     private boolean sneaking;
+    /** The wind where the player is (m/s, towards +x and +z): it carries the player's scent (G5). */
+    public double windX, windZ;
+
+    /**
+     * How much farther (or nearer) an animal at (cx, cz) notices the player at (px, pz) with this wind:
+     * up to 1.8 times downwind of the player (the scent comes to it), down to 0.7 upwind (approaching
+     * face to the wind), 1 in a calm. The wind counts fully from 4 m/s.
+     */
+    public static double scent(double px, double pz, double cx, double cz, double wx, double wz) {
+        double dx = cx - px, dz = cz - pz, d = Math.hypot(dx, dz), w = Math.hypot(wx, wz);
+        if (d < 1e-6 || w < 1e-6) return 1;
+        double along = (dx * wx + dz * wz) / (d * w), strength = Math.min(1, w / 4);
+        return 1 + strength * (along > 0 ? 0.8 * along : 0.3 * along);
+    }
 
     public Life(World world, long seed) {
         this.world = world;
@@ -365,7 +379,8 @@ public final class Life {
             heronFlight(c, dt);
             return;
         }
-        double notice = s.fleeRange * (sneaking ? 0.5 : 1) * (s.temper == Species.Temper.WARY ? 0.65 : 1);
+        double notice = s.fleeRange * (sneaking ? 0.5 : 1) * (s.temper == Species.Temper.WARY ? 0.65 : 1)
+            * scent(px, pz, c.x, c.z, windX, windZ);
         Creature predator = nearest(c, 12, o -> o.species.hunts(s) && o.dying <= 0);
         boolean threatened = (dp < notice && s.fleeRange > 0 && !c.tame && !tamingBy(c, dp)) || predator != null || c.hurt > 0;
         double speed = 0;

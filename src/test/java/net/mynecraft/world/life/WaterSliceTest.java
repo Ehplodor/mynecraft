@@ -172,4 +172,15 @@ class WaterSliceTest {
         a.pollution = b.pollution = c.pollution = 0.5;
         assertNull(e.purest());
     }
+
+    @Test
+    void theWindCarriesTheScent() {
+        // Wind blowing east at 5 m/s: an animal east of the player (downwind) smells it from farther.
+        double down = Life.scent(0, 0, 10, 0, 5, 0), up = Life.scent(0, 0, -10, 0, 5, 0), side = Life.scent(0, 0, 0, 10, 5, 0);
+        assertEquals(1.8, down, 1e-9);
+        assertEquals(0.7, up, 1e-9);
+        assertEquals(1, side, 1e-9);
+        assertEquals(1, Life.scent(0, 0, 10, 0, 0, 0), 1e-9); // calm
+        assertEquals(1.4, Life.scent(0, 0, 10, 0, 2, 0), 1e-9); // a breeze counts half
+    }
 }

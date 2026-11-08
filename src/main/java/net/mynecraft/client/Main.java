@@ -339,6 +339,7 @@ public final class Main {
         renderer.creatures = creatureRenderer;
         boolean showcase = argv.contains("--showcase");
         double pollutionTimer = 0;
+        boolean listenDemo = argv.contains("--listen");
         double lifeWait = Double.parseDouble(option(argv.toArray(new String[0]), "--life-seconds", showcase ? "2" : "0")), lifeClock = 0;
         Creature aimed = null;
         Overlay overlay = new Overlay();
@@ -682,6 +683,7 @@ public final class Main {
                         worldMap.open(player.x, player.z);
                         input.capture(false);
                     }
+                    sound.listening = input.heldChar('v') || listenDemo; // V held: listen (G13)
                     if (input.pressedChar('n')) notebook.turn(); // naturalist's notebook: patch, compass, skills, projects
                     if (notebook.open && notebook.page == Notebook.PROJECTS && input.pressedChar('y')) liv.acceptProject();
                     if (input.pressedChar('h')) { // the hearth: centre of the territory the compass watches
@@ -840,6 +842,9 @@ public final class Main {
                     showcase = false;
                 }
                 life.lure = inventory.id(input.slot); // kept animals follow the food in the hand
+                var air = weather.here(); // the wind carries the player's scent to the animals downwind
+                life.windX = air.windX();
+                life.windZ = air.windZ();
                 life.tick(dt, player.x, player.y, player.z, input.shiftDown());
                 for (int[] e : liv.tick(dt, world, player, weather, life, recipes, DayCycle.daylight(ticks), creative, survival,
                     miningProgress > 0)) {
@@ -854,8 +859,8 @@ public final class Main {
                         heron.goalX = at[0] + 0.5;
                         heron.goalY = at[1];
                         heron.goalZ = at[2] + 0.5;
-                        heron.vx = -4;
-                        heron.vz = -4;
+                        heron.state = net.mynecraft.world.life.Creature.State.FLY; // glides in and lands in the shallows
+                        heron.stateTime = 30;
                         sound.splash(at[0] + 0.5, at[1], at[2] + 0.5);
                     }
                 }
@@ -1197,6 +1202,11 @@ public final class Main {
             if (input.selected != shownBlock) {
                 shownBlock = input.selected;
                 blockShownAt = now;
+            }
+            if (sound.listening) { // G13: what the ear finds, and from where
+                String heard = sound.notable == null ? "Vous écoutez... rien de marquant."
+                    : "Vous écoutez : " + sound.notableName + ", " + SoundEngine.bearing(cam.yaw, cam.pos.x, cam.pos.z, sound.notable[0], sound.notable[2]) + ".";
+                hud.textCentered(heard, hud.width() / 2f, hud.height() * 0.3f, 0.85f, 0.9f, 1);
             }
             if (notebook.open && !screenOpen && !worldMap.open) notebook.draw(hud, life, player.x, player.z, liv);
             if (aimedVillager != null && !screenOpen) { // an inhabitant: name, trade, what they say

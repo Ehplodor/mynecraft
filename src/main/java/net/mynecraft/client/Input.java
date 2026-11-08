@@ -110,14 +110,24 @@ final class Input {
      * codes are positions on a US keyboard: M is not where the M is on an AZERTY keyboard).
      */
     boolean pressedChar(char c) {
-        Integer key = keyOfChar.computeIfAbsent(c, ch -> {
+        int key = keyOf(c);
+        return key >= 0 && key <= GLFW_KEY_LAST && pressed(key);
+    }
+
+    /** The key printing this letter is held down (whatever the layout). */
+    boolean heldChar(char c) {
+        int key = keyOf(c);
+        return key >= 0 && key <= GLFW_KEY_LAST && down(key);
+    }
+
+    private int keyOf(char c) {
+        return keyOfChar.computeIfAbsent(c, ch -> {
             for (int k = GLFW_KEY_SPACE; k <= GLFW_KEY_LAST; k++) {
                 String name = glfwGetKeyName(k, 0);
                 if (name != null && name.equalsIgnoreCase(String.valueOf(ch))) return k;
             }
             return GLFW_KEY_A + Character.toLowerCase(ch) - 'a'; // no layout information: US position
         });
-        return key >= 0 && key <= GLFW_KEY_LAST && pressed(key);
     }
 
     boolean shiftDown() {
