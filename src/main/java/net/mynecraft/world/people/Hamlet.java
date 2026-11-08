@@ -66,6 +66,8 @@ public final class Hamlet {
      * whether the herbalist already handed out reeds and a willow cutting.
      */
     public boolean riverFouled, owesTrap, taughtReeds;
+    /** The fisher's river held back upstream by closed sluices (H3: the dispute over the water). */
+    public boolean riverHeld;
     public String fouler;
     private double riverCheck;
 
@@ -252,6 +254,8 @@ public final class Hamlet {
         double x = f.workAt != null ? f.workAt[0] : f.x, z = f.workAt != null ? f.workAt[2] : f.z;
         Ecology.Patch p = ecology.existing(x, z);
         if (p == null) return;
+        if (p.held > 0.3 && !riverHeld) { riverHeld = true; say(f, "L'eau baisse... quelqu'un la retient en amont !"); }
+        else if (p.held < 0.1 && riverHeld) { riverHeld = false; say(f, "L'eau redescend : merci à qui a rouvert la vanne."); }
         if (p.pollution > 0.3) {
             riverFouled = true;
             Flows.Source src = flows == null ? null : flows.pollutedBy(x, z);
@@ -670,6 +674,9 @@ public final class Hamlet {
             s = ("toi".equals(foulerName(player)) ? "C'est toi qui verses tes eaux de tannage dans ma rivière !"
                 : "La rivière est trouble depuis que " + foulerName(player) + " y verse ses eaux sales.")
                 + " Plus une truite ne fraie.";
+        else if (riverHeld && (v.job == Job.FISHER || v.job == Job.BUILDER))
+            s = v.job == Job.FISHER ? "La rivière est basse : une vanne fermée en amont la retient. Les truites manquent d'eau pour frayer."
+                : "Plus assez d'eau pour gâcher le mortier ni faire tourner la roue. Rouvre la vanne, veux-tu ?";
         else if (v.job == Job.HERBALIST && riverFouled && !taughtReeds) {
             taughtReeds = true;
             player.inventory.add(Blocks.REEDS, 4);
@@ -746,6 +753,7 @@ public final class Hamlet {
         o.addProperty("riverFouled", riverFouled);
         o.addProperty("owesTrap", owesTrap);
         o.addProperty("taughtReeds", taughtReeds);
+        o.addProperty("riverHeld", riverHeld);
         if (fouler != null) o.addProperty("fouler", fouler);
         JsonArray hs = new JsonArray();
         for (int[] h : huts) { JsonArray a = new JsonArray(); for (int v : h) a.add(v); hs.add(a); }
@@ -783,6 +791,7 @@ public final class Hamlet {
         riverFouled = o.has("riverFouled") && o.get("riverFouled").getAsBoolean();
         owesTrap = o.has("owesTrap") && o.get("owesTrap").getAsBoolean();
         taughtReeds = o.has("taughtReeds") && o.get("taughtReeds").getAsBoolean();
+        riverHeld = o.has("riverHeld") && o.get("riverHeld").getAsBoolean();
         fouler = o.has("fouler") ? o.get("fouler").getAsString() : null;
         for (var h : o.getAsJsonArray("huts")) {
             JsonArray a = h.getAsJsonArray();

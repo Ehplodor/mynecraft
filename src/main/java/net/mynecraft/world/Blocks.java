@@ -37,8 +37,11 @@ public final class Blocks {
         // a water barrel, a rug
         OAK_TABLE = 140, OAK_CHAIR = 141, LANTERN = 145, LANTERN_OFF = 146, BARREL = 147, RUG = 148,
         // The water's slice: reeds along the banks and the willow (a cutting, its weeping leaves on an oak-like trunk)
-        REEDS = 149, WILLOW_SAPLING = 150, WILLOW_LEAVES = 151;
-    public static final int COUNT = 152; // ids are shorts: up to 32 767 states
+        REEDS = 149, WILLOW_SAPLING = 150, WILLOW_LEAVES = 151,
+        // Sharing the water: a sluice gate (closed: a wall; open: a frame the water flows through), a stone
+        // channel to lead it; the flood's leavings: fertile silt and driftwood
+        SLUICE = 152, SLUICE_OPEN = 153, STONE_CHANNEL = 154, SILT = 155, DRIFTWOOD = 156;
+    public static final int COUNT = 157; // ids are shorts: up to 32 767 states
 
     /**
      * Each id is one block state: a resource name (namespace minecraft) plus its properties, as in
@@ -63,7 +66,7 @@ public final class Blocks {
         "cobblestone_wall", "oak_window", "oak_window", "nest", "nest", "beehive", "beehive", "beehive",
         "oak_door", "oak_door", "oak_door", "oak_door", "oak_door", "oak_door",
         "oak_table", "oak_chair", "oak_chair", "oak_chair", "oak_chair", "lantern", "lantern", "barrel", "rug",
-        "reeds", "willow_sapling", "willow_leaves"};
+        "reeds", "willow_sapling", "willow_leaves", "sluice", "sluice", "stone_channel", "silt", "driftwood"};
     public static final String[] STATE = {"", "", "", "", "", "", "", "axis=y", "", "", "", "", "", "", "", "",
         "axis=x", "axis=z", "type=bottom", "type=top", "type=double", "", "", "", "axis=y",
         "", "", "", "", "axis=y", "axis=x", "axis=z", "",
@@ -83,7 +86,7 @@ public final class Blocks {
         "", "axis=x", "axis=z", "full=false", "full=true", "state=empty", "state=bees", "state=honey",
         "half=lower,axis=z,open=false", "half=lower,axis=z,open=true", "half=upper,axis=x,open=false",
         "half=upper,axis=x,open=true", "half=upper,axis=z,open=false", "half=upper,axis=z,open=true",
-        "", "facing=north", "facing=south", "facing=west", "facing=east", "lit=true", "lit=false", "", "", "", "", ""};
+        "", "facing=north", "facing=south", "facing=west", "facing=east", "lit=true", "lit=false", "", "", "", "", "", "open=false", "open=true", "", "", ""};
 
     public static final byte LAYER_OPAQUE = 0, LAYER_CUTOUT = 1, LAYER_TRANSLUCENT = 2;
     public static final byte SHAPE_NONE = 0, SHAPE_CUBE = 1, SHAPE_CROSS = 2, SHAPE_SLAB_BOTTOM = 3, SHAPE_SLAB_TOP = 4,
@@ -151,6 +154,8 @@ public final class Blocks {
         cutout(WILLOW_LEAVES, 1, true); // silvery green of its own, not the biome's
         plant(REEDS);
         plant(WILLOW_SAPLING);
+        cutout(SLUICE_OPEN, 0, false); // a frame: the water and the eye go through
+        SOLID[SLUICE_OPEN] = false;
         for (short leaves : new short[] {OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES}) {
             cutout(leaves, 1, true);
             TINT[leaves] = TINT_FOLIAGE; // vanilla gives birch and spruce fixed colours; biome foliage here
@@ -220,6 +225,7 @@ public final class Blocks {
         for (int i = 0; i < COUNT; i++) FAMILY[i] = (short) i;
         for (int i = 0; i < COUNT; i++) if (DOOR[i]) FAMILY[i] = OAK_DOOR;
         FAMILY[LANTERN_OFF] = LANTERN;
+        FAMILY[SLUICE_OPEN] = SLUICE;
         for (int f = 1; f < 4; f++) FAMILY[THATCH_ROOF + f] = THATCH_ROOF;
         for (int i = WATER_FLOW_1 - 1; i <= WATER_FALLING; i++) {
             short w = (short) (i == WATER_FLOW_1 - 1 ? WATER : i);
@@ -277,6 +283,11 @@ public final class Blocks {
             SPRUCE_LOG_Z, OAK_PLANKS, BIRCH_PLANKS, SPRUCE_PLANKS, COBBLESTONE, OAK_SLAB, OAK_SLAB_TOP, OAK_SLAB_DOUBLE);
         hardness(0.2f, OAK_LEAVES, BIRCH_LEAVES, SPRUCE_LEAVES, WILLOW_LEAVES);
         hardness(0f, REEDS, WILLOW_SAPLING);
+        hardness(2f, SLUICE, SLUICE_OPEN);
+        DROP[SLUICE_OPEN] = SLUICE;
+        hardness(1.5f, STONE_CHANNEL);
+        hardness(0.5f, SILT);
+        hardness(1.5f, DRIFTWOOD);
         hardness(0.3f, GLASS, GLOWSTONE);
         hardness(0f, SHORT_GRASS, POPPY);
         hardness(3f, COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, DEEPSLATE);
@@ -373,7 +384,12 @@ public final class Blocks {
         TIER[IRON_ORE] = 2;
         TIER[GOLD_ORE] = TIER[DIAMOND_ORE] = TIER[OBSIDIAN] = 3;
         TOOL[ANVIL] = TOOL_PICKAXE;
-        for (short s : new short[] {DIRT, GRASS, SAND, GRAVEL, CLAY, FARMLAND}) {
+        MATTER[STONE_CHANNEL] = M_STONE;
+        TOOL[STONE_CHANNEL] = TOOL_PICKAXE;
+        TIER[STONE_CHANNEL] = 1;
+        MATTER[DRIFTWOOD] = MATTER[SLUICE] = MATTER[SLUICE_OPEN] = M_WOOD;
+        TOOL[DRIFTWOOD] = TOOL[SLUICE] = TOOL[SLUICE_OPEN] = TOOL_AXE;
+        for (short s : new short[] {DIRT, GRASS, SAND, GRAVEL, CLAY, FARMLAND, SILT}) {
             MATTER[s] = M_SOIL;
             TOOL[s] = TOOL_SHOVEL;
         }
@@ -574,6 +590,7 @@ public final class Blocks {
     public static short settled(short id) {
         if (DOOR[id & 0xFFFF]) return withOpen(id, false);
         if (id == LANTERN_OFF) return LANTERN;
+        if (id == SLUICE_OPEN) return SLUICE;
         return id;
     }
 

@@ -40,7 +40,7 @@ public final class Gestures {
     }
 
     /** What a use of the right hand did (for sounds and messages); NONE if nothing. */
-    public enum Use { NONE, ATE, DRANK, PICKED, HOED, SOWED, PLANTED, COMPOSTED, DOOR, SLEPT, HIVE_LOST, SAT, RESTED, LIGHT, REMEDY }
+    public enum Use { NONE, ATE, DRANK, PICKED, HOED, SOWED, PLANTED, COMPOSTED, DOOR, SLEPT, HIVE_LOST, SAT, RESTED, LIGHT, REMEDY, SLUICE }
 
     /**
      * The right hand on the block at (x, y, z) (or on nothing: x = Integer.MIN_VALUE) holding the item
@@ -60,6 +60,10 @@ public final class Gestures {
         if (Blocks.isDoor(target)) { // both halves
             net.mynecraft.world.Doors.toggle(w, x, y, z);
             return Use.DOOR;
+        }
+        if (target == Blocks.SLUICE || target == Blocks.SLUICE_OPEN) { // the gate: hold the water back or let it go
+            w.set(x, y, z, target == Blocks.SLUICE ? Blocks.SLUICE_OPEN : Blocks.SLUICE);
+            return Use.SLUICE;
         }
         if (target == Blocks.LANTERN || target == Blocks.LANTERN_OFF) {
             w.set(x, y, z, target == Blocks.LANTERN ? Blocks.LANTERN_OFF : Blocks.LANTERN);

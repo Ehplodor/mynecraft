@@ -1,6 +1,7 @@
 """The water slice: textures, models and blockstates of the reeds, the willow cutting and the willow
-leaves, the sprite of the willow bark, their French names, and the data (reeds count as thatching
-straw) in the default packs.
+leaves, the sluice gate (closed, open), the stone channel, the silt and the driftwood; the sprite of
+the willow bark; their French names, and the data (reeds count as thatching straw, recipes of the
+gate and the channel) in the default packs.
 
 Usage: python3 tools/gen_water_pack.py   (after gen_default_pack.py, gen_life_pack.py and gen_herd_pack.py; writes only its own files)
 """
@@ -10,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from gen_default_pack import NS, clamp, rgba, save, write_json  # noqa: E402
-from gen_life_pack import DATA, data  # noqa: E402
+from gen_life_pack import DATA, data, shaped  # noqa: E402
 
 
 def blocks():
@@ -53,6 +54,53 @@ def blocks():
     for n in ("reeds", "willow_sapling", "willow_leaves"):
         write_json(f"blockstates/{n}.json", {"variants": {"": {"model": f"minecraft:block/{n}"}}})
 
+    def plank(x, y, r):
+        g = r.randint(-12, 12) - (18 if y % 4 == 3 else 0)
+        return (clamp(150 + g), clamp(112 + g), clamp(66 + g // 2), 255)
+
+    # The sluice gate: closed, a board of planks banded with iron; open, the frame alone (posts and lintel).
+    def closed(x, y, r):
+        if y in (2, 3, 12, 13):
+            return (clamp(95 + r.randint(-8, 8)), clamp(95 + r.randint(-8, 8)), clamp(100 + r.randint(-8, 8)), 255)
+        return plank(x, y, r)
+    save("sluice", rgba(closed, 504))
+
+    def frame(x, y, r):
+        if x <= 2 or x >= 13 or y <= 2:
+            return plank(x, y, r)
+        return (0, 0, 0, 0)
+    save("sluice_open", rgba(frame, 505))
+    write_json("models/block/sluice.json", {"parent": "block/cube_all", "textures": {"all": "block/sluice"}})
+    write_json("models/block/sluice_open.json", {"parent": "block/cube_all", "textures": {"all": "block/sluice_open"}})
+    write_json("blockstates/sluice.json", {"variants": {"open=false": {"model": "minecraft:block/sluice"},
+                                                        "open=true": {"model": "minecraft:block/sluice_open"}}})
+
+    def stone(x, y, r):
+        g = r.randint(-14, 14)
+        return (clamp(125 + g), clamp(125 + g), clamp(128 + g), 255)
+
+    # The stone channel: dressed stone, a groove along the top where the water runs.
+    def channel_top(x, y, r):
+        if 4 <= x <= 11:
+            g = r.randint(-10, 10) - (25 if x in (4, 11) else 10)
+            return (clamp(105 + g), clamp(105 + g), clamp(110 + g), 255)
+        return stone(x, y, r)
+    save("stone_channel_top", rgba(channel_top, 506))
+    save("stone_channel", rgba(lambda x, y, r: stone(x, y, r) if y % 8 != 7 else (95, 95, 98, 255), 507))
+    write_json("models/block/stone_channel.json", {"parent": "block/cube_column",
+                                                   "textures": {"end": "block/stone_channel_top", "side": "block/stone_channel"}})
+
+    # Silt: fine, grey-brown, faintly banded; driftwood: bleached, silver-grey grain.
+    save("silt", rgba(lambda x, y, r: (clamp(128 + r.randint(-9, 9) + (6 if y % 5 == 0 else 0)),
+                                       clamp(112 + r.randint(-9, 9)), clamp(88 + r.randint(-7, 7)), 255), 508))
+    save("driftwood", rgba(lambda x, y, r: (clamp(178 + r.randint(-14, 10) - (22 if x % 5 == 2 else 0)),
+                                            clamp(170 + r.randint(-14, 10) - (22 if x % 5 == 2 else 0)),
+                                            clamp(155 + r.randint(-12, 8) - (20 if x % 5 == 2 else 0)), 255), 509))
+    for n in ("stone_channel", "silt", "driftwood"):
+        if n != "stone_channel":
+            write_json(f"models/block/{n}.json", {"parent": "block/cube_all", "textures": {"all": f"block/{n}"}})
+        write_json(f"blockstates/{n}.json", {"variants": {"": {"model": f"minecraft:block/{n}"}}})
+
 
 def items():
     from PIL import Image
@@ -77,6 +125,10 @@ def names():
     lang["block.minecraft.willow_sapling"] = "Bouture de saule"
     lang["block.minecraft.willow_leaves"] = "Feuilles de saule"
     lang["item.minecraft.willow_bark"] = "Écorce de saule"
+    lang["block.minecraft.sluice"] = "Vanne"
+    lang["block.minecraft.stone_channel"] = "Rigole de pierre"
+    lang["block.minecraft.silt"] = "Limon"
+    lang["block.minecraft.driftwood"] = "Bois flotté"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(lang, f, indent=2, ensure_ascii=False)
         f.write("\n")
@@ -85,6 +137,9 @@ def names():
 def recipes():
     # Reeds thatch a roof as well as straw.
     data("tags/item/thatch_straw.json", {"values": ["minecraft:plant_fiber", "minecraft:wheat", "minecraft:reeds"]})
+    shaped("sluice", ["PIP", "PPP"], {"P": "#planks", "I": "iron_ingot"}, "sluice", skill="building", level=1)
+    shaped("stone_channel", ["C C", "CCC"], {"C": "cobblestone"}, "stone_channel", count=3, skill="building")
+    shaped("oak_planks_from_driftwood", ["D"], {"D": "driftwood"}, "oak_planks", count=2, skill="woodcutting")
     files = []
     for root, _, ns in os.walk(DATA):
         for n in ns:

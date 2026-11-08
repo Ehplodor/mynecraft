@@ -942,7 +942,7 @@ public final class Main {
             boolean interactive = Blocks.isDoor(aimedBlock) || aimedBlock == Blocks.BERRY_BUSH
                 || aimedBlock == Blocks.STRAW_BED || aimedBlock == Blocks.FISH_TRAP_FULL || aimedBlock == Blocks.SNARE_FULL
                 || Blocks.isChair(aimedBlock) || aimedBlock == Blocks.LANTERN || aimedBlock == Blocks.LANTERN_OFF
-                || aimedBlock == Blocks.BARREL;
+                || aimedBlock == Blocks.BARREL || aimedBlock == Blocks.SLUICE || aimedBlock == Blocks.SLUICE_OPEN;
             short heldItem = inventory.id(input.slot);
             boolean used = false;
             if (input.placeRequested && !screenOpen && !paused && hit != null && !creative && !input.shiftDown()
@@ -982,7 +982,7 @@ public final class Main {
                 && aimedBlock != Blocks.BARREL) {
                 var u = liv.use(world, input.slot, new int[] {hit.x(), hit.y(), hit.z()}, null, false, life, null, null, sound); // doors, lanterns, seats
                 if (u == net.mynecraft.world.actor.Gestures.Use.SAT) { player.x = hit.x() + 0.5; player.y = hit.y() + 9 / 16.0; player.z = hit.z() + 0.5; }
-                for (int dy = -1; dy <= 1; dy++) renderer.blockChanged(hit.x(), hit.y() + dy, hit.z());
+                for (int dy = -1; dy <= 1; dy++) { renderer.blockChanged(hit.x(), hit.y() + dy, hit.z()); fluids.blockChanged(hit.x(), hit.y() + dy, hit.z()); }
                 used = true;
             }
             if (used) {
@@ -1043,6 +1043,14 @@ public final class Main {
                         if (!pool && Math.abs(dz) == 4 && Math.abs(dx) <= 6 && (dx & 1) == 0) demoSet(world, renderer, x, gy + 1, z, Blocks.REEDS);
                     }
                 net.mynecraft.world.Growth.willow(world, cx + 9, gy + 1, cz - 5);
+                // A stone channel leaving the pool westwards through an open gate, a field beside it.
+                for (int dx = -8; dx >= -14; dx--) {
+                    demoSet(world, renderer, cx + dx, gy - 1, cz, Blocks.STONE_CHANNEL);
+                    demoSet(world, renderer, cx + dx, gy, cz, dx == -8 ? Blocks.SLUICE_OPEN : Blocks.WATER_FLOW_1);
+                    for (int dz = 2; dz <= 4; dz++) demoSet(world, renderer, cx + dx, gy, cz + dz, Blocks.FARMLAND);
+                    for (int dz = 2; dz <= 4; dz++) demoSet(world, renderer, cx + dx, gy + 1, cz + dz, (short) (Blocks.WHEAT_0 + 1));
+                }
+                demoSet(world, renderer, cx - 8, gy, cz - 2, Blocks.SLUICE);
                 for (int dx = -4; dx <= 4; dx++) for (int dz = -4; dz <= 4; dz++) for (int y = gy + 1; y <= gy + 6; y++)
                     renderer.blockChanged(cx + 9 + dx, y, cz - 5 + dz);
             }

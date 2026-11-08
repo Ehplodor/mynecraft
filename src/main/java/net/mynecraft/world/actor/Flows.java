@@ -125,8 +125,9 @@ public final class Flows {
         }
     }
 
-    /** The river's lowest point about a patch away from (x, z), lower than the river there; null if none. */
-    private double[] downstream(double x, double z) {
+    /** The river's lowest point about a patch away from (x, z), lower than the river there; null if none (or no river). */
+    public double[] downstream(double x, double z) {
+        if (river == null) return null;
         double here = river.at((int) Math.floor(x), (int) Math.floor(z)), best = Double.isNaN(here) ? Double.MAX_VALUE : here;
         double[] at = null;
         for (int a = 0; a < 16; a++)

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "open=false": {
+      "model": "minecraft:block/sluice"
+    },
+    "open=true": {
+      "model": "minecraft:block/sluice_open"
+    }
+  }
+}

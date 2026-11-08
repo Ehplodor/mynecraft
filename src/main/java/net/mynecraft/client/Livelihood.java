@@ -330,7 +330,7 @@ final class Livelihood {
         actor.z = p.z;
         double day = life.eco.day(), phase = life.eco.season().phase();
         flows.day = day;
-        if ((bankTimer -= dt) <= 0) { bankTimer = 1; riverbank.update(w, life.ecology); } // reeds and willows clean the water
+        if ((bankTimer -= dt) <= 0) { bankTimer = 1; riverbank.update(w, life.ecology); net.mynecraft.world.life.Riverbank.hold(life.ecology, flows::downstream); } // reeds and willows clean the water
         actor.skills.rust(day);
         toastLeft -= dt;
         var air = weather.here();
@@ -472,7 +472,8 @@ final class Livelihood {
     void openStation(String name, int[] at, World w, double wind) {
         station = name;
         stationAt = at;
-        power = Power.at(w, at[0], at[1], at[2], wind);
+        Ecology.Patch here = life.ecology.existing(at[0], at[2]);
+        power = Power.at(w, at[0], at[1], at[2], wind, here == null ? 0 : here.held);
     }
 
     void closeStation() {

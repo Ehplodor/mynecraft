@@ -1,4 +1,5 @@
 # The water slice: a pool with reeds and a willow, clear then fouled by a tannery; the notebook's projects page.
 clear --seed 7 --time 6000 --pos -40,~7,30 --view 0,-30 --creative --water-demo --life-seconds 2
 foul --seed 7 --time 6000 --pos -40,~7,30 --view 0,-30 --creative --water-demo --pollute 0.8 --life-seconds 2
+sluice --seed 7 --time 6000 --pos -46,~7,26 --view 30,-50 --creative --water-demo --life-seconds 2
 projects --seed 7 --time 6000 --life-demo --notebook-page 3 --view 0,-20

@@ -71,6 +71,12 @@ public final class Ecology {
         public double pollution;
         /** Reeds (and willows, worth several) along this patch's water: they filter it. Kept by the world, not saved. */
         public double cleaners;
+        /**
+         * Closed sluice gates on the water of this patch (counted from the world), and the share of the
+         * river's flow held back upstream of it (0..0.8, from the gates up to three patches upstream): a
+         * wheel turns slower, the trout spawn less. Neither is saved: the world keeps them.
+         */
+        public double sluices, held;
         /** Trout stop spawning above {@link #SPAWN_STOP} pollution and only start again below {@link #SPAWN_RESUME}. */
         public boolean spawnStopped;
         /** Animals in the patch per species (active ones), and those dormant (hibernating, estivating). */
@@ -313,7 +319,7 @@ public final class Ecology {
         double troutFood = p.aquatic / (p.aquatic + 0.2);
         // Polluted water grows less life and smothers what there is.
         double clean = 1 - p.pollution;
-        p.aquatic = clamp(p.aquatic + (runoff * 20 + 0.02 * warm * p.water) * clean
+        p.aquatic = clamp(p.aquatic + (runoff * 20 + 0.02 * warm * p.water) * clean * (1 - 0.5 * p.held)
             - (0.05 * p.aquatic + 0.15 * p.pollution * p.aquatic + 0.01 * n[trout] * troutFood) * dt);
         // The water cleans itself, faster in the warm and where reeds filter it.
         p.pollution = clamp(p.pollution * Math.exp(-selfCleaning(p, warm) * dt));
@@ -360,7 +366,7 @@ public final class Ecology {
             births[s] = n[s] * b * food * breeding(sp, season.phase()) * Math.max(0, 1 - n[s] / ceiling(p, sp));
             deaths[s] = n[s] * m * (1 + 1.5 * (1 - food));
             if (sp == Species.TROUT) { // fouled water: fewer eggs hatch, then none; fish choke and die
-                births[s] *= p.spawnStopped ? 0 : 1 - p.pollution;
+                births[s] *= p.spawnStopped ? 0 : (1 - p.pollution) * (1 - 0.6 * p.held); // a held river: less to spawn in
                 deaths[s] += n[s] * 0.25 * p.pollution;
             }
             if (!suitable(p, sp)) { births[s] = 0; deaths[s] += n[s] * 0.1; }
