@@ -193,7 +193,7 @@ public final class Growth {
     }
 
     /** A willow: a short oak trunk and a wide, drooping crown of willow leaves. */
-    static void willow(World w, int x, int y, int z) {
+    public static void willow(World w, int x, int y, int z) {
         int top = y + 4;
         for (int dz = -3; dz <= 3; dz++)
             for (int dx = -3; dx <= 3; dx++) {

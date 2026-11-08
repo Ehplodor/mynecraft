@@ -132,4 +132,44 @@ class WaterSliceTest {
         bank.update(w, e);
         assertEquals(1, e.patch(-1, 0).cleaners, 1e-9);
     }
+
+    @Test
+    void theRiversProjectIsAccomplishedAfterThreeCleanDays() throws Exception {
+        net.mynecraft.world.actor.Projects pr = new net.mynecraft.world.actor.Projects();
+        Ecology e = river();
+        Ecology.Patch p = e.patch(0, 0);
+        p.pop[TROUT] = 5;
+        assertNotNull(pr.proposeRiver(10, 10));
+        assertNull(pr.proposeRiver(10, 10), "proposed twice");
+        assertFalse(pr.river(p, 5), "followed before being accepted");
+        assertNotNull(pr.acceptNext());
+        p.pollution = 0.3;
+        assertFalse(pr.river(p, 5));
+        p.pollution = 0.02;
+        assertFalse(pr.river(p, 2));
+        p.pop[TROUT] = 0.5; // the trout gone: the streak starts again
+        assertFalse(pr.river(p, 2));
+        p.pop[TROUT] = 5;
+        assertFalse(pr.river(p, 2));
+        assertTrue(pr.river(p, 1.5));
+        assertEquals(net.mynecraft.world.actor.Projects.State.DONE, pr.get("A2").state);
+        Path f = Files.createTempDirectory("proj").resolve("projects.json");
+        pr.save(f);
+        net.mynecraft.world.actor.Projects back = new net.mynecraft.world.actor.Projects();
+        back.load(f);
+        assertEquals(net.mynecraft.world.actor.Projects.State.DONE, back.get("A2").state);
+        assertEquals(10, back.get("A2").x, 1e-9);
+    }
+
+    @Test
+    void thePurestRiverIsTheCleanestAndLiveliest() {
+        Ecology e = river();
+        Ecology.Patch a = e.patch(0, 0), b = e.patch(1, 0), c = e.patch(2, 0);
+        a.aquatic = b.aquatic = c.aquatic = 0.8;
+        a.pop[TROUT] = 6; b.pop[TROUT] = 2; c.pop[TROUT] = 8;
+        c.pollution = 0.3; // the liveliest, but fouled
+        assertSame(a, e.purest());
+        a.pollution = b.pollution = c.pollution = 0.5;
+        assertNull(e.purest());
+    }
 }

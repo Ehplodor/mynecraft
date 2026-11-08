@@ -88,6 +88,7 @@ final class Livelihood {
             flows.load(worldDir.resolve("flows.bin"));
             growth.load(worldDir.resolve("growth.txt"));
             hamlet.load(worldDir.resolve("hamlet.json"));
+            projects.load(worldDir.resolve("projects.json"));
             life.loadHerd(worldDir.resolve("herd.json"));
         } catch (IOException | RuntimeException e) {
             System.err.println("[life] cannot read the player's life: " + e.getMessage());
@@ -101,6 +102,7 @@ final class Livelihood {
             flows.save(worldDir.resolve("flows.bin"));
             growth.save(worldDir.resolve("growth.txt"));
             hamlet.save(worldDir.resolve("hamlet.json"));
+            projects.save(worldDir.resolve("projects.json"));
             life.saveHerd(worldDir.resolve("herd.json"));
         } catch (IOException e) {
             System.err.println("[life] cannot save the player's life: " + e.getMessage());
@@ -196,6 +198,18 @@ final class Livelihood {
 
     final net.mynecraft.world.life.Riverbank riverbank = new net.mynecraft.world.life.Riverbank();
     private double bankTimer;
+
+    /** The player's projects (aspirations), shown on the notebook's last page. */
+    final net.mynecraft.world.actor.Projects projects = new net.mynecraft.world.actor.Projects();
+    private double lastProjectDay = Double.NaN;
+    /** Set when the river's project was just accomplished: the heron comes (the caller plays the scene). */
+    boolean heronComing;
+
+    /** Accepts the first proposed project (Y, on the notebook's projects page). */
+    void acceptProject() {
+        var p = projects.acceptNext();
+        say(p == null ? "Aucun projet en attente." : "Projet accepté : " + p.title + ".");
+    }
 
     /** Half-hearts a remedy will give back at the next tick. */
     int heal;
@@ -399,6 +413,7 @@ final class Livelihood {
         }
         if (hamlet.founded) {
             hamlet.tick(dt, w, flows, life.ecology, recipes, daylight, raining, day);
+            followProjects(day);
             for (int[] e; (e = hamlet.edits.poll()) != null; ) {
                 changed.add(e);
                 short b = w.get(e[0], e[1], e[2]); // what the inhabitants picked or sowed grows back like the player's
@@ -407,6 +422,26 @@ final class Livelihood {
             }
         }
         return changed;
+    }
+
+    /** Proposes the river's project when the fisher complains, and follows it day by day. */
+    private void followProjects(double day) {
+        var fisher = hamlet.villager(net.mynecraft.world.actor.Job.FISHER);
+        if (hamlet.riverFouled && fisher != null && projects.get(net.mynecraft.world.actor.Projects.RIVER) == null) {
+            double fx = fisher.workAt != null ? fisher.workAt[0] : fisher.x, fz = fisher.workAt != null ? fisher.workAt[2] : fisher.z;
+            projects.proposeRiver(fx, fz);
+            say("Nouveau projet : ramener la rivière à la vie (carnet, page des projets ; Y pour l'accepter).");
+        }
+        if (Double.isNaN(lastProjectDay) || day < lastProjectDay) { lastProjectDay = day; return; }
+        if (day - lastProjectDay < 0.05) return;
+        var a = projects.get(net.mynecraft.world.actor.Projects.RIVER);
+        Ecology.Patch p = a == null ? null : life.ecology.existing(a.x, a.z);
+        if (projects.river(p, day - lastProjectDay)) {
+            p.pop[Species.HERON.ordinal()] = Math.max(1, p.pop[Species.HERON.ordinal()]); // and the herons come back to stay
+            heronComing = true;
+            say("Projet accompli : la rivière revit ! Un héron cendré arrive...");
+        }
+        lastProjectDay = day;
     }
 
     int[] spawn;

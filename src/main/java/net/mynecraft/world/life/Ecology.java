@@ -129,6 +129,24 @@ public final class Ecology {
         return patches.size();
     }
 
+    /** How pure and alive a patch's water is (0 where there is no water or it is fouled): for the purest river (L17). */
+    public static double purity(Patch p) {
+        if (p.water <= 0.1 || p.pollution >= 0.05) return 0;
+        double trout = p.pop[Species.TROUT.ordinal()];
+        return Math.min(1, p.aquatic) * (1 - 10 * p.pollution) * trout / (trout + 2);
+    }
+
+    /** The patch of the territory with the purest, liveliest water (L17 "eau de source"), or null. */
+    public Patch purest() {
+        Patch best = null;
+        double score = 0.05;
+        for (Patch p : patches.values()) {
+            double s = purity(p);
+            if (s > score) { score = s; best = p; }
+        }
+        return best;
+    }
+
     public java.util.Collection<Patch> patches() {
         return patches.values();
     }

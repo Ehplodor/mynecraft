@@ -102,14 +102,16 @@ void main() {
         vec2 bent = suv + n.xz * 0.04 * clamp(thick / 4.0, 0.0, 1.0);
         if (linearDepth(texture(uSceneDepth, bent).r) < linearDepth(gl_FragCoord.z)) bent = suv; // not what is in front
         vec3 under = texture(uSceneColor, bent).rgb;
-        float absorb = 1.0 - exp(-thick * 0.22);
+        vec2 water = texture(uPollution, (vPos.xz + uCamWorld) / 512.0).rg; // pollution, purest-water mark
+        float absorb = 1.0 - exp(-thick * 0.22 * (1.0 - 0.6 * water.g)); // spring water: the bed seen deep down
         vec3 deep = vTint * 0.35 * lit;
         vec3 body = mix(under * mix(vec3(1.0), vTint * 1.4, 0.45), deep, absorb);
         // Fouled water (tannery, dyes): cloudy and brown, the bed no longer seen, a scum drifting on it.
-        float foul = texture(uPollution, (vPos.xz + uCamWorld) / 512.0).r;
+        float foul = water.r;
         if (foul > 0.01) {
             vec2 wp = vPos.xz + uCamWorld;
-            float scum = smoothstep(0.55, 0.9, sin(wp.x * 0.7 + uTime * 0.3) * sin(wp.y * 0.9 - uTime * 0.2) * 0.5 + 0.5);
+            float swirl = sin(wp.x * 1.3 + sin(wp.y * 0.4) * 2.0 + uTime * 0.3) * sin(wp.y * 1.7 + sin(wp.x * 0.5) * 2.0 - uTime * 0.2);
+            float scum = smoothstep(0.6, 0.95, swirl * 0.5 + 0.5);
             vec3 murk = vec3(0.36, 0.30, 0.18) * lit;
             body = mix(body, murk, clamp(foul * 1.4, 0.0, 0.85));
             body = mix(body, vec3(0.55, 0.5, 0.35) * lit, scum * foul * 0.5);

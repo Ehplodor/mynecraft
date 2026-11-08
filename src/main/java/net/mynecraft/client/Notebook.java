@@ -15,18 +15,20 @@ import net.mynecraft.world.life.Vegetation;
  */
 final class Notebook {
     boolean open;
-    /** 0 the patch, 1 the harmony compass and the flows, 2 skills and trades (N turns the pages, then closes). */
+    /** 0 the patch, 1 the harmony compass and the flows, 2 skills and trades, 3 projects (N turns the pages, then closes). */
     int page;
+    static final int PROJECTS = 3;
 
     /** N: next page, closing after the last. */
     void turn() {
         if (!open) { open = true; page = 0; }
-        else if (++page > 2) { open = false; page = 0; }
+        else if (++page > PROJECTS) { open = false; page = 0; }
     }
 
     void draw(Hud hud, Life life, double x, double z, Livelihood me) {
         if (page == 1) compass(hud, life, x, z, me);
         else if (page == 2) skills(hud, me);
+        else if (page == PROJECTS) projects(hud, life, me);
         else draw(hud, life, x, z);
     }
 
@@ -127,6 +129,42 @@ final class Notebook {
         y += line * 0.3f;
         hud.text("Plans connus : " + String.join(", ", me.actor.plans), left, y, 0.8f, 0.85f, 0.8f);
         y += line;
+        hud.text("N : page suivante", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
+    }
+
+    /** The projects (aspirations): proposed, under way, accomplished; and the purest water of the territory. */
+    private void projects(Hud hud, Life life, Livelihood me) {
+        float s = hud.scale, line = hud.lineHeight() + s;
+        float w = Math.min(hud.width() * 0.6f, 330 * s), left = 6 * s, top = 6 * s;
+        float rows = 5.5f + 3.3f * Math.max(1, me.projects.all().size());
+        hud.rect(left - 3 * s, top - 3 * s, w + 6 * s, rows * line + 8 * s, 0.05f, 0.06f, 0.04f, 0.78f);
+        float y = top;
+        hud.text("Projets", left, y, 1, 0.95f, 0.7f);
+        y += line * 1.3f;
+        var all = me.projects.all();
+        if (all.isEmpty()) {
+            hud.text("Aucun projet pour l'instant : écoutez les gens, regardez la nature.", left, y, 0.75f, 0.75f, 0.75f);
+            y += line;
+        }
+        boolean waiting = false;
+        for (var p : all) {
+            String mark = switch (p.state) { case PROPOSED -> "[proposé]"; case ACCEPTED -> "[en cours]"; case DONE -> "[accompli]"; };
+            float c = p.state == net.mynecraft.world.actor.Projects.State.DONE ? 0.6f : 1;
+            hud.text(mark + " " + p.title, left, y, c, c * 0.95f, c * 0.75f);
+            y += line;
+            hud.text("  " + p.goal, left, y, 0.75f, 0.8f, 0.75f);
+            y += line;
+            if (!p.status.isEmpty()) { hud.text("  " + p.status, left, y, 0.6f, 0.85f, 0.95f); y += line; }
+            waiting |= p.state == net.mynecraft.world.actor.Projects.State.PROPOSED;
+            y += line * 0.3f;
+        }
+        var pure = life.ecology.purest();
+        if (pure != null) {
+            hud.text(String.format("Eau de source : la parcelle %d, %d (vers %d, %d), la plus pure et la plus vivante", pure.px, pure.pz,
+                pure.px * Ecology.PATCH + Ecology.PATCH / 2, pure.pz * Ecology.PATCH + Ecology.PATCH / 2), left, y, 0.55f, 0.85f, 1);
+            y += line;
+        }
+        if (waiting) { hud.text("Y : accepter le projet proposé", left, y + line * 0.2f, 0.95f, 0.85f, 0.5f); y += line; }
         hud.text("N : fermer", left, y + line * 0.2f, 0.6f, 0.6f, 0.6f);
     }
 
