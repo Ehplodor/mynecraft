@@ -550,7 +550,7 @@ Fait aussi : **élevage doux**. Trois espèces ajoutées à l'écologie (en fin 
 
 ### ✅ M33 — Énergie et flux de matières (socle)
 Fait : **énergie** (`Power`) : la **roue à aubes** tourne avec l'eau courante et le débit réel du bassin versant (`Hydrology.flow`), le **moulin à vent** avec le vent de l'atmosphère s'il est dégagé ; à défaut, les bras (trois fois plus lent, fatigant). **Transformations** : meule (farine, gravier, sable), scierie (6 planches par bûche), four (fer, verre, pierre, terre cuite, charbon de bois, pain, tarte), enclume (outils de fer au marteau), cuve de tannage. **Déchets** : cendres et scories au sol, eaux usées de la tannerie et de la teinture qui troublent la vie aquatique de la parcelle (les truites en pâtissent).
-Fait aussi : les **eaux usées descendent la rivière** (trois parcelles en aval, moitié moins à chaque fois, l'amont épargné). Reste : logistique (canaux, goulottes, charrettes), force animale, recul de la forêt par le bois de chauffe à grande échelle.
+Fait aussi : les **eaux usées descendent la rivière** (trois parcelles en aval, moitié moins à chaque fois, l'amont épargné). Reste : logistique (goulottes, charrettes ; vanne et rigole faites en M38), force animale, recul de la forêt par le bois de chauffe à grande échelle.
 - Énergie : roue à aubes au débit réel de la rivière, moulin à vent selon le vent de l'atmosphère,
   force animale, bois de chauffe (forêt qui recule si on abat trop)
 - Transformations : meule, four, boulangerie, scierie, forge, fonderie, tannerie, verrerie
@@ -565,6 +565,19 @@ Fait aussi : **tambour** (rythme synthétisé de huit temps), premier **ouvrage 
 - Teintures tirées des plantes et des minéraux, peinture, sculpture, poterie, tissage, instruments
   et musique jouée ; décoration qui nourrit le bien-être et la beauté du lieu
 - Métiers : potier, tisserand, teinturier, artiste, musicien ; œuvres des PNJ dans les hameaux
+
+### ✅ M38 — La tranche de l'eau
+Fait : la boucle de l'eau de bout en bout, sur le backlog chiffré (157 points). **Pollution par parcelle**, qui dure
+(demi-vie de 4 jours selon la chaleur), descend la rivière et garde sa source ; elle étouffe la vie aquatique, les
+truites (frai stoppé à 50 %, repris sous 25 %) et les hérons. **Signes** : eau trouble à l'écran (`PollutionMap`),
+carnet, boussole. **Réparer** : roseaux sauvages et plantés, saule et son écorce, épuration des berges (`Riverbank`).
+**Hameau** : plainte et refus de Corentin, nasse offerte au retour des truites, enseignement d'Anselme, rumeur.
+**Projets** (page du carnet) : A2 « ramener la rivière à la vie », retour du héron, eau de source. **Partager l'eau** :
+vanne, rigole de pierre, débit retenu en aval, dispute de l'eau. **Crue** : déclenchée par les averses, montée et
+retrait sans eau orpheline, laisses de bois flotté, limon fertile, saules qui tiennent la berge. **Vent et écoute**.
+Équilibrage (test) : une saison de tannage arrête le frai sans éteindre les truites, et la rivière revit en une à deux saisons.
+Reste : rigole où l'eau coule dans un bloc creux et emporte les objets (le plan de repli est fait), cri synthétisé du
+héron, débit des rivières dans l'autoépuration, moules d'eau douce.
 
 ## Phase 4 — Une société vivante
 

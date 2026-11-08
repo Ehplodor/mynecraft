@@ -129,6 +129,13 @@ public final class Gestures {
             return winter ? Use.HIVE_LOST : Use.PICKED;
         }
         byte kind = Items.TOOL[held & 0xFFFF];
+        if (kind == Items.TOOL_HOE && target == Blocks.SILT && w.get(x, y + 1, z) == Blocks.AIR) { // the flood's silt: a ready-fed field
+            w.set(x, y, z, Blocks.FARMLAND);
+            if (flows != null) flows.give(Matter.COMPOST, 3, x, z);
+            a.inventory.wearOut(slot);
+            a.skills.practice(Skill.FARMING, 0.5);
+            return Use.HOED;
+        }
         if (kind == Items.TOOL_HOE && (target == Blocks.GRASS || target == Blocks.DIRT) && w.get(x, y + 1, z) == Blocks.AIR) {
             w.set(x, y, z, Blocks.FARMLAND);
             a.inventory.wearOut(slot);

@@ -89,6 +89,7 @@ final class Livelihood {
             growth.load(worldDir.resolve("growth.txt"));
             hamlet.load(worldDir.resolve("hamlet.json"));
             projects.load(worldDir.resolve("projects.json"));
+            flood.load(worldDir.resolve("flood.txt"));
             life.loadHerd(worldDir.resolve("herd.json"));
         } catch (IOException | RuntimeException e) {
             System.err.println("[life] cannot read the player's life: " + e.getMessage());
@@ -103,6 +104,7 @@ final class Livelihood {
             growth.save(worldDir.resolve("growth.txt"));
             hamlet.save(worldDir.resolve("hamlet.json"));
             projects.save(worldDir.resolve("projects.json"));
+            flood.save(worldDir.resolve("flood.txt"));
             life.saveHerd(worldDir.resolve("herd.json"));
         } catch (IOException e) {
             System.err.println("[life] cannot save the player's life: " + e.getMessage());
@@ -198,6 +200,27 @@ final class Livelihood {
 
     final net.mynecraft.world.life.Riverbank riverbank = new net.mynecraft.world.life.Riverbank();
     private double bankTimer;
+
+    /** The flood of the rivers round the player (E7). */
+    final net.mynecraft.world.Flood flood = new net.mynecraft.world.Flood();
+    private double lastFloodDay = Double.NaN, floodTimer;
+
+    /** Rain, the flood's rise and fall, its marks; Corentin's warning. */
+    private void followFlood(double day, double precipitation, World w, Player p, List<int[]> changed) {
+        if (w.generator == null) return;
+        if (!Double.isNaN(lastFloodDay) && day > lastFloodDay && flood.update(day - lastFloodDay, precipitation)) {
+            say("La rivière grossit... l'eau monte sur les berges basses.");
+            var fisher = hamlet.villager(net.mynecraft.world.actor.Job.FISHER);
+            if (fisher != null) hamlet.warnFlood(fisher);
+        }
+        lastFloodDay = day;
+        if ((floodTimer -= 1) > 0 || !flood.active() && flood.flooded() == 0) return;
+        floodTimer = 60; // about every second
+        var hydrology = w.generator.landscape().hydrology();
+        boolean was = flood.active();
+        changed.addAll(flood.apply(w, (int) Math.floor(p.x), (int) Math.floor(p.z), 40, (x, z) -> hydrology.water(x, z) != null));
+        if (was && !flood.active()) say("La crue est passée : du bois flotté, du limon sur les berges.");
+    }
 
     /** The player's projects (aspirations), shown on the notebook's last page. */
     final net.mynecraft.world.actor.Projects projects = new net.mynecraft.world.actor.Projects();
@@ -335,6 +358,7 @@ final class Livelihood {
         toastLeft -= dt;
         var air = weather.here();
         boolean raining = air.precipitation() > 0.1 && air.temperature() > 0;
+        followFlood(day, air.temperature() > 0 ? Math.min(1, air.precipitation() / 0.03) : 0, w, p, changed); // 0.03: a downpour
         double speed = Math.hypot(p.vx, p.vz);
         effort = mining ? 0.6 : speed > 5 ? 1 : speed > 0.5 ? 0.25 : 0;
         if (!creative && !p.flying) {

@@ -72,7 +72,7 @@ public final class Flows {
     }
 
     /** Pollution added to a patch's water by one unit of waste water (a tanned hide, a dyed cloth). */
-    public static final double POLLUTION_PER_POUR = 0.08;
+    public static final double POLLUTION_PER_POUR = 0.12;
 
     /** Who last fouled a patch's water, and from where (the place the waste water was poured). */
     public record Source(String who, double x, double z, double day) {}

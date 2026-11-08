@@ -67,6 +67,8 @@ final class SoundEngine {
      * sound comes from, and what it is, for the HUD.
      */
     boolean listening;
+    /** The rivers in flood (0 calm .. 1 at the crest): their roar grows. */
+    float swell;
     double[] notable;
     String notableName;
     private double lastCall;
@@ -294,7 +296,7 @@ final class SoundEngine {
                 int s = water[i * 3 + k];
                 boolean on = w != null && (int) w[4] == k;
                 if (on) alSource3f(s, AL_POSITION, (float) w[0], (float) w[1], (float) w[2]);
-                alSourcef(s, AL_GAIN, on ? (float) Math.min(1, w[3]) * (k == 2 ? 1.2f : 0.9f) * far : 0);
+                alSourcef(s, AL_GAIN, on ? (float) Math.min(1, w[3]) * (k == 2 ? 1.2f : 0.9f) * far * (1 + swell) : 0);
             }
         }
         if (a.coast != null) alSource3f(surf, AL_POSITION, (float) a.coast[0], (float) a.coast[1], (float) a.coast[2]);

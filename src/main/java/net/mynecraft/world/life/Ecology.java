@@ -44,7 +44,7 @@ public final class Ecology {
      * (bacteria, dilution in the current), faster in the warm. A strong pollution falls under a
      * tenth in about a season (8 days) once the tannery stops.
      */
-    public static final double POLLUTION_HALF_DAYS = 3;
+    public static final double POLLUTION_HALF_DAYS = 4;
     /** Extra cleaning per day for each reed along the water (a willow counts as several), saturating. */
     public static final double REED_CLEANING = 0.03;
     /** Trout spawning stops above this pollution, and resumes only below the second (a threshold, with a lag). */
