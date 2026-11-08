@@ -173,9 +173,15 @@ public final class TerrainGenerator {
                 // Clay in the beds of shallow waters (the potter's earth, M34).
                 if ((ground == Blocks.SAND || ground == Blocks.DIRT || ground == Blocks.GRAVEL) && r % 23 == 0
                     && Blocks.FLUID[c.get(x, h + 1, z) & 0xFFFF] == Blocks.FLUID_WATER) c.set(x, h, z, Blocks.CLAY);
+                short biome = biomes[z * 16 + x];
+                // Wild reeds on the banks, where the ground meets the water (the river's own filter).
+                if ((ground == Blocks.GRASS || ground == Blocks.SAND || ground == Blocks.DIRT) && r % 5 < 3 && c.get(x, h + 1, z) == Blocks.AIR
+                    && biome != Landscape.SNOWY_PLAINS && biome != Landscape.SNOWY_TAIGA && besideWater(c, x, h, z)) {
+                    c.set(x, h + 1, z, Blocks.REEDS);
+                    continue;
+                }
                 if (ground != Blocks.GRASS && ground != Blocks.SNOW_BLOCK) continue;
                 if (c.get(x, h + 1, z) != Blocks.AIR) continue;
-                short biome = biomes[z * 16 + x];
                 int trees = switch (biome) {
                     case Landscape.DARK_FOREST -> 140;
                     case Landscape.FOREST, Landscape.BIRCH_FOREST -> 70;
@@ -212,6 +218,17 @@ public final class TerrainGenerator {
                     c.set(x, h + 1, z, Blocks.BROWN_MUSHROOM);
             }
         }
+    }
+
+    /** Water level with or just below the ground at (x, h, z), within two columns of it (inside the chunk). */
+    private static boolean besideWater(Chunk c, int x, int h, int z) {
+        for (int[] o : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {2, 0}, {-2, 0}, {0, 2}, {0, -2}, {1, 1}, {-1, -1}, {1, -1}, {-1, 1}}) {
+            int nx = x + o[0], nz = z + o[1];
+            if (nx < 0 || nx > 15 || nz < 0 || nz > 15) continue;
+            if (Blocks.FLUID[c.get(nx, h, nz) & 0xFFFF] == Blocks.FLUID_WATER || Blocks.FLUID[c.get(nx, h - 1, nz) & 0xFFFF] == Blocks.FLUID_WATER
+                && c.get(nx, h, nz) == Blocks.AIR) return true;
+        }
+        return false;
     }
 
     /** Big oak: tall trunk and a wide two-layer crown (dense forests). */
